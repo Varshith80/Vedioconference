@@ -1,0 +1,15 @@
+{
+  "name": "cancellation",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{ "name": "phase-3" }],
+  "meta": {
+    "description": "Triggered by Calendly invitee.canceled or by POST /api/bookings/[id]/cancel. Documented in n8n/docs/WORKFLOWS.md §2.6."
+  }
+}

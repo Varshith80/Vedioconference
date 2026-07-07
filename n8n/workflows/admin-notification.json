@@ -1,0 +1,15 @@
+{
+  "name": "admin-notification",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{ "name": "phase-3" }],
+  "meta": {
+    "description": "Resend digest to ADMIN_EMAIL on every important workflow event. Documented in n8n/docs/WORKFLOWS.md §2.7."
+  }
+}

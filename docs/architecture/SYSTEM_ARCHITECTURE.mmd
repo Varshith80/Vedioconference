@@ -1,0 +1,51 @@
+flowchart LR
+    subgraph Browser["Student Browser"]
+        UI[Next.js 15 + React + Tailwind]
+    end
+
+    subgraph Vercel["Vercel"]
+        FE[Next.js App<br/>App Router + RSC + Route Handlers]
+    end
+
+    subgraph Supabase["Supabase Project"]
+        SB_AUTH[Auth<br/>JWT sessions]
+        SB_DB[(PostgreSQL 15<br/>+ RLS)]
+        SB_STORE[Storage<br/>avatars / resources / course-covers]
+    end
+
+    subgraph N8N["n8n (automation)"]
+        WF1[Booking → Payment]
+        WF2[Payment → Zoom]
+        WF3[Confirmation Email]
+        WF4[Reminder T-24h / T-1h]
+        WF5[Reschedule]
+        WF6[Cancellation]
+        WF7[Admin Notification]
+        WF8[Tutor Notification]
+    end
+
+    subgraph ThirdParty["Third-party SaaS"]
+        CAL[Calendly]
+        STR[Stripe]
+        ZM[Zoom]
+        RS[Resend]
+    end
+
+    UI -->|HTTPS| FE
+    FE -->|SSR + RSC| SB_DB
+    FE -->|Auth| SB_AUTH
+    FE -->|upload / download| SB_STORE
+    FE -->|webhook| N8N
+
+    N8N -->|webhook| CAL
+    N8N -->|REST| STR
+    N8N -->|OAuth REST| ZM
+    N8N -->|SMTP| RS
+    N8N -->|service-role| SB_DB
+
+    WF1 --> WF2
+    WF2 --> WF3
+    WF2 --> WF8
+    WF1 --> WF7
+    WF5 --> WF7
+    WF6 --> WF7

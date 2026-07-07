@@ -1,0 +1,15 @@
+{
+  "name": "payment-to-zoom",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{ "name": "phase-3" }],
+  "meta": {
+    "description": "Stripe checkout.session.completed → Zoom meeting → confirmation email. Documented in n8n/docs/WORKFLOWS.md §2.2. Implemented in Phase 3."
+  }
+}

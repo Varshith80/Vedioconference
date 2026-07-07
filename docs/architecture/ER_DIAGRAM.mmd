@@ -1,0 +1,145 @@
+erDiagram
+    auth_users ||--|| profiles            : "1:1"
+    profiles   ||--o{ bookings            : "is student"
+    profiles   ||--o| tutors               : "1:1 tutor profile"
+    profiles   ||--o{ resources            : "uploads"
+    profiles   ||--o{ notifications        : "receives"
+    profiles   ||--o{ subscriptions        : "subscribes"
+    profiles   ||--o{ invoices             : "issued to"
+
+    tutors     ||--o{ course_tutors        : "teaches"
+    courses    ||--o{ course_tutors        : "taught by"
+    courses    ||--o{ resources            : "has"
+    courses    ||--o{ bookings             : "for"
+    courses    ||--o{ subscriptions        : "subscribed"
+
+    bookings   ||--|| payments             : "paid by"
+    bookings   ||--o| meeting_links        : "has Zoom"
+    bookings   ||--o| bookings             : "rescheduled_from"
+    bookings   ||--o{ resource_grants      : "grants access"
+    bookings   ||--o| invoices             : "billed"
+
+    resources  ||--o{ resource_grants      : "granted to"
+
+    payments   ||--o{ invoices             : "produces"
+    subscriptions ||--o{ invoices          : "produces"
+
+    profiles {
+        uuid    id PK
+        citext  email
+        text    full_name
+        text    phone
+        user_role role
+        boolean is_active
+    }
+    tutors {
+        uuid    id PK
+        uuid    profile_id FK
+        text    headline
+        numeric hourly_rate
+        text    calendly_event_uri
+        text    zoom_user_id
+        boolean is_published
+    }
+    courses {
+        uuid    id PK
+        text    slug
+        text    title
+        text    subject
+        text    level
+        text    level_group
+        int     price_cents
+        int     duration_min
+        boolean is_published
+    }
+    bookings {
+        uuid    id PK
+        uuid    student_id FK
+        uuid    tutor_id   FK
+        uuid    course_id  FK
+        booking_status status
+        timestamptz scheduled_start
+        timestamptz scheduled_end
+        text    stripe_session_id
+        text    calendly_event_uri
+        int     amount_cents
+    }
+    payments {
+        uuid    id PK
+        uuid    booking_id FK
+        text    stripe_payment_intent_id
+        payment_status status
+        int     amount_cents
+    }
+    meeting_links {
+        uuid    id PK
+        uuid    booking_id FK
+        text    meeting_id
+        text    join_url
+        text    start_url
+    }
+    resources {
+        uuid    id PK
+        uuid    course_id FK
+        uuid    tutor_id  FK
+        text    title
+        text    file_path
+        text    visibility
+    }
+    notifications {
+        uuid    id PK
+        uuid    user_id FK
+        text    type
+        text    channel
+        timestamptz read_at
+    }
+    audit_logs {
+        uuid    id PK
+        text    table_name
+        uuid    row_id
+        text    action
+        uuid    actor_id
+        jsonb   changes
+    }
+    subscriptions {
+        uuid    id PK
+        uuid    student_id FK
+        uuid    course_id  FK
+        subscription_status status
+        text    stripe_subscription_id
+        timestamptz current_period_end
+    }
+    coupons {
+        uuid    id PK
+        text    code
+        coupon_kind kind
+        int     percent_off
+        int     amount_off_cents
+    }
+    invoices {
+        uuid    id PK
+        uuid    student_id FK
+        uuid    booking_id FK
+        uuid    subscription_id FK
+        invoice_status status
+        int     amount_cents
+    }
+    webhook_events {
+        uuid    id PK
+        text    provider
+        text    event_id
+        text    event_type
+        jsonb   payload
+    }
+    n8n_executions {
+        uuid    id PK
+        text    workflow
+        text    status
+        timestamptz started_at
+    }
+    n8n_dead_letters {
+        uuid    id PK
+        text    workflow
+        jsonb   original_event
+        text    error
+    }

@@ -1,0 +1,35 @@
+{
+  "name": "vedioconference",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Videoconferencing Course Platform – Next.js 15, Supabase, n8n, Calendly, Stripe, Zoom.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm -r lint",
+    "type-check": "pnpm -r type-check",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter web test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css,scss,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json,css,scss,yml,yaml}\"",
+    "db:types": "supabase gen types typescript --local > apps/web/types/database.generated.ts",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "supabase": "^1.200.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

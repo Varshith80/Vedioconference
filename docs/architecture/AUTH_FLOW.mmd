@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    actor U as Student
+    participant FE as Next.js (Browser)
+    participant MW as Next.js Middleware
+    participant SB as Supabase Auth
+    participant DB as Supabase DB (RLS)
+    participant N8N as n8n
+
+    U->>FE: Visit /dashboard
+    FE->>MW: GET /dashboard
+    MW->>SB: auth.getUser() (reads cookie)
+    SB-->>MW: null (no session)
+    MW-->>U: 302 → /auth/login?next=/dashboard
+
+    U->>FE: Submit login form
+    FE->>SB: signInWithPassword(email, password)
+    SB-->>FE: Set-Cookie: sb-access-token, sb-refresh-token
+    FE-->>U: 302 → /dashboard
+    FE->>MW: GET /dashboard (with cookies)
+    MW->>SB: auth.getUser() (refreshes if needed)
+    SB-->>MW: User
+    MW->>DB: SELECT FROM profiles WHERE id=auth.uid()
+    DB-->>MW: Profile row (RLS pass)
+    MW-->>FE: render <DashboardLayout/>
+    FE-->>U: HTML
+
+    Note over U,N8N: From here every server action goes through
+    Note over SB: services that use the user's JWT, so RLS automatically
+    Note over N8N: restricts data to the owner.
+
+    U->>FE: Click "Book a course"
+    FE->>N8N: POST /webhook/booking-init
+    N8N-->>FE: Stripe checkout URL
+    U->>SB: (Stripe-hosted payment) — handled by Stripe
+    N8N-->>DB: INSERT booking, meeting_link
+    N8N-->>U: Confirmation email via Resend

@@ -1,0 +1,15 @@
+{
+  "name": "reschedule",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{ "name": "phase-3" }],
+  "meta": {
+    "description": "Calendly invitee.updated → void old Zoom → new Zoom + Stripe credit. Documented in n8n/docs/WORKFLOWS.md §2.5."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "tutor-notification",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{ "name": "phase-3" }],
+  "meta": {
+    "description": "Notifies tutor with student name, course, and host start_url after payment-to-zoom. Documented in n8n/docs/WORKFLOWS.md §2.8."
+  }
+}

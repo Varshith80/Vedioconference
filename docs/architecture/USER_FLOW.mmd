@@ -1,0 +1,29 @@
+flowchart TD
+    A([Visitor]) --> B{Landing}
+    B -->|Browse courses| C[Catalogue]
+    B -->|Read about| D[About / Tutors]
+    B -->|Sign in| E[Login]
+    B -->|Sign up| F[Register]
+
+    F -->|Email confirm| G[Active account]
+    E --> G
+    G --> H[Dashboard]
+
+    C -->|Click course| I[Course detail]
+    I -->|Choose slot| J[Calendly embed]
+    J -->|Webhook| K[Booking created]
+    K -->|Stripe checkout| L{Payment}
+    L -->|Failed| M[Booking pending]
+    M -->|Retry| L
+    L -->|Succeeded| N[Zoom meeting created]
+    N --> O[Confirmation email]
+    O --> P[Student dashboard: upcoming]
+
+    P -->|T-24h| Q[Reminder email]
+    Q -->|T-1h| R[Reminder email]
+    R -->|At start| S[Join Zoom]
+    S -->|Done| T[Course completed]
+    T --> U[Resource unlocked]
+
+    P -->|Cancel| V[Refund + delete Zoom]
+    P -->|Reschedule| W[New slot, new Zoom]

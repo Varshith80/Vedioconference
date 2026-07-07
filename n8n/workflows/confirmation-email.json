@@ -1,0 +1,15 @@
+{
+  "name": "confirmation-email",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{ "name": "phase-3" }],
+  "meta": {
+    "description": "Internal workflow triggered by payment-to-zoom. Sends Resend confirmation email. Documented in n8n/docs/WORKFLOWS.md §2.3."
+  }
+}
