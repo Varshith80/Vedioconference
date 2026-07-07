@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+﻿import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { stripe } from '@/lib/stripe/client';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -25,14 +25,24 @@ export async function POST(req: NextRequest) {
     if (!user) throw Unauthorized();
 
     const body = checkoutSchema.parse(await req.json());
-    const supabase = createSupabaseServerClient();
-    const { data: course, error: courseError } = await supabase
+    const supabase = await createSupabaseServerClient();
+    const { data: rawCourse, error: courseError } = await supabase
       .from('courses')
       .select('*')
       .eq('id', body.courseId)
       .eq('is_published', true)
       .single();
-    if (courseError || !course) throw BadRequest('Cours introuvable.');
+    if (courseError || !rawCourse) throw BadRequest('Cours introuvable.');
+    // The Database type is permissive (Record<string, unknown>) until
+    // `pnpm db:types` runs; assert the public columns we need.
+    const course = rawCourse as {
+      currency: string;
+      price_cents: number;
+      title: string;
+      subtitle: string | null;
+      id: string;
+      slug: string;
+    };
 
     const session = await stripe().checkout.sessions.create({
       mode: 'payment',

@@ -22,10 +22,11 @@ export async function POST(req: NextRequest) {
     const raw = await req.text();
 
     // Parse the signature header
-    const parts = Object.fromEntries(sigHeader.split(',').map((p) => {
+    const parts: Record<string, string> = {};
+    for (const p of sigHeader.split(',')) {
       const [k, v] = p.split('=');
-      return [k.trim(), v];
-    }));
+      if (k && v) parts[k.trim()] = v;
+    }
     const t = parts.t;
     const v1 = parts.v1;
     if (!t || !v1) throw Unauthorized('Malformed signature.');
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       event_id: eventId,
       event_type: body.event,
       payload: body as unknown as Record<string, unknown>,
-    });
+    } as never);
     if (insertError && (insertError as { code?: string }).code === '23505') {
       return NextResponse.json({ received: true, duplicate: true });
     }
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     logger.info('Calendly webhook received', { event: body.event, eventId });
 
     await admin.from('webhook_events')
-      .update({ processed: true, processed_at: new Date().toISOString() })
+      .update({ processed: true, processed_at: new Date().toISOString() } as never)
       .eq('provider', 'calendly')
       .eq('event_id', eventId);
 

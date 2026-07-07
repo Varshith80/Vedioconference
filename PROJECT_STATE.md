@@ -15,22 +15,22 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 1 — Foundation** → **CLOSED (approved)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint A complete (awaiting approval)**.
 
 ## Current status
 
-🟢 **Ready for Phase 2.**
-Phase 1 has been formally reviewed (`docs/review/PHASE1_REVIEW.md`)
-and approved. All critical and high-severity findings have been
-remediated. The architecture is **frozen** and the repository is
-organised for long-term, multi-session, multi-phase development.
+🟡 **Sprint A of Phase 2 is done.** The marketing site, design
+system, and supporting infrastructure are shipped. `pnpm lint`,
+`pnpm test` (10/10), `pnpm type-check`, and `pnpm build` are
+green. **Awaiting explicit approval before Sprint B** (auth UI +
+dashboard shell).
 
 ## Phase completion summary
 
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| 2 | Marketing site, auth UI, dashboard shell | 🟡 Next | — |
+| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A done | 2026-07-07 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ⏳ | — |
 | 4 | Admin dashboard | ⏳ | — |
 | 5 | Resources, notifications, polish | ⏳ | — |
@@ -266,6 +266,84 @@ vedioconference/
 - **No broken links** as of this commit (validated by the
   consistency audit on 2026-07-07).
 
+## Completed deliverables (Phase 2 — Sprint A)
+
+### Design system & shared atoms
+
+- `apps/web/components/shared/{container,section,heading,page-header,empty-state,loading-spinner,error-state}.tsx` — mobile-first responsive atoms.
+- `apps/web/components/ui/{button,card,badge,input,textarea,label,alert,avatar,separator,dropdown-menu,dialog,skeleton}.tsx` — shadcn-style primitives.
+- `apps/web/tailwind.config.ts` — `sm/md/lg/xl/2xl` breakpoints, brand-indigo + success + warning tokens, container config, `fade-in` / `fade-up` / `accordion-down` animations.
+- `apps/web/styles/globals.css` — HSL tokens, focus-visible ring, `prefers-reduced-motion`, `brand-gradient` and `mesh-gradient` utilities, `text-balance/pretty`, `skip-link` utility.
+
+### Layout
+
+- `apps/web/components/layout/{brand-mark,site-header,site-footer}.tsx` — inline-SVG brand mark, sticky transparent-to-solid header with mobile sheet, footer with legal links.
+
+### Marketing pages (`/`, `/about`, `/pricing`, `/contact`, `/courses`, `/courses/[slug]`, `/tutors`, `/tutors/[slug]`)
+
+- `app/(marketing)/layout.tsx` — RSC, `revalidate=60`, skip-to-content link.
+- `app/(marketing)/page.tsx` — landing (hero + features + tutor preview + testimonials + CTA band + Organization JSON-LD).
+- `app/(marketing)/{about,pricing,contact}/page.tsx` — content + FAQ / contact form / pricing table.
+- `app/(marketing)/courses/page.tsx` + `[slug]/page.tsx` — list and detail with `generateStaticParams` and `generateMetadata`.
+- `app/(marketing)/tutors/page.tsx` + `[slug]/page.tsx` — directory and detail.
+- `app/(marketing)/courses/[slug]/page.tsx` — joined `course_tutors(tutor:tutors(*, profile:profiles(*)))` query.
+
+### Marketing components
+
+- `apps/web/components/marketing/{hero,features-grid,tutor-preview,testimonials,cta-band,pricing-table,course-card,course-detail,tutor-card,tutor-detail,contact-form,jsonld}.tsx`.
+
+### API
+
+- `apps/web/app/api/contact/route.ts` — POST with Zod, in-memory rate limit (5/hr/IP), honeypot, Resend send.
+
+### SEO & metadata
+
+- `apps/web/app/sitemap.ts` — static routes + dynamic `courses` and `tutors` slugs.
+- `apps/web/app/robots.ts` — disallows `/dashboard`, `/admin`, `/api`, `/auth`.
+- `apps/web/app/opengraph-image.tsx` — Edge runtime, 1200×630, gradient + wordmark.
+- `apps/web/public/{logo,icon,favicon}.svg` — inline SVG brand assets.
+- `Organization` / `Course` / `Person` JSON-LD on landing + detail pages.
+
+### Type safety boundary
+
+- `apps/web/types/domain.ts` — strongly-typed `Course`, `Tutor`, `Profile`, `Booking`, `Payment`, etc., derived from the SQL schema. Services cast Supabase rows to these types at the boundary.
+- `apps/web/types/database.generated.ts` — permissive placeholder until `pnpm db:types` runs. `Relationships: []` is intentional so postgrest-js doesn't fall through to `SelectQueryError` (i.e. `never`).
+
+### Build-time safety
+
+- `apps/web/lib/supabase/server.ts` — `createSupabaseServerClient` is now `async` (Next 15 `cookies()` is async) and build-time safe (falls back to a no-op cookie adapter when called from `generateStaticParams`).
+- `apps/web/services/{auth,courses,tutors}.ts` — wrapped the public-data queries in `try/catch` that return `[]` on error so the build is offline-tolerant.
+- `apps/web/services/auth.ts` — `getCurrentUser` returns `null` on error so the marketing layout can render during build.
+- Dynamic routes use `export const dynamic = 'force-dynamic'` so the catalog renders on demand (no static generation against unreachable Supabase in CI).
+
+### Tests
+
+- `apps/web/vitest.config.ts`.
+- `apps/web/tests/unit/{rate-limit,format,contact-schema}.test.ts` — 10 tests, all passing.
+
+### Code quality
+
+- `apps/web/.eslintrc.json` — added the missing `plugins` and `parser` entries (the previous config referenced `@typescript-eslint/*` rules without the plugin installed).
+- `apps/web/components/marketing/contact-form.tsx` — `import type { z }` (the rule flagged it).
+- `apps/web/components/forms/{login,forgot-password,register}-form.tsx` — `import type { z }`, switched from the `@/lib/supabase` barrel to `@/lib/supabase/client` to avoid pulling `next/headers` into the client bundle.
+- `apps/web/components/marketing/pricing-table.tsx` — removed unused `Container` / `Section` / `Heading` imports.
+- `apps/web/app/admin/page.tsx` — escaped the apostrophe in `Vue d'ensemble`.
+- `apps/web/app/api/auth/register/route.ts` — removed unused imports.
+- `apps/web/app/api/courses/route.ts` — removed unused `getCurrentUser` / `Unauthorized`.
+- `apps/web/app/api/webhooks/stripe/route.ts` — `import type Stripe` (used only as a type), removed unused `BadRequest`.
+- `apps/web/app/api/bookings/[id]/cancel/route.ts` — Next 15 async `params`, and `as never` casts on Supabase mutations (see Known limitations).
+- `apps/web/app/api/profile/route.ts` — `as never` cast on `.update()`.
+- `apps/web/app/api/admin/overview/route.ts` — `role` cast.
+- `apps/web/app/admin/layout.tsx` — `role` cast.
+- `apps/web/app/dashboard/page.tsx` — `full_name` cast.
+- `apps/web/app/dashboard/bookings/page.tsx` — defensive cast on the booking row.
+- `apps/web/app/api/webhooks/{calendly,stripe,n8n}/route.ts` — `as never` casts and the Calendly signature parser is now type-safe.
+
+### Removed
+
+- `apps/web/app/page.tsx` — replaced by the `(marketing)` route group.
+- `apps/web/app/marketing/` — a leftover Phase 1 path that conflicted with the new `(marketing)` group.
+
 ## Outstanding technical debt
 
 See `docs/TechnicalDebt.md` for the full list (34 items). The
@@ -282,6 +360,14 @@ highest-impact items:
 | TD-026 | Vitest coverage ≥ 70% | Phase 6 |
 | TD-027 | Playwright e2e | Phase 6 |
 | TD-028 | k6 load test | Phase 6 |
+
+## Known limitations (Sprint A → Sprint B)
+
+- **`Database` type is permissive.** `apps/web/types/database.generated.ts` declares every `Insert` and `Update` as `Record<string, unknown>`. Supabase client mutations in pre-existing Phase 1 routes are typed as `never` for these operations, so each `.insert({...})` / `.update({...})` is wrapped in an `as never` cast. **Fix:** run `pnpm db:types` against a live database; the generated types drop the casts.
+- **The `Database['public']['Tables']['bookings']['Row']` join is hand-rolled** in `services/bookings.ts` and the dashboard page (`(b as { course?: { title?: string } })` cast). When the generated types land, the service should return a typed `BookingWithCourse` interface instead of `Booking[]`.
+- **`generateStaticParams` and `force-dynamic` are mixed.** The current pages opt out of static generation so the build is offline-tolerant; in production we will turn static generation back on and rely on the build-time `try/catch` to surface a real fetch failure (it returns `[]` and the dynamic page is rendered on demand).
+- **No Lighthouse run yet.** Sprint A targets `Performance ≥ 90, Accessibility ≥ 95, SEO ≥ 95, Best Practices ≥ 95`; this needs a Vercel preview URL to measure.
+- **`pnpm db:types` is not run in CI.** It needs a live Supabase project. Once Vercel/Staging has one, generate the types in CI before `pnpm build`.
 
 ## Known risks
 
@@ -308,12 +394,12 @@ green.
 
 ## Estimated overall progress
 
-**~17%** of the project (Phase 1 = ~17% of the 6-phase plan).
+**~25%** of the project (Sprint A of Phase 2 = +8%).
 
 | Phase | Weight | % Complete |
 |---|---|---|
 | 1 | 17% | **17%** ✅ |
-| 2 | 17% | 0% |
+| 2 | 17% | **8%** (Sprint A done) |
 | 3 | 33% | 0% |
 | 4 | 17% | 0% |
 | 5 | 8% | 0% |
@@ -321,4 +407,4 @@ green.
 
 ## Last updated
 
-**2026-07-07** by the Phase 1 architecture review.
+**2026-07-07** by the Sprint A close-out.

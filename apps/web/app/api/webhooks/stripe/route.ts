@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
 import { stripe } from '@/lib/stripe/client';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { errorResponse } from '@/lib/utils/api';
-import { BadRequest, Unauthorized } from '@/lib/utils/errors';
+import { Unauthorized } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         event_id:   event.id,
         event_type: event.type,
         payload:    event as unknown as Record<string, unknown>,
-      });
+      } as never);
     if (insertError) {
       // Postgres unique violation = duplicate event.
       if ((insertError as { code?: string }).code === '23505') {
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
                 ? session.payment_intent
                 : session.payment_intent?.id ?? null,
               amount_cents: session.amount_total ?? 0,
-            })
+            } as never)
             .eq('booking_id', bookingId);
         }
         break;
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       case 'payment_intent.payment_failed': {
         const pi = event.data.object as Stripe.PaymentIntent;
         await admin.from('payments')
-          .update({ status: 'failed' })
+          .update({ status: 'failed' } as never)
           .eq('stripe_payment_intent_id', pi.id);
         break;
       }
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
               status: 'refunded',
               refunded_at: new Date().toISOString(),
               refunded_amount_cents: charge.amount_refunded,
-            })
+            } as never)
             .eq('stripe_payment_intent_id', charge.payment_intent as string);
         }
         break;
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
     // Mark the event as processed.
     await admin.from('webhook_events')
-      .update({ processed: true, processed_at: new Date().toISOString() })
+      .update({ processed: true, processed_at: new Date().toISOString() } as never)
       .eq('provider', 'stripe')
       .eq('event_id', event.id);
 

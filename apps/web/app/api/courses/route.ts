@@ -1,8 +1,6 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { getCurrentUser } from '@/services/auth';
+﻿import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
-import { Unauthorized } from '@/lib/utils/errors';
 
 /** GET /api/courses – public, paginated, filterable. */
 export async function GET(req: NextRequest) {
@@ -14,7 +12,7 @@ export async function GET(req: NextRequest) {
     const page        = Number(searchParams.get('page')     ?? '1');
     const pageSize    = Number(searchParams.get('pageSize') ?? '12');
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     let query = supabase.from('courses').select('*', { count: 'exact' }).eq('is_published', true);
     if (subject)    query = query.eq('subject', subject);
     if (levelGroup) query = query.eq('level_group', levelGroup);

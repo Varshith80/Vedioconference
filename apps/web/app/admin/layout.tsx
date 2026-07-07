@@ -5,7 +5,10 @@ export const metadata = { title: 'Administration' };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireProfile();
-  if (profile.role !== 'admin' && profile.role !== 'super_admin') {
+  // The Database type is permissive (Record<string, unknown>) until
+  // `pnpm db:types` runs; assert the public columns we need.
+  const { role } = profile as { role: string };
+  if (role !== 'admin' && role !== 'super_admin') {
     redirect('/dashboard');
   }
   return <>{children}</>;

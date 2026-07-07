@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { z } from 'zod';
-import { getCurrentUser } from '@/services/auth';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { errorResponse } from '@/lib/utils/api';
-import { BadRequest } from '@/lib/utils/errors';
 import { registerSchema, forgotPasswordSchema } from '@/lib/validations/auth';
 import { logger } from '@/lib/utils/logger';
 

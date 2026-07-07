@@ -1,5 +1,7 @@
 {
   "extends": "next/core-web-vitals",
+  "plugins": ["@typescript-eslint"],
+  "parser": "@typescript-eslint/parser",
   "rules": {
     "no-console": ["warn", { "allow": ["warn", "error"] }],
     "prefer-const": "error",

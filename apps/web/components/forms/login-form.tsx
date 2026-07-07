@@ -5,10 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { loginSchema } from '@/lib/validations/auth';
-import { createSupabaseBrowserClient } from '@/lib/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 type Values = z.infer<typeof loginSchema>;

@@ -1,11 +1,11 @@
-import { NextResponse, type NextRequest } from 'next/server';
+﻿import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
 
 /** GET /api/tutors – public list of published tutors. */
 export async function GET(_req: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from('tutors')
       .select('*, profile:profiles(*)')

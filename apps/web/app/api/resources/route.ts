@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+﻿import { NextResponse, type NextRequest } from 'next/server';
 import { getCurrentUser } from '@/services/auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) throw Unauthorized();
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from('resources')
       .select('*, course:courses(*)')

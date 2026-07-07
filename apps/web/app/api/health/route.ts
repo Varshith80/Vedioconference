@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { stripe } from '@/lib/stripe/client';
 import { resend } from '@/lib/email/client';
@@ -12,7 +12,7 @@ export async function GET() {
 
   // Database
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { error } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
     checks.database = error ? error.message : 'ok';
   } catch (e) { checks.database = (e as Error).message; }

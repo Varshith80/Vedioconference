@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+﻿import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 /**
@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
  * Use in protected pages.
  */
 export async function requireUser() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
   return user;
@@ -16,7 +16,7 @@ export async function requireUser() {
  * Server helper: get the current profile (and role) or redirect.
  */
 export async function requireProfile() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 

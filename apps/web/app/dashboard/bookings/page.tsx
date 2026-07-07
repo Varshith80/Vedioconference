@@ -6,7 +6,10 @@ export const metadata = { title: 'Mes réservations' };
 
 export default async function DashboardBookingsPage() {
   const profile = await requireProfile();
-  const bookings = await getStudentBookings(profile.id);
+  // The Database type is permissive (Record<string, unknown>) until
+  // `pnpm db:types` runs; assert the public columns we need.
+  const { id } = profile as { id: string };
+  const bookings = await getStudentBookings(id);
 
   return (
     <main className="container py-12">
@@ -15,18 +18,30 @@ export default async function DashboardBookingsPage() {
         {bookings.length === 0 && (
           <li className="p-6 text-sm text-muted-foreground">Aucune réservation pour le moment.</li>
         )}
-        {bookings.map((b) => (
-          <li key={b.id} className="flex items-center justify-between p-6">
-            <div>
-              <p className="font-medium">{(b as { course?: { title?: string } }).course?.title ?? 'Cours'}</p>
-              <p className="text-sm text-muted-foreground">{formatDateTime(b.scheduled_start)}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="rounded-full bg-secondary px-3 py-1 text-xs">{b.status}</span>
-              <span className="text-sm font-medium">{formatCents(b.amount_cents, b.currency)}</span>
-            </div>
-          </li>
-        ))}
+        {bookings.map((b) => {
+          const booking = b as {
+            id: string;
+            scheduled_start: string;
+            status: string;
+            course?: { title?: string } | null;
+            amount_cents?: number | null;
+            currency?: string | null;
+          };
+          return (
+            <li key={booking.id} className="flex items-center justify-between p-6">
+              <div>
+                <p className="font-medium">{booking.course?.title ?? 'Cours'}</p>
+                <p className="text-sm text-muted-foreground">{formatDateTime(booking.scheduled_start)}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs">{booking.status}</span>
+                <span className="text-sm font-medium">
+                  {formatCents(booking.amount_cents ?? 0, booking.currency ?? 'EUR')}
+                </span>
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </main>
   );

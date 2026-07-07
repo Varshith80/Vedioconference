@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+﻿import { NextResponse, type NextRequest } from 'next/server';
 import { getCurrentUser } from '@/services/auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
@@ -8,9 +8,12 @@ import { Forbidden, Unauthorized } from '@/lib/utils/errors';
 async function requireAdmin() {
   const user = await getCurrentUser();
   if (!user) throw Unauthorized();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+  // The Database type is permissive (Record<string, unknown>) until
+  // `pnpm db:types` runs; assert the public columns we need.
+  const role = (profile as { role?: string } | null)?.role;
+  if (!profile || (role !== 'admin' && role !== 'super_admin')) {
     throw Forbidden();
   }
   return { user, supabase };

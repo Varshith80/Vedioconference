@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { registerSchema } from '@/lib/validations/auth';
-import { createSupabaseBrowserClient } from '@/lib/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 type Values = z.infer<typeof registerSchema>;
@@ -54,7 +54,7 @@ export function RegisterForm() {
         {errors.password && <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>}
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" {...register('acceptTerms')} /> J'accepte les CGU et la politique de confidentialité.
+        <input type="checkbox" {...register('acceptTerms')} /> J&apos;accepte les CGU et la politique de confidentialité.
       </label>
       {errors.acceptTerms && <p className="text-xs text-destructive">{errors.acceptTerms.message}</p>}
 

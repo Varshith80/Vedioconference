@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+﻿import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getCurrentUser } from '@/services/auth';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     if (!user) throw Unauthorized();
     const { type, token } = verifySchema.parse(await req.json());
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.verifyOtp({ type, token, email: user.email! });
     if (error) throw BadRequest(error.message);
 

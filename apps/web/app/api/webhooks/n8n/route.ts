@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         event_id: String(body.event_id),
         event_type: body.type,
         payload: body,
-      });
+      } as never);
       if (insertError && (insertError as { code?: string }).code === '23505') {
         return NextResponse.json({ received: true, duplicate: true });
       }
@@ -46,9 +46,9 @@ export async function POST(req: NextRequest) {
         const { booking_id, meeting_id, join_url, passcode, host_url, start_url } = body;
         const { error } = await admin.from('meeting_links').upsert({
           booking_id, provider: 'zoom', meeting_id, join_url, passcode, host_url, start_url,
-        }, { onConflict: 'booking_id' });
+        } as never, { onConflict: 'booking_id' });
         if (error) throw error;
-        await admin.from('bookings').update({ status: 'confirmed' }).eq('id', booking_id);
+        await admin.from('bookings').update({ status: 'confirmed' } as never).eq('id', booking_id);
         break;
       }
       case 'payment_succeeded': {
@@ -56,13 +56,13 @@ export async function POST(req: NextRequest) {
         const { error } = await admin.from('payments').update({
           status: 'succeeded', paid_at: new Date().toISOString(),
           stripe_payment_intent_id, stripe_receipt_url, amount_cents,
-        }).eq('id', payment_id);
+        } as never).eq('id', payment_id);
         if (error) throw error;
         break;
       }
       case 'payment_failed': {
         const { payment_id } = body;
-        const { error } = await admin.from('payments').update({ status: 'failed' }).eq('id', payment_id);
+        const { error } = await admin.from('payments').update({ status: 'failed' } as never).eq('id', payment_id);
         if (error) throw error;
         break;
       }
@@ -70,13 +70,14 @@ export async function POST(req: NextRequest) {
         const { booking_id, channel = 'email', type = 'reminder_24h' } = body;
         const { data: booking } = await admin
           .from('bookings').select('student_id').eq('id', booking_id).single();
-        if (booking?.student_id) {
+        const studentId = (booking as { student_id?: string } | null)?.student_id;
+        if (studentId) {
           await admin.from('notifications').insert({
-            user_id: booking.student_id,
+            user_id: studentId,
             type,
             channel,
             payload: body,
-          });
+          } as never);
         }
         break;
       }
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
           workflow: workflow ?? 'unknown',
           original_event: original_event ?? {},
           error: error ?? 'unknown',
-        });
+        } as never);
         break;
       }
       default:

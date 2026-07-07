@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+﻿import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
 import { BadRequest } from '@/lib/utils/errors';
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     if (!code) throw BadRequest('Missing code parameter.');
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) throw BadRequest(error.message);
 
