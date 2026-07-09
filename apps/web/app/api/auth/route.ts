@@ -1,28 +1,43 @@
-﻿import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
 import { BadRequest, Unauthorized } from '@/lib/utils/errors';
 import { loginSchema } from '@/lib/validations/auth';
+import { getAuthProvider } from '@/services/auth/auth-provider-factory';
 
+/**
+ * POST /api/auth – sign in with e-mail + password.
+ *
+ * Delegates to the configured AuthProvider. The cookie set/clear
+ * logic for the B2 Supabase provider will live here; for B1 the
+ * stub writes to `localStorage` and the API just returns success.
+ */
 export async function POST(req: NextRequest) {
   try {
     const body = loginSchema.parse(await req.json());
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.auth.signInWithPassword(body);
-    if (error) throw Unauthorized(error.message);
+    const provider = getAuthProvider();
+    const result = await provider.signInWithPassword(body);
+    if (!result.ok) throw Unauthorized(result.error.message);
     return NextResponse.json({ ok: true });
-  } catch (e) { return errorResponse(e); }
+  } catch (e) {
+    return errorResponse(e);
+  }
 }
 
 const signOutSchema = z.object({ scope: z.enum(['local', 'global']).default('global') });
 
+/**
+ * DELETE /api/auth – sign out.
+ */
 export async function DELETE(req: NextRequest) {
   try {
     const { scope } = signOutSchema.parse(await req.json().catch(() => ({})));
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.auth.signOut({ scope });
-    if (error) throw BadRequest(error.message);
+    const provider = getAuthProvider();
+    const result = await provider.signOut();
+    if (!result.ok) throw BadRequest(result.error.message);
+    void scope; // B2 will use it to scope the cookie clear
     return NextResponse.json({ ok: true });
-  } catch (e) { return errorResponse(e); }
+  } catch (e) {
+    return errorResponse(e);
+  }
 }

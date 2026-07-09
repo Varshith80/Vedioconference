@@ -58,9 +58,15 @@ export function useAuth(): UseAuthValue {
       isAuthenticated: status === 'authenticated',
       signInWithPassword: (input) => unwrap(provider.signInWithPassword(input)),
       signUp: (input) => unwrap(provider.signUp(input)),
-      signOut: () => unwrap(provider.signOut()),
-      resetPasswordForEmail: (input) => unwrap(provider.resetPasswordForEmail(input)),
-      updatePassword: (input) => unwrap(provider.updatePassword(input)),
+      signOut: async () => {
+        await unwrap(provider.signOut());
+      },
+      resetPasswordForEmail: async (input) => {
+        await unwrap(provider.resetPasswordForEmail(input));
+      },
+      updatePassword: async (input) => {
+        await unwrap(provider.updatePassword(input));
+      },
       verifyOtp: (input) => unwrap(provider.verifyOtp(input)),
     }),
     [provider, status, session, unwrap],

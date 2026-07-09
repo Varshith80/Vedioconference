@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { AuthContext, type AuthContextValue } from './auth-context';
 import { getAuthProvider } from './auth-provider-factory';
+import type { AuthSession } from '@/types/auth';
 
 /**
  * Mounts the auth provider into a React tree and tracks the
