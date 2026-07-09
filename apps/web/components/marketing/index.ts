@@ -21,3 +21,8 @@ export { Stat } from './stat';
 export { MethodStep } from './method-step';
 export { LivePill } from './live-pill';
 export { HeroCurve } from './hero-curve';
+
+// Sprint B1 marketing sections used by the new homepage.
+export { LearningPaths } from './learning-paths';
+export { TeachingMethod } from './teaching-method';
+export { KeyFiguresBand } from './key-figures-band';
