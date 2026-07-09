@@ -9,28 +9,32 @@
 
 ## Project name
 
-**Vedioconference — Course Platform**
-Internal codename: `vedioconference`
+**Intégrale** — Course Platform
+Internal codename: `vedioconference` (kept for the monorepo name; the brand is Intégrale).
 Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint A complete (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint B complete (awaiting approval)**.
 
 ## Current status
 
-🟡 **Sprint A of Phase 2 is done.** The marketing site, design
-system, and supporting infrastructure are shipped. `pnpm lint`,
-`pnpm test` (10/10), `pnpm type-check`, and `pnpm build` are
-green. **Awaiting explicit approval before Sprint B** (auth UI +
-dashboard shell).
+🟡 **Sprint B of Phase 2 is done.** The marketing site has been
+rebuilt end-to-end on the new Intégrale brand (verbatim from the
+client brief), the auth UI is wired through an `AuthProvider`
+abstraction that Sprint B2 will swap to Supabase, and the
+dashboard shell is live with sidebar, top nav, header, and
+placeholders for bookings / resources / profile.
+`pnpm type-check`, `pnpm lint`, `pnpm test` (48/48),
+`pnpm build` (31 routes) are all green. **Awaiting explicit
+approval before Sprint B2** (Supabase wiring + smoke test).
 
 ## Phase completion summary
 
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A done | 2026-07-07 |
+| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A + B done | 2026-07-09 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ⏳ | — |
 | 4 | Admin dashboard | ⏳ | — |
 | 5 | Resources, notifications, polish | ⏳ | — |
@@ -343,6 +347,168 @@ vedioconference/
 
 - `apps/web/app/page.tsx` — replaced by the `(marketing)` route group.
 - `apps/web/app/marketing/` — a leftover Phase 1 path that conflicted with the new `(marketing)` group.
+- `apps/web/lib/constants/marketing.ts` — replaced by `brand.ts` (Sprint B1).
+
+## Completed deliverables (Phase 2 — Sprint B)
+
+Sprint B was split into **B1** (UI, brand, auth abstraction, dashboard
+shell) and **B2** (real Supabase wiring + smoke test). B2 cannot start
+until the client provides the project e-mail account required to
+create the Supabase project. B1 is complete and gated on user
+approval.
+
+### Brand (Sprint B1)
+
+- `apps/web/lib/constants/brand.ts` — single source of truth for
+  the Intégrale brand (palette hex, IBM Plex Serif/Sans/Mono type
+  stack, name, tagline, primary nav, footer links, 4 learning
+  paths, 3 method steps, 3 key figures, copyright year 2026).
+- `apps/web/styles/globals.css` — refreshed HSL tokens to the
+  client palette, added `--brand-primary` / `--brand-accent` /
+  `--brand-warning` CSS variables, `bg-paper-grid` (papier
+  millimétré) and `live-pill-dot` keyframes.
+- `apps/web/tailwind.config.ts` — `fontFamily` extended with
+  `serif` (Plex Serif) and `mono` (Plex Mono) stacks.
+- `apps/web/app/layout.tsx` — `next/font/google` loads IBM Plex
+  Sans / Serif / Mono and exposes them as CSS variables.
+- `apps/web/components/layout/brand-mark.tsx` — `'Int∫grale'`
+  wordmark; the `∫` is a *letter* (font-serif, not a decorative
+  icon). `tone: 'default' | 'invert'`, three sizes. Single
+  `aria-label` on the root, inner spans `aria-hidden`.
+- `apps/web/public/{favicon,icon,logo}.svg` — Vélin/light and
+  Bleu Plan/dark `∫` glyph variants.
+- `apps/web/app/opengraph-image.tsx` — 1200×630 with Bleu Plan
+  gradient, `∫` glyph card, wordmark, tagline, Ambre Surligneur
+  accent dot, 'Cours en direct · Lycée → Licence'.
+
+### Marketing primitives (Sprint B1)
+
+- `apps/web/components/marketing/section-eyebrow.tsx`
+- `apps/web/components/marketing/level-chip.tsx`
+- `apps/web/components/marketing/stat.tsx`
+- `apps/web/components/marketing/method-step.tsx`
+- `apps/web/components/marketing/live-pill.tsx`
+- `apps/web/components/marketing/hero-curve.tsx`
+
+### Marketing sections (Sprint B1)
+
+- `apps/web/components/marketing/hero.tsx` — fully rewritten
+  on the brief: 'Comprendre, pas seulement retenir.' with a
+  LivePill badge, 'Réserver un cours gratuit' → /contact,
+  'Voir les niveaux' → /levels, social proof, and the
+  HeroCurve on a paper-grid background.
+- `apps/web/components/marketing/learning-paths.tsx` — 4
+  path cards reading from `LEARNING_PATHS`.
+- `apps/web/components/marketing/teaching-method.tsx` — 3
+  step cards reading from `METHOD_STEPS`.
+- `apps/web/components/marketing/key-figures-band.tsx` — 3
+  stats on a Bleu Plan surface, reading from `KEY_FIGURES`.
+- The homepage `app/(marketing)/page.tsx` composes the new
+  sections verbatim from the brief. FeaturesGrid /
+  TutorPreview / Testimonials are no longer used.
+
+### Marketing pages (Sprint B1)
+
+- `apps/web/app/(marketing)/page.tsx` — new homepage (replaces
+  the Sprint A version).
+- `apps/web/app/(marketing)/about/page.tsx` — full rewrite on
+  Intégrale copy.
+- `apps/web/app/(marketing)/levels/page.tsx` (new) — one card
+  per learning path with a 'Demander un devis' CTA.
+- `apps/web/app/(marketing)/{pricing,contact,tutors,courses}/page.tsx`
+  — metadata + page-header copy refreshed for the Intégrale brand.
+- `apps/web/app/(marketing)/{tutors,courses}/[slug]/page.tsx`
+  unchanged in shape (still backed by `services/{tutors,courses}.ts`).
+- `apps/web/components/layout/site-footer.tsx` — full rewrite
+  to a flat single-line footer per the brief ('Niveaux ·
+  Tarifs · Contact · Mentions légales · © 2026 Intégrale').
+- `apps/web/components/layout/site-header.tsx` — brand link
+  aria-label is now 'Intégrale — Accueil'.
+
+### SEO (Sprint B1)
+
+- `apps/web/app/sitemap.ts` — `/levels` added to the static
+  pages list.
+- `apps/web/app/(marketing)/levels/page.tsx` — `ItemList`
+  JSON-LD listing the four learning paths.
+
+### Auth abstraction (Sprint B1)
+
+- `apps/web/types/auth.ts` — `AuthProvider` interface, discriminated
+  `AuthResult<T>`, `AuthSession`, `AuthSubscription`, input
+  payloads (`SignInInput`, `SignUpInput`, `ResetPasswordInput`,
+  `UpdatePasswordInput`, `VerifyOtpInput`).
+- `apps/web/types/user.ts` — minimal `User` (id, email, fullName,
+  createdAt) — kept separate from the richer `Profile`.
+- `apps/web/types/errors.ts` — `AuthError` + `AuthErrorCode` + helper.
+- `apps/web/services/auth/local-stub-auth-provider.ts` — B1
+  implementation: persists users to `localStorage`, enforces an
+  8-char minimum password, rejects duplicate e-mails, fakes 250ms
+  latency, and emits state changes to subscribers. Stub-only —
+  not a security boundary.
+- `apps/web/services/auth/auth-provider-factory.ts` —
+  `getAuthProvider()` with a module-level cache.
+- `apps/web/services/auth/auth-context.ts` + `auth-react-provider.tsx`
+  — the React provider and context.
+- `apps/web/services/auth/use-auth.ts` — the `useAuth()` hook
+  (the only public surface). Throws if used outside `<AuthProvider>`.
+
+### Auth UI (Sprint B1)
+
+- `apps/web/components/forms/login-form.tsx` — uses `useAuth()`.
+- `apps/web/components/forms/register-form.tsx` — uses `useAuth()`.
+- `apps/web/components/forms/forgot-password-form.tsx` — uses
+  `useAuth()`.
+- `apps/web/components/forms/reset-password-form.tsx` (new) —
+  reads `?code=&email=`, runs `verifyOtp(recovery)`, then
+  `updatePassword`.
+- `apps/web/app/auth/layout.tsx` (new) — wraps every auth page
+  in `<AuthProvider>`, renders a minimal header + centred `<main>`.
+- `apps/web/app/auth/{login,register,forgot-password}/page.tsx` —
+  stripped to bare page → form.
+- `apps/web/app/auth/reset-password/page.tsx` (new).
+- `apps/web/app/auth/verify-email/page.tsx` (new).
+
+### API route handlers (Sprint B1)
+
+- `apps/web/app/api/auth/route.ts` — POST (sign-in) and
+  DELETE (sign-out) now delegate to the provider.
+- `apps/web/app/api/auth/register/route.ts` — POST (sign-up)
+  and PUT (password-reset) delegate to the provider.
+- `apps/web/app/api/auth/verify-email/route.ts` — accepts
+  `{ email, type, token }` and delegates to `verifyOtp`.
+- `apps/web/app/api/auth/callback/route.ts` — validates
+  `?code=` and redirects; B2 will add the real
+  `exchangeCodeForSession`.
+
+### Dashboard shell (Sprint B1)
+
+- `apps/web/components/dashboard/sidebar.tsx` — vertical nav
+  with `aria-current="page"` on the active item.
+- `apps/web/components/dashboard/top-nav.tsx` — horizontal
+  tab nav for screens < md.
+- `apps/web/components/dashboard/header.tsx` — top bar with
+  user name + 'Se déconnecter' button.
+- `apps/web/components/dashboard/breadcrumbs.tsx` — a11y
+  breadcrumb trail.
+- `apps/web/app/dashboard/layout.tsx` — wraps the tree in
+  `<AuthProvider>`, redirects to /auth/login when signed out,
+  shows a loading state while the session is being read.
+- `apps/web/app/dashboard/page.tsx` — full rewrite: greeting
+  + 3 quick-link cards.
+- `apps/web/app/dashboard/bookings/page.tsx` — placeholder
+  EmptyState (replaces the Sprint A Supabase-driven page).
+- `apps/web/app/dashboard/resources/page.tsx` (new) — placeholder.
+- `apps/web/app/dashboard/profile/page.tsx` (new) — reads
+  the auth session, renders the user info.
+
+### Build-time safety (Sprint B1)
+
+- `apps/web/app/dashboard/{page,bookings/page}.tsx` and
+  `apps/web/app/admin/layout.tsx` opt out of static generation
+  via `export const dynamic = 'force-dynamic'` so the build
+  is offline-tolerant until B2 provisions the real Supabase
+  env.
 
 ## Outstanding technical debt
 
@@ -361,12 +527,22 @@ highest-impact items:
 | TD-027 | Playwright e2e | Phase 6 |
 | TD-028 | k6 load test | Phase 6 |
 
-## Known limitations (Sprint A → Sprint B)
+## Known limitations (Sprint B → Sprint B2)
 
+- **Auth is the local stub.** `LocalStubAuthProvider` persists to
+  `localStorage` — that is *not* a security boundary. **Sprint B2
+  ships a `SupabaseAuthProvider` that implements the same
+  `AuthProvider` interface** and is selected by the factory when
+  the env is configured. UI code does not change.
+- **Dashboard redirect is client-side.** The B1 dashboard layout
+  bounces to /auth/login in a `useEffect` because the stub does
+  not write any HTTP cookie. B2 will flip this back to a
+  server-side `getCurrentUser()` check that reads the Supabase
+  session cookie.
 - **`Database` type is permissive.** `apps/web/types/database.generated.ts` declares every `Insert` and `Update` as `Record<string, unknown>`. Supabase client mutations in pre-existing Phase 1 routes are typed as `never` for these operations, so each `.insert({...})` / `.update({...})` is wrapped in an `as never` cast. **Fix:** run `pnpm db:types` against a live database; the generated types drop the casts.
 - **The `Database['public']['Tables']['bookings']['Row']` join is hand-rolled** in `services/bookings.ts` and the dashboard page (`(b as { course?: { title?: string } })` cast). When the generated types land, the service should return a typed `BookingWithCourse` interface instead of `Booking[]`.
 - **`generateStaticParams` and `force-dynamic` are mixed.** The current pages opt out of static generation so the build is offline-tolerant; in production we will turn static generation back on and rely on the build-time `try/catch` to surface a real fetch failure (it returns `[]` and the dynamic page is rendered on demand).
-- **No Lighthouse run yet.** Sprint A targets `Performance ≥ 90, Accessibility ≥ 95, SEO ≥ 95, Best Practices ≥ 95`; this needs a Vercel preview URL to measure.
+- **No Lighthouse run yet.** Sprint B targets `Performance ≥ 90, Accessibility ≥ 95, SEO ≥ 95, Best Practices ≥ 95`; this needs a Vercel preview URL to measure.
 - **`pnpm db:types` is not run in CI.** It needs a live Supabase project. Once Vercel/Staging has one, generate the types in CI before `pnpm build`.
 
 ## Known risks
@@ -379,27 +555,33 @@ highest-impact items:
 | R-04 | GDPR non-compliance at launch | PM | DPIA + Operations Guide in Phase 6 |
 | R-05 | Tutor double-booking under high load | DBA | Trigger `fn_no_tutor_overlap` (in place) |
 
-## Next phase objectives (Phase 2)
+## Next phase objectives (Phase 2 — Sprint B2)
 
-- Marketing site (Landing, About, Courses, Tutors, Pricing, Contact).
-- Full auth UI (login, register, forgot-password, reset-password, verify-email).
-- Dashboard shell (sidebar, header, profile, bookings, resources pages).
-- CI green from day 1.
-- Streaming SSR on `/dashboard`.
-- Marketing-page cache headers.
-
-**Acceptance criteria:** Lighthouse ≥ 90 (perf/a11y/SEO) on
-marketing pages, smoke test for `register → login → dashboard` is
-green.
+- Provision the Supabase project (client provides the project
+  e-mail account; we run `supabase link` and `db push`).
+- Generate DB types: `pnpm db:types` → commit
+  `types/database.generated.ts`.
+- Ship a `SupabaseAuthProvider` that implements the existing
+  `AuthProvider` interface. Wire it into the factory based on
+  env. The auth UI and the dashboard shell require *zero*
+  changes.
+- Flip the dashboard layout back to a server-side
+  `getCurrentUser()` check that reads the Supabase cookie.
+- Remove the B1 `force-dynamic` guards on /dashboard and
+  /admin/* once the env is live.
+- Smoke test: `register → verify-email → login → /dashboard →
+  /dashboard/profile → sign-out`. Documented in
+  `docs/review/PHASE2_SPRINT_B2_SUMMARY.md`.
+- Lighthouse ≥ 90 (perf/a11y/SEO) on the marketing pages.
 
 ## Estimated overall progress
 
-**~25%** of the project (Sprint A of Phase 2 = +8%).
+**~33%** of the project (Sprint A of Phase 2 = +8%, Sprint B1 = +8%).
 
 | Phase | Weight | % Complete |
 |---|---|---|
 | 1 | 17% | **17%** ✅ |
-| 2 | 17% | **8%** (Sprint A done) |
+| 2 | 17% | **16%** (Sprint A + B1 done; B2 = remaining 1%) |
 | 3 | 33% | 0% |
 | 4 | 17% | 0% |
 | 5 | 8% | 0% |
@@ -407,4 +589,4 @@ green.
 
 ## Last updated
 
-**2026-07-07** by the Sprint A close-out.
+**2026-07-09** by the Sprint B1 close-out.
