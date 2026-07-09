@@ -57,7 +57,7 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
       <Container className="flex h-14 items-center justify-between gap-3 sm:h-16">
         <Link
           href="/"
-          aria-label="Vedioconference — Accueil"
+          aria-label="Intégrale — Accueil"
           className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BrandMark />
