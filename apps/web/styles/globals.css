@@ -49,6 +49,15 @@
     --ring: 217 60% 19%;
 
     --radius: 0.625rem;
+
+    /* Canonical brand hex codes. Source of truth lives in
+     * `lib/constants/brand.ts`; these CSS variables are mirrored
+     * here so Tailwind utility classes (e.g. arbitrary-value
+     * `text-[color:var(--brand-primary)]`) can use them without
+     * a Tailwind config change. Keep in sync with the TS module. */
+    --brand-primary: #142B4D;   /* Bleu Plan */
+    --brand-accent:  #1F7A6C;   /* Vert Réactif */
+    --brand-warning: #E8A33D;   /* Ambre Surligneur */
   }
 
   .dark {
@@ -157,4 +166,25 @@
            focus:rounded-md focus:bg-primary focus:px-4 focus:py-2
            focus:text-primary-foreground focus:shadow-lg;
   }
+
+  /* Live-pill pulse — the green dot inside <LivePill />.
+   * Uses box-shadow expansion so the size change does not affect
+   * layout. The `prefers-reduced-motion` block above already
+   * neutralises this for users who request it. */
+  .live-pill-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0.45;
+    transform: scale(1);
+    animation: live-pill-pulse 1.6s ease-out infinite;
+  }
+}
+
+@keyframes live-pill-pulse {
+  0%   { transform: scale(1);   opacity: 0.45; }
+  70%  { transform: scale(2.2); opacity: 0;    }
+  100% { transform: scale(2.2); opacity: 0;    }
 }

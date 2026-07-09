@@ -12,3 +12,12 @@ export { TutorCard } from './tutor-card';
 export { TutorDetail } from './tutor-detail';
 export { ContactForm } from './contact-form';
 export { JsonLd } from './jsonld';
+
+// Sprint B1 marketing primitives. Pulled out of the homepage so
+// they can be reused on /levels, /tutors, and the dashboard shell.
+export { SectionEyebrow } from './section-eyebrow';
+export { LevelChip } from './level-chip';
+export { Stat } from './stat';
+export { MethodStep } from './method-step';
+export { LivePill } from './live-pill';
+export { HeroCurve } from './hero-curve';
