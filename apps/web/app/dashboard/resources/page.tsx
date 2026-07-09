@@ -1,46 +1,44 @@
 import type { Metadata } from 'next';
-import { CalendarRange } from 'lucide-react';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { EmptyState } from '@/components/shared/empty-state';
+import { BookOpen } from 'lucide-react';
 import { BRAND } from '@/lib/constants/brand';
 
 export const metadata: Metadata = {
-  title: `Mes réservations — ${BRAND.name}`,
-  description: 'Vos séances à venir et votre historique.',
+  title: `Ressources — ${BRAND.name}`,
+  description: 'Supports de cours, exercices corrigés, notes partagées.',
 };
 
-// B1: this is a placeholder shell — the B2 sprint will replace
-// it with the real Supabase-backed list.
 export const dynamic = 'force-dynamic';
 
-export default function DashboardBookingsPage() {
+export default function DashboardResourcesPage() {
   return (
-    <Section spacing="default" aria-labelledby="bookings-title">
+    <Section spacing="default" aria-labelledby="resources-title">
       <Container>
         <Breadcrumbs
           items={[
             { label: 'Accueil', href: '/' },
             { label: 'Tableau de bord', href: '/dashboard' },
-            { label: 'Mes réservations' },
+            { label: 'Ressources' },
           ]}
         />
         <div className="mt-3">
-          <Heading id="bookings-title" level="h1" className="text-3xl sm:text-4xl">
-            Mes réservations
+          <Heading id="resources-title" level="h1" className="text-3xl sm:text-4xl">
+            Ressources
           </Heading>
           <p className="mt-2 text-base text-muted-foreground">
-            Vos séances à venir et votre historique.
+            Les supports partagés par vos profs apparaîtront ici.
           </p>
         </div>
 
         <div className="mt-10">
           <EmptyState
-            icon={<CalendarRange className="h-6 w-6" aria-hidden={true} />}
-            title="Aucune réservation pour le moment"
-            description="Vos futures séances apparaîtront ici dès que vous en aurez réservées une."
+            icon={<BookOpen className="h-6 w-6" aria-hidden={true} />}
+            title="Aucune ressource pour l’instant"
+            description="Les PDF, fiches d’exercices et notes de cours partagés pendant vos séances seront listés ici."
           />
         </div>
       </Container>
