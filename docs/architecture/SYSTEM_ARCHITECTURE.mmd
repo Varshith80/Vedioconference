@@ -9,43 +9,64 @@ flowchart LR
 
     subgraph Supabase["Supabase Project"]
         SB_AUTH[Auth<br/>JWT sessions]
-        SB_DB[(PostgreSQL 15<br/>+ RLS)]
+        SB_DB[(PostgreSQL 15<br/>+ RLS<br/>courses, modules, enrollments,<br/>module_progress, module_bookings,<br/>meeting_links, payments, ...)]
         SB_STORE[Storage<br/>avatars / resources / course-covers]
     end
 
-    subgraph N8N["n8n (automation)"]
-        WF1[Booking → Payment]
-        WF2[Payment → Zoom]
-        WF3[Confirmation Email]
-        WF4[Reminder T-24h / T-1h]
-        WF5[Reschedule]
-        WF6[Cancellation]
-        WF7[Admin Notification]
-        WF8[Tutor Notification]
+    subgraph N8N["n8n (only automation layer)"]
+        WF1[enrollment-created]
+        WF2[module-booking-to-zoom]
+        WF3[module-completed]
+        WF4[module-confirmation-email]
+        WF5[module-reminder-scheduler]
+        WF6[module-reschedule]
+        WF7[module-cancellation]
+        WF8[admin-notification]
+        WF9[tutor-notification]
     end
 
     subgraph ThirdParty["Third-party SaaS"]
-        CAL[Calendly]
-        STR[Stripe]
-        ZM[Zoom]
+        CAL[Calendly<br/>one event type per module]
+        STR[Stripe<br/>one Checkout per course]
+        ZM[Zoom<br/>one meeting per module booking]
         RS[Resend]
     end
 
-    UI -->|HTTPS| FE
+    UI -->|browse courses<br/>enroll in a course<br/>book a module| FE
     FE -->|SSR + RSC| SB_DB
     FE -->|Auth| SB_AUTH
     FE -->|upload / download| SB_STORE
-    FE -->|webhook| N8N
 
-    N8N -->|webhook| CAL
+    UI -->|Stripe Checkout redirect<br/>(course payment)| STR
+    UI -->|Calendly inline embed<br/>(per-module slot pick)| CAL
+
+    STR -->|checkout.session.completed| WF1
+    CAL -->|invitee.created| WF2
+    ZM  -->|meeting.ended| WF3
+
     N8N -->|REST| STR
     N8N -->|OAuth REST| ZM
     N8N -->|SMTP| RS
-    N8N -->|service-role| SB_DB
+    N8N -->|service-role key| SB_DB
 
-    WF1 --> WF2
-    WF2 --> WF3
+    WF1 -->|flip enrollment to active<br/>insert module_progress| SB_DB
+    WF2 -->|create module_bookings row<br/>create meeting_links row| SB_DB
+    WF3 -->|flip module_bookings + module_progress<br/>to completed (maybe enrollment too)| SB_DB
+
+    WF2 --> ZM
+    WF6 --> ZM
+    WF7 --> ZM
+
+    WF2 --> WF4
+    WF2 --> WF9
+    WF5 --> RS
+    WF4 --> RS
+    WF7 --> RS
+    WF1 --> WF8
     WF2 --> WF8
-    WF1 --> WF7
-    WF5 --> WF7
-    WF6 --> WF7
+    WF3 --> WF8
+    WF6 --> WF8
+    WF7 --> WF8
+
+    SB_DB -->|read enrollments + modules + progress| FE
+    FE -->|HTML + RSC| UI

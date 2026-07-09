@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { errorResponse } from '@/lib/utils/api';
 import { Unauthorized } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
+import { serverEnv } from '@/lib/env';
 
 /**
  * Stripe inbound webhook.
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get('stripe-signature');
     if (!signature) throw Unauthorized('Missing signature.');
 
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    const secret = serverEnv().STRIPE_WEBHOOK_SECRET;
     if (!secret) throw Unauthorized('Webhook secret not configured.');
 
     const rawBody = await req.text();
@@ -53,8 +54,15 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const bookingId = (session.metadata?.booking_id ?? session.client_reference_id) as string | undefined;
-        if (bookingId) {
+        // Sprint B2: the unit of payment is the *enrollment*
+        // (`enrollment_id`), not the legacy `booking_id`. The
+        // metadata key is now `enrollment_id`; we still accept
+        // `booking_id` from older n8n workflows as a transitional
+        // safety net.
+        const enrollmentId = (session.metadata?.enrollment_id ??
+          session.client_reference_id) as string | undefined;
+        const legacyBookingId = session.metadata?.booking_id as string | undefined;
+        if (enrollmentId) {
           await admin.from('payments')
             .update({
               status: 'succeeded',
@@ -64,7 +72,18 @@ export async function POST(req: NextRequest) {
                 : session.payment_intent?.id ?? null,
               amount_cents: session.amount_total ?? 0,
             } as never)
-            .eq('booking_id', bookingId);
+            .eq('enrollment_id', enrollmentId);
+        } else if (legacyBookingId) {
+          await admin.from('payments')
+            .update({
+              status: 'succeeded',
+              paid_at: new Date().toISOString(),
+              stripe_payment_intent_id: typeof session.payment_intent === 'string'
+                ? session.payment_intent
+                : session.payment_intent?.id ?? null,
+              amount_cents: session.amount_total ?? 0,
+            } as never)
+            .eq('booking_id', legacyBookingId);
         }
         break;
       }

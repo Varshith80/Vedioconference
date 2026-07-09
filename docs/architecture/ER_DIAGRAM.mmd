@@ -1,7 +1,7 @@
 erDiagram
-    auth_users ||--|| profiles            : "1:1"
-    profiles   ||--o{ bookings            : "is student"
-    profiles   ||--o| tutors               : "1:1 tutor profile"
+    auth_users ||--|| profiles             : "1:1"
+    profiles   ||--o{ enrollments          : "enrolls in"
+    profiles   ||--o{ module_bookings      : "books"
     profiles   ||--o{ resources            : "uploads"
     profiles   ||--o{ notifications        : "receives"
     profiles   ||--o{ subscriptions        : "subscribes"
@@ -10,19 +10,29 @@ erDiagram
     tutors     ||--o{ course_tutors        : "teaches"
     courses    ||--o{ course_tutors        : "taught by"
     courses    ||--o{ resources            : "has"
-    courses    ||--o{ bookings             : "for"
+    courses    ||--o{ modules              : "decomposed into"
+    courses    ||--o{ enrollments          : "has students"
     courses    ||--o{ subscriptions        : "subscribed"
 
-    bookings   ||--|| payments             : "paid by"
-    bookings   ||--o| meeting_links        : "has Zoom"
-    bookings   ||--o| bookings             : "rescheduled_from"
-    bookings   ||--o{ resource_grants      : "grants access"
-    bookings   ||--o| invoices             : "billed"
+    modules    ||--o{ module_bookings      : "scheduled as"
+    modules    ||--o{ module_progress      : "tracked by"
+
+    enrollments ||--o{ module_progress     : "contains"
+    enrollments ||--o{ module_bookings     : "authorises"
+    enrollments ||--o| payments            : "paid by"
+    enrollments ||--o{ resource_grants     : "grants access"
+
+    module_bookings ||--|| meeting_links   : "has Zoom"
+    module_bookings ||--o| module_bookings : "rescheduled_from"
+    module_bookings ||--o{ invoices        : "billed"
 
     resources  ||--o{ resource_grants      : "granted to"
 
     payments   ||--o{ invoices             : "produces"
     subscriptions ||--o{ invoices          : "produces"
+
+    %% Legacy / deprecated
+    _bookings_legacy ||--o| meeting_links  : "legacy join (nullable)"
 
     profiles {
         uuid    id PK
@@ -52,28 +62,70 @@ erDiagram
         int     duration_min
         boolean is_published
     }
-    bookings {
+    modules {
+        uuid    id PK
+        uuid    course_id FK
+        int     position
+        text    slug
+        text    title
+        text    description
+        int     duration_min
+        boolean is_published
+        boolean is_preview
+        text    calendly_event_uri
+    }
+    enrollments {
         uuid    id PK
         uuid    student_id FK
-        uuid    tutor_id   FK
         uuid    course_id  FK
+        enrollment_status status
+        text    stripe_session_id
+        text    stripe_payment_intent_id
+        int     amount_cents
+        timestamptz paid_at
+        timestamptz completed_at
+        timestamptz refunded_at
+        int     refunded_amount_cents
+    }
+    module_progress {
+        uuid    id PK
+        uuid    enrollment_id FK
+        uuid    module_id     FK
+        module_progress_status status
+        timestamptz started_at
+        timestamptz completed_at
+    }
+    module_bookings {
+        uuid    id PK
+        uuid    enrollment_id FK
+        uuid    module_id     FK
+        uuid    tutor_id      FK
+        uuid    student_id    FK
         booking_status status
         timestamptz scheduled_start
         timestamptz scheduled_end
-        text    stripe_session_id
         text    calendly_event_uri
-        int     amount_cents
+        text    calendly_invitee_uri
+        text    notes
+        timestamptz cancelled_at
+        uuid    rescheduled_from FK
     }
     payments {
         uuid    id PK
-        uuid    booking_id FK
+        uuid    enrollment_id   FK
+        uuid    module_booking_id FK
+        uuid    booking_id_legacy FK
         text    stripe_payment_intent_id
         payment_status status
         int     amount_cents
+        timestamptz paid_at
+        timestamptz refunded_at
+        int     refunded_amount_cents
     }
     meeting_links {
         uuid    id PK
-        uuid    booking_id FK
+        uuid    module_booking_id FK
+        uuid    booking_id_legacy FK
         text    meeting_id
         text    join_url
         text    start_url
@@ -85,6 +137,11 @@ erDiagram
         text    title
         text    file_path
         text    visibility
+    }
+    resource_grants {
+        uuid    resource_id  FK
+        uuid    enrollment_id FK
+        timestamptz granted_at
     }
     notifications {
         uuid    id PK
@@ -119,7 +176,8 @@ erDiagram
     invoices {
         uuid    id PK
         uuid    student_id FK
-        uuid    booking_id FK
+        uuid    enrollment_id FK
+        uuid    module_booking_id FK
         uuid    subscription_id FK
         invoice_status status
         int     amount_cents
@@ -140,6 +198,6 @@ erDiagram
     n8n_dead_letters {
         uuid    id PK
         text    workflow
-        jsonb   original_event
+        jsonb original_event
         text    error
     }

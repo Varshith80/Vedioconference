@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { Toaster } from '@/components/ui/toaster';
 import { BRAND } from '@/lib/constants/brand';
 import { locales, defaultLocale, type Locale } from '@/i18n';
+import { publicEnv } from '@/lib/env';
 import '../../styles/globals.css';
 
 const sans = IBM_Plex_Sans({
@@ -58,7 +59,7 @@ export async function generateMetadata({
   return {
     title: { default: `${BRAND.name} — ${tagline}`, template: `%s · ${BRAND.name}` },
     description,
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+    metadataBase: new URL(publicEnv().NEXT_PUBLIC_SITE_URL),
     openGraph: {
       type: 'website',
       locale: OG_LOCALE[locale as Locale] ?? OG_LOCALE[defaultLocale],

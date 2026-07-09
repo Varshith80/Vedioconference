@@ -9,21 +9,36 @@ flowchart TD
     E --> G
     G --> H[Dashboard]
 
+    %% Course-level (payment)
     C -->|Click course| I[Course detail]
-    I -->|Choose slot| J[Calendly embed]
-    J -->|Webhook| K[Booking created]
-    K -->|Stripe checkout| L{Payment}
-    L -->|Failed| M[Booking pending]
-    M -->|Retry| L
-    L -->|Succeeded| N[Zoom meeting created]
-    N --> O[Confirmation email]
-    O --> P[Student dashboard: upcoming]
+    I -->|Enroll| I1[Stripe Checkout]
+    I1 -->|Failed| I2[Enrollment pending]
+    I2 -->|Retry| I1
+    I1 -->|Succeeded| I3[enrollment = active]
+    I3 --> H2[Course dashboard]
 
-    P -->|T-24h| Q[Reminder email]
-    Q -->|T-1h| R[Reminder email]
-    R -->|At start| S[Join Zoom]
-    S -->|Done| T[Course completed]
-    T --> U[Resource unlocked]
+    %% Module-level (live session)
+    H2 -->|Pick module| J[Module list]
+    J -->|Choose slot| K[Calendly embed per module]
+    K -->|Webhook| L[module_bookings scheduled]
+    L -->|n8n + Zoom| M[Zoom meeting created]
+    M -->|Confirmation email| N[Student notified]
+    N --> O[Upcoming modules]
 
-    P -->|Cancel| V[Refund + delete Zoom]
-    P -->|Reschedule| W[New slot, new Zoom]
+    O -->|T-24h| P[Reminder email]
+    P -->|T-1h| Q[Reminder email]
+    Q -->|At start| R[Join Zoom]
+    R -->|meeting.ended| S[Module completed]
+    S --> T{All modules<br/>completed?}
+    T -->|No| J
+    T -->|Yes| U[Enrollment completed]
+    U --> V[Course resources unlocked]
+
+    %% Side actions
+    O -->|Cancel a module| W[Zoom voided, no refund]
+    O -->|Reschedule a module| X[New slot, new Zoom]
+    O -->|Refund a course| Y[Stripe refund at course level<br/>enrollment = refunded]
+
+    %% Re-enrollment
+    U -->|Re-enroll| I1
+    Y -->|Re-enroll| I1

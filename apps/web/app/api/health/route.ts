@@ -1,8 +1,8 @@
-﻿import { NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
 import { stripe } from '@/lib/stripe/client';
 import { resend } from '@/lib/email/client';
 import { logger } from '@/lib/utils/logger';
+import { serverEnv } from '@/lib/env';
 
 const startedAt = Date.now();
 
@@ -12,7 +12,7 @@ export async function GET() {
 
   // Database
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClientUntyped();
     const { error } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
     checks.database = error ? error.message : 'ok';
   } catch (e) { checks.database = (e as Error).message; }
@@ -31,7 +31,8 @@ export async function GET() {
 
   // n8n
   try {
-    const url = process.env.N8N_BASE_URL;
+    const env = serverEnv();
+    const url = env.N8N_BASE_URL;
     if (!url) throw new Error('N8N_BASE_URL not configured');
     const res = await fetch(`${url}/healthz`, { signal: AbortSignal.timeout(2000) });
     checks.n8n = res.ok ? 'ok' : `HTTP ${res.status}`;
@@ -39,7 +40,7 @@ export async function GET() {
 
   const allOk = Object.values(checks).every((c) => c === 'ok');
   logger.debug('health', checks);
-  return NextResponse.json(
+  return Response.json(
     {
       status: allOk ? 'ok' : 'degraded',
       checks,

@@ -3,23 +3,31 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { errorResponse } from '@/lib/utils/api';
 import { BadRequest, Unauthorized } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
+import { serverEnv } from '@/lib/env';
 
 /**
  * Generic inbound webhook for n8n.
  * Validates a shared secret, records the event in `webhook_events`
  * for idempotency, then updates the relevant Supabase row.
  *
- * Expected payloads (one endpoint, multiple `type`s):
- *   { type: "meeting_created",   booking_id, ... }
- *   { type: "payment_succeeded", payment_id, ... }
- *   { type: "payment_failed",    payment_id, ... }
- *   { type: "reminder_sent",     booking_id, channel }
+ * Sprint B2 expected payloads (one endpoint, multiple `type`s):
+ *   { type: "meeting_created",   module_booking_id, meeting_id, ... }
+ *   { type: "meeting_created",   booking_id,        ... }   (legacy)
+ *   { type: "payment_succeeded", payment_id,        ... }
+ *   { type: "payment_failed",    payment_id,        ... }
+ *   { type: "reminder_sent",     module_booking_id, channel, type }
+ *   { type: "reminder_sent",     booking_id,        channel, type }   (legacy)
  *   { type: "workflow_failed",   workflow, error, original_event }
+ *
+ * The handler is forward-and-backward compatible: a new payload
+ * with `module_booking_id` is preferred; a legacy payload with
+ * `booking_id` continues to work (writes to `_bookings_legacy`
+ * for `meeting_created` / `reminder_sent`).
  */
 export async function POST(req: NextRequest) {
   try {
     const secret = req.headers.get('x-webhook-secret');
-    if (secret !== process.env.N8N_WEBHOOK_SECRET) throw Unauthorized('Invalid webhook secret.');
+    if (secret !== serverEnv().N8N_WEBHOOK_SECRET) throw Unauthorized('Invalid webhook secret.');
 
     const body = await req.json();
     if (!body?.type) throw BadRequest('Missing event type.');
@@ -43,12 +51,40 @@ export async function POST(req: NextRequest) {
 
     switch (body.type) {
       case 'meeting_created': {
-        const { booking_id, meeting_id, join_url, passcode, host_url, start_url } = body;
+        const { module_booking_id, booking_id, meeting_id, join_url, passcode, host_url, start_url } = body;
+        const id = module_booking_id ?? booking_id;
+        if (!id) {
+          throw BadRequest('meeting_created requires module_booking_id or booking_id.');
+        }
+        // For B2, upsert keyed on module_booking_id when present
+        // (the unique index `uq_meeting_links_module_booking_id`
+        // backs the conflict target). For legacy, fall back to
+        // the `booking_id` conflict target.
+        const onConflict = module_booking_id ? 'module_booking_id' : 'booking_id';
         const { error } = await admin.from('meeting_links').upsert({
-          booking_id, provider: 'zoom', meeting_id, join_url, passcode, host_url, start_url,
-        } as never, { onConflict: 'booking_id' });
+          ...(module_booking_id ? { module_booking_id } : { booking_id }),
+          provider: 'zoom',
+          meeting_id,
+          join_url,
+          passcode,
+          host_url,
+          start_url,
+        } as never, { onConflict });
         if (error) throw error;
-        await admin.from('bookings').update({ status: 'confirmed' } as never).eq('id', booking_id);
+
+        if (module_booking_id) {
+          await admin
+            .from('module_bookings')
+            .update({ status: 'confirmed' } as never)
+            .eq('id', module_booking_id);
+        } else {
+          // Legacy path: write to _bookings_legacy if a row
+          // still exists. Best-effort; missing row is OK.
+          await admin
+            .from('_bookings_legacy')
+            .update({ status: 'confirmed' } as never)
+            .eq('id', booking_id);
+        }
         break;
       }
       case 'payment_succeeded': {
@@ -67,13 +103,26 @@ export async function POST(req: NextRequest) {
         break;
       }
       case 'reminder_sent': {
-        const { booking_id, channel = 'email', type = 'reminder_24h' } = body;
-        const { data: booking } = await admin
-          .from('bookings').select('student_id').eq('id', booking_id).single();
-        const studentId = (booking as { student_id?: string } | null)?.student_id;
-        if (studentId) {
+        const { module_booking_id, booking_id, channel = 'email', type = 'reminder_24h' } = body;
+        let userId: string | null = null;
+        if (module_booking_id) {
+          const { data: mb } = await admin
+            .from('module_bookings')
+            .select('student_id')
+            .eq('id', module_booking_id)
+            .single();
+          userId = (mb as { student_id?: string } | null)?.student_id ?? null;
+        } else {
+          const { data: b } = await admin
+            .from('_bookings_legacy')
+            .select('student_id')
+            .eq('id', booking_id)
+            .single();
+          userId = (b as { student_id?: string } | null)?.student_id ?? null;
+        }
+        if (userId) {
           await admin.from('notifications').insert({
-            user_id: studentId,
+            user_id: userId,
             type,
             channel,
             payload: body,

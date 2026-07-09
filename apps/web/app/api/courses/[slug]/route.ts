@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { type NextRequest } from 'next/server';
+import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
 import { NotFound } from '@/lib/utils/errors';
 
@@ -7,7 +7,7 @@ import { NotFound } from '@/lib/utils/errors';
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   try {
     const { slug } = await params;
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClientUntyped();
     const { data, error } = await supabase
       .from('courses')
       .select('*, course_tutors(tutor:tutors(*, profile:profiles(*)))')
@@ -15,6 +15,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
       .eq('is_published', true)
       .single();
     if (error || !data) throw NotFound('Cours introuvable.');
-    return NextResponse.json({ data });
+    return Response.json({ data });
   } catch (e) { return errorResponse(e); }
 }

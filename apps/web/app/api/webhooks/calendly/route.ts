@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { errorResponse } from '@/lib/utils/api';
 import { BadRequest, Unauthorized } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
+import { serverEnv } from '@/lib/env';
 
 /**
  * Calendly inbound webhook.
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     const sigHeader = req.headers.get('calendly-webhook-signature');
     if (!sigHeader) throw Unauthorized('Missing signature.');
 
-    const key = process.env.CALENDLY_WEBHOOK_SIGNING_KEY;
+    const key = serverEnv().CALENDLY_WEBHOOK_SIGNING_KEY;
     if (!key) throw Unauthorized('Webhook signing key not configured.');
 
     const raw = await req.text();

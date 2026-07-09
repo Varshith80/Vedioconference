@@ -1,5 +1,5 @@
-﻿import { NextResponse, type NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+﻿import { type NextRequest } from 'next/server';
+import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
 
 /** GET /api/courses – public, paginated, filterable. */
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     const page        = Number(searchParams.get('page')     ?? '1');
     const pageSize    = Number(searchParams.get('pageSize') ?? '12');
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClientUntyped();
     let query = supabase.from('courses').select('*', { count: 'exact' }).eq('is_published', true);
     if (subject)    query = query.eq('subject', subject);
     if (levelGroup) query = query.eq('level_group', levelGroup);
@@ -22,6 +22,6 @@ export async function GET(req: NextRequest) {
     const { data, count, error } = await query.range(from, from + pageSize - 1).order('title');
     if (error) throw error;
 
-    return NextResponse.json({ data: data ?? [], total: count ?? 0, page, pageSize });
+    return Response.json({ data: data ?? [], total: count ?? 0, page, pageSize });
   } catch (e) { return errorResponse(e); }
 }

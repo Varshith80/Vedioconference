@@ -36,7 +36,7 @@ export default async function AdminLayout({
   const profile = await requireProfile();
   // The Database type is permissive (Record<string, unknown>) until
   // `pnpm db:types` runs; assert the public columns we need.
-  const { role } = profile as { role: string };
+  const { role } = profile as unknown as { role: string };
   if (role !== 'admin' && role !== 'super_admin') {
     const h = await headers();
     const active = (h.get('x-next-intl-locale') ?? locale) as Locale;

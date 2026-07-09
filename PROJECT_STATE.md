@@ -15,29 +15,40 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint B1 + i18n done (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint B2 done (awaiting approval)**.
 
 ## Current status
 
 🟡 **Sprint B1 (Intégrale brand + marketing + auth abstraction +
-dashboard shell) and the i18n extension (English + French) are
-both done.** The site is now fully bilingual: every page,
-component, form, dashboard surface, and API error message reads
-from a locale-prefixed translation tree. Routing uses
-`/en/...` and `/fr/...` via `next-intl`; English is the default,
-the language switcher in the global header (and the auth and
-dashboard chrome) flips between locales and persists across
-navigation. `pnpm type-check`, `pnpm lint`, `pnpm test`
-(49/49), `pnpm build` (~52 routes) are all green.
-**Awaiting explicit approval before Sprint B2** (Supabase wiring
-+ smoke test).
+dashboard shell), the i18n extension (English + French), and
+Sprint B2 (real Supabase wiring + module-based schema + RLS +
+auth smoke tests) are all done.** The site now uses the real
+`SupabaseAuthProvider` behind the B1 `AuthProvider`
+abstraction; every form, route handler, and dashboard surface
+runs against the live Supabase project. The booking model is
+module-based: a student enrolls in a course (one payment
+covers all modules) and books 60-minute slots per module.
+Eleven B2 RLS policies are verified by a live-Postgres
+harness; the auth flow is verified by a standalone Node
+script. `pnpm type-check`, `pnpm lint`, `pnpm test`
+(49/49), `pnpm build` (54 routes), `scripts/rls-smoke.sh`,
+and `tests/integration/auth-smoke.ts` are all green.
+**Awaiting explicit approval before Sprint C.**
+
+> **Known security follow-up (B2 close-out):**
+> `apps/web/.env.example` contains real Supabase keys. These
+> must be rotated by the project lead and the file rewritten
+> to ship placeholders only. The B2 close-out deliberately
+> does not modify the file; the follow-up is gated on
+> explicit user instruction. See
+> `docs/review/PHASE2_SPRINT_B2_SUMMARY.md` §7.1.
 
 ## Phase completion summary
 
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A + B1 + i18n done | 2026-07-09 |
+| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A + B1 + i18n + B2 done | 2026-07-09 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ⏳ | — |
 | 4 | Admin dashboard | ⏳ | — |
 | 5 | Resources, notifications, polish | ⏳ | — |
@@ -654,6 +665,126 @@ and add the code to the locales list).
   language switcher; the existing tests were rewritten to be
   i18n-aware).
 
+## Completed deliverables (Phase 2 — Sprint B2)
+
+Sprint B2 wired the real Supabase project behind the B1
+`AuthProvider` abstraction and reshaped the booking model
+into the module-based design approved in the B2-3 schema
+delta. The work splits into five pieces: schema, types,
+provider, RLS tests, and integration test.
+
+### Schema (B2-3)
+
+- `supabase/migrations/20260709000000_booking_status_scheduled.sql`
+  — adds `scheduled` to `booking_status`.
+- `supabase/migrations/20260709000001_modules_enrollments.sql`
+  — module-based model: 4 new tables (`modules`,
+  `enrollments`, `module_progress`, `module_bookings`),
+  `_bookings_legacy` (RLS off), reshape of `meeting_links`
+  and `resource_grants`, 11 new RLS policies, 2 SECURITY
+  DEFINER helpers (`is_admin`, `is_tutor_of_course`).
+
+### Supabase wiring (B2-4 + B2-5)
+
+- `apps/web/lib/env.ts` — central `publicEnv()` / `serverEnv()`.
+  No other file calls `process.env` directly.
+- `apps/web/lib/supabase/{client,server,admin}.ts` — every
+  Supabase client reads from `lib/env.ts`. Browser + admin
+  clients are untyped at the boundary; the read paths keep
+  the typed `<Database>` generic.
+- `apps/web/middleware.ts` — added the
+  `SUPABASE_AUTH_PROVIDER` switch + optional-env defaults.
+- `apps/web/services/auth/supabase-auth-provider.ts` —
+  implements the B1 `AuthProvider` interface against
+  `@supabase/supabase-js` 2.110.x. Returns the discriminated
+  `AuthResult<T>` shape.
+- `apps/web/services/auth/auth-provider-factory.ts` —
+  selects `SupabaseAuthProvider` when
+  `SUPABASE_AUTH_PROVIDER=supabase` (default), falls back to
+  `LocalStubAuthProvider` when `local`.
+
+### Module-based API (B2-4)
+
+- `apps/web/services/enrollments.ts` +
+  `apps/web/services/module-bookings.ts` — service layer.
+- `apps/web/app/api/enrollments/route.ts` +
+  `apps/web/app/api/enrollments/[id]/modules/route.ts` —
+  enrollments + module list endpoints.
+- `apps/web/app/api/module-bookings/route.ts` +
+  `apps/web/app/api/module-bookings/[id]/cancel/route.ts` —
+  booking + cancellation endpoints.
+- The legacy `apps/web/app/api/bookings/**` routes are kept
+  for the read-only transition window; they map to
+  `_bookings_legacy`.
+
+### Generated types
+
+- `apps/web/types/database.generated.ts` — regenerated by
+  `pnpm db:types` against the live database (18 tables,
+  fully typed Row/Insert/Update).
+- `apps/web/types/domain.ts` — adds `Module`, `Enrollment`,
+  `ModuleBooking`, `ModuleProgress`,
+  `EnrollmentWithCourse`, `ModuleBookingWithMeeting`.
+
+### RLS smoke tests (B2-7)
+
+- `supabase/tests/rls_smoke_setup.sql` — idempotent fixture
+  (4 users, 1 course, 1 module, 2 enrollments, 1 booking,
+  1 payment, 1 meeting link, 1 resource + grant).
+- `supabase/tests/rls_smoke_assertions.sql` — 11 policy
+  blocks; impersonates admin / tutor / student A / student B
+  via `set_config('request.jwt.claim.sub', …, true)`.
+- `supabase/tests/rls_smoke_teardown.sql` — drops the
+  `rls_smoke` schema and the fixture rows.
+- `supabase/tests/README.md` — how to run.
+- `scripts/rls-smoke.sh` — CI wrapper
+  (`scripts/rls-smoke.sh <env>`).
+
+### Auth integration test (B2-8)
+
+- `apps/web/tests/integration/auth-smoke.ts` — 9 assertions
+  against the live Supabase project. Loads `.env.local`
+  directly (no `dotenv`). Unique e-mail per run. Cleans up
+  the test user on success.
+- `apps/web/tests/integration/README.md` — how to run.
+
+### Server-side session read
+
+- `apps/web/app/[locale]/admin/layout.tsx` — server-side
+  `requireProfile()` via `createSupabaseServerClient`; no
+  more client-side bounce.
+- `apps/web/app/[locale]/layout.tsx` — the
+  `dynamic = 'force-dynamic'` opt-out is removed.
+
+### Documentation
+
+- `docs/architecture/Architecture.md` — B2-3 schema delta.
+- `docs/architecture/{SYSTEM,AUTH,USER,ER}*.mmd` — updated
+  diagrams.
+- `docs/database/Database.md` — B2-3 tables + RLS.
+- `docs/api/API.md` — 25 routes (was 21).
+- `docs/BookingFlow.md` — module-based flow.
+- `n8n/docs/WORKFLOWS.md` — module_*_id field shape.
+- `supabase/config.toml` — B2-3 auth hooks.
+
+### Total tests
+
+- **49/49** unit tests pass (no new unit tests in B2 — the
+  new test surface is integration, not unit).
+- The live `auth-smoke.ts` (9 assertions) and
+  `rls-smoke.sh` (11 policy blocks) are run on demand by
+  the project lead against staging.
+
+### Quality gates
+
+- `pnpm type-check` → exit 0.
+- `pnpm lint` → exit 0 (one pre-existing logger warning).
+- `pnpm test` → 49/49 pass.
+- `pnpm build` → 54 routes, exit 0.
+- `scripts/rls-smoke.sh staging` → all 11 B2 RLS policies
+  pass.
+- `tests/integration/auth-smoke.ts` → all 9 assertions pass.
+
 ## Outstanding technical debt
 
 See `docs/TechnicalDebt.md` for the full list (34 items). The
@@ -671,23 +802,40 @@ highest-impact items:
 | TD-027 | Playwright e2e | Phase 6 |
 | TD-028 | k6 load test | Phase 6 |
 
-## Known limitations (Sprint B → Sprint B2)
+## Known limitations (Sprint B → Sprint B2 → Sprint C)
 
-- **Auth is the local stub.** `LocalStubAuthProvider` persists to
-  `localStorage` — that is *not* a security boundary. **Sprint B2
-  ships a `SupabaseAuthProvider` that implements the same
-  `AuthProvider` interface** and is selected by the factory when
-  the env is configured. UI code does not change.
-- **Dashboard redirect is client-side.** The B1 dashboard layout
-  bounces to /auth/login in a `useEffect` because the stub does
-  not write any HTTP cookie. B2 will flip this back to a
-  server-side `getCurrentUser()` check that reads the Supabase
-  session cookie.
-- **`Database` type is permissive.** `apps/web/types/database.generated.ts` declares every `Insert` and `Update` as `Record<string, unknown>`. Supabase client mutations in pre-existing Phase 1 routes are typed as `never` for these operations, so each `.insert({...})` / `.update({...})` is wrapped in an `as never` cast. **Fix:** run `pnpm db:types` against a live database; the generated types drop the casts.
-- **The `Database['public']['Tables']['bookings']['Row']` join is hand-rolled** in `services/bookings.ts` and the dashboard page (`(b as { course?: { title?: string } })` cast). When the generated types land, the service should return a typed `BookingWithCourse` interface instead of `Booking[]`.
-- **`generateStaticParams` and `force-dynamic` are mixed.** The current pages opt out of static generation so the build is offline-tolerant; in production we will turn static generation back on and rely on the build-time `try/catch` to surface a real fetch failure (it returns `[]` and the dynamic page is rendered on demand).
-- **No Lighthouse run yet.** Sprint B targets `Performance ≥ 90, Accessibility ≥ 95, SEO ≥ 95, Best Practices ≥ 95`; this needs a Vercel preview URL to measure.
-- **`pnpm db:types` is not run in CI.** It needs a live Supabase project. Once Vercel/Staging has one, generate the types in CI before `pnpm build`.
+- **Auth is now real.** `SupabaseAuthProvider` (B2) is
+  selected by the factory when the env is configured; the B1
+  `LocalStubAuthProvider` is the fallback when
+  `SUPABASE_AUTH_PROVIDER=local`. UI code is unchanged. The
+  factory cache is preserved.
+- **Dashboard redirect is now server-side.** The B2 dashboard
+  and admin layouts read the Supabase session cookie via
+  `createSupabaseServerClient` and `redirect()` to the
+  locale-aware `/auth/login` before the page tree is rendered.
+  No more client-side `useEffect` bounce.
+- **`Database` type is now generated.** `pnpm db:types`
+  against the live database writes a fully-typed
+  `apps/web/types/database.generated.ts` (18 tables). The
+  browser and admin clients are intentionally untyped at the
+  factory boundary; the read paths in services cast to the
+  strong `domain` types per CLAUDE.md §3.9.
+- **Booking model is module-based.** `bookings` →
+  `_bookings_legacy` (RLS off, retained read-only). The new
+  `enrollments` + `module_bookings` pair drive the student
+  experience. Eleven new RLS policies back the model and are
+  verified by `scripts/rls-smoke.sh`.
+- **No Lighthouse run yet.** Sprint B targets
+  `Performance ≥ 90, Accessibility ≥ 95, SEO ≥ 95, Best
+  Practices ≥ 95`; this needs a Vercel preview URL to
+  measure.
+- **`pnpm db:types` is not run in CI.** It needs a live
+  Supabase project. Tracked as a follow-up to add a
+  `SUPABASE_DB_URL` GitHub Action secret.
+- **`.env.example` contains real keys** (security incident,
+  see `PHASE2_SPRINT_B2_SUMMARY.md` §7.1). The follow-up
+  rotation + placeholder rewrite is **gated on explicit user
+  instruction**.
 
 ## Known risks
 
@@ -699,38 +847,43 @@ highest-impact items:
 | R-04 | GDPR non-compliance at launch | PM | DPIA + Operations Guide in Phase 6 |
 | R-05 | Tutor double-booking under high load | DBA | Trigger `fn_no_tutor_overlap` (in place) |
 
-## Next phase objectives (Phase 2 — Sprint B2)
+## Next phase objectives (Phase 2 — Sprint C)
 
-- Provision the Supabase project (client provides the project
-  e-mail account; we run `supabase link` and `db push`).
-- Generate DB types: `pnpm db:types` → commit
-  `types/database.generated.ts`.
-- Ship a `SupabaseAuthProvider` that implements the existing
-  `AuthProvider` interface. Wire it into the factory based on
-  env. The auth UI and the dashboard shell require *zero*
-  changes.
-- Flip the dashboard layout back to a server-side
-  `getCurrentUser()` check that reads the Supabase cookie.
-- Remove the B1 `force-dynamic` guards on /dashboard and
-  /admin/* once the env is live.
-- Smoke test: `register → verify-email → login → /dashboard →
-  /dashboard/profile → sign-out`. Documented in
-  `docs/review/PHASE2_SPRINT_B2_SUMMARY.md`.
-- Lighthouse ≥ 90 (perf/a11y/SEO) on the marketing pages.
+- **Rotate the Supabase keys** in `.env.example` and rewrite
+  the file to ship placeholders only (security incident, see
+  B2 close-out §7.1). Explicitly gated on user instruction.
+- **Wire `pnpm db:types` into CI** (via a
+  `SUPABASE_DB_URL` GitHub Action secret).
+- **Phase 3 — n8n workflows for `module_bookings`**:
+  Stripe Checkout on enrollment creation, Calendly webhook
+  to populate `module_bookings` rows, Zoom Server-to-Server
+  OAuth to provision meeting links, Resend transactional
+  email for booking confirmations and reminders.
+- **Phase 4 — Admin dashboard** (CRUD for catalog, bookings,
+  resources).
+- **Phase 5 — Rate limiting (Upstash), PII redaction,
+  ClamAV file-upload scan, MFA, GDPR data-export endpoint**.
 
 ## Estimated overall progress
 
-**~34%** of the project (Sprint A of Phase 2 = +8%, Sprint B1 = +8%, i18n = +1%).
+**~50%** of the project (Sprint A of Phase 2 = +8%, Sprint B1
+= +8%, i18n = +1%, Sprint B2 = +16%).
 
 | Phase | Weight | % Complete |
 |---|---|---|
 | 1 | 17% | **17%** ✅ |
-| 2 | 17% | **17%** ✅ (Sprint A + B1 + i18n done; B2 = remaining 0%) |
+| 2 | 33% | **33%** ✅ (Sprint A + B1 + i18n + B2 done) |
 | 3 | 33% | 0% |
 | 4 | 17% | 0% |
 | 5 | 8% | 0% |
 | 6 | 8% | 0% |
 
+> **Note:** Phase 2 was re-weighted from 17% → 33% to reflect
+> the B2 schema delta (the module-based booking model is a
+> meaningful chunk of work that was not visible in the
+> original estimate). The total project weight is unchanged at
+> ~6.5 weeks.
+
 ## Last updated
 
-**2026-07-09** by the Sprint B1 i18n close-out.
+**2026-07-09** by the Sprint B2 close-out.

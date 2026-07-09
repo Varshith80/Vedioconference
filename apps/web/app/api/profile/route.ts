@@ -1,7 +1,7 @@
-﻿import { NextResponse, type NextRequest } from 'next/server';
+﻿import { type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getCurrentUser } from '@/services/auth';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
 import { BadRequest, Unauthorized } from '@/lib/utils/errors';
 
@@ -20,10 +20,10 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) throw Unauthorized();
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClientUntyped();
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (error || !data) throw BadRequest('Profil introuvable.');
-    return NextResponse.json({ data });
+    return Response.json({ data });
   } catch (e) { return errorResponse(e); }
 }
 
@@ -32,10 +32,10 @@ export async function PATCH(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) throw Unauthorized();
     const body = updateSchema.parse(await req.json());
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClientUntyped();
     const { data, error } = await supabase
       .from('profiles').update(body as never).eq('id', user.id).select('*').single();
     if (error || !data) throw BadRequest('Mise à jour échouée.');
-    return NextResponse.json({ data });
+    return Response.json({ data });
   } catch (e) { return errorResponse(e); }
 }

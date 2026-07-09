@@ -29,9 +29,14 @@ sequenceDiagram
     Note over SB: services that use the user's JWT, so RLS automatically
     Note over N8N: restricts data to the owner.
 
-    U->>FE: Click "Book a course"
-    FE->>N8N: POST /webhook/booking-init
-    N8N-->>FE: Stripe checkout URL
+    U->>FE: Click "Enroll in this course"
+    FE->>U: redirect to Stripe Checkout (course-level)
     U->>SB: (Stripe-hosted payment) — handled by Stripe
-    N8N-->>DB: INSERT booking, meeting_link
+    SB->>N8N: checkout.session.completed (enrollment-created workflow)
+    N8N->>DB: UPDATE enrollments SET status='active' + INSERT module_progress rows
     N8N-->>U: Confirmation email via Resend
+
+    U->>FE: Pick a module inside the course
+    FE->>N8N: (Calendly inline embed renders per module)
+    N8N->>DB: INSERT module_bookings, INSERT meeting_links
+    N8N-->>U: Confirmation email with Zoom join URL

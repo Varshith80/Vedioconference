@@ -2,7 +2,7 @@ import createIntlMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { locales, defaultLocale, type Locale } from '@/i18n';
-import type { Database } from '@/types/database.generated';
+import { publicEnv } from '@/lib/env';
 
 /**
  * Next.js middleware.
@@ -40,9 +40,10 @@ export async function middleware(request: NextRequest) {
 
   // 2. Supabase session refresh. We mutate the same `intlResponse`
   //    so cookies from both layers end up in one response.
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  const env = publicEnv();
+  const supabase = createServerClient(
+    env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:54321',
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'public-anon-key',
     {
       cookies: {
         get(name: string) {

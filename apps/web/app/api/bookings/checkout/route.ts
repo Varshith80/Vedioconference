@@ -1,71 +1,18 @@
-﻿import { NextResponse, type NextRequest } from 'next/server';
-import { z } from 'zod';
-import { stripe } from '@/lib/stripe/client';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getCurrentUser } from '@/services/auth';
+import { type NextRequest } from 'next/server';
 import { errorResponse } from '@/lib/utils/api';
-import { BadRequest, Unauthorized } from '@/lib/utils/errors';
-import { logger } from '@/lib/utils/logger';
-
-const checkoutSchema = z.object({
-  courseId: z.string().uuid(),
-  start:    z.string().datetime(),
-  end:      z.string().datetime(),
-});
+import { ApiError } from '@/lib/utils/errors';
 
 /**
- * Create a Stripe Checkout Session for a course booking.
+ * POST /api/bookings/checkout – DEPRECATED in Sprint B2.
  *
- * The session metadata carries everything the Stripe webhook
- * (handled by n8n) needs to create the booking + Zoom meeting.
+ * Payment is now course-level. The legacy per-booking Stripe
+ * Checkout Session endpoint has been replaced by
+ * `POST /api/enrollments`, which creates a Stripe Checkout
+ * Session for a single (student, course) enrollment.
  */
-export async function POST(req: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) throw Unauthorized();
-
-    const body = checkoutSchema.parse(await req.json());
-    const supabase = await createSupabaseServerClient();
-    const { data: rawCourse, error: courseError } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('id', body.courseId)
-      .eq('is_published', true)
-      .single();
-    if (courseError || !rawCourse) throw BadRequest('Cours introuvable.');
-    // The Database type is permissive (Record<string, unknown>) until
-    // `pnpm db:types` runs; assert the public columns we need.
-    const course = rawCourse as {
-      currency: string;
-      price_cents: number;
-      title: string;
-      subtitle: string | null;
-      id: string;
-      slug: string;
-    };
-
-    const session = await stripe().checkout.sessions.create({
-      mode: 'payment',
-      customer_email: user.email!,
-      line_items: [{
-        price_data: {
-          currency:    course.currency.toLowerCase(),
-          unit_amount: course.price_cents,
-          product_data: { name: course.title, description: course.subtitle ?? undefined },
-        },
-        quantity: 1,
-      }],
-      metadata: {
-        student_id: user.id,
-        course_id:  course.id,
-        start:      body.start,
-        end:        body.end,
-      },
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/bookings?status=success`,
-      cancel_url:  `${process.env.NEXT_PUBLIC_SITE_URL}/courses/${course.slug}?status=cancelled`,
-    });
-
-    logger.info('Stripe checkout session created', { sessionId: session.id, userId: user.id });
-    return NextResponse.json({ url: session.url, sessionId: session.id });
-  } catch (e) { return errorResponse(e); }
+export async function POST(_req: NextRequest) {
+  return errorResponse(
+    new ApiError(410, 'endpoint_removed',
+      'This endpoint has been removed in Sprint B2.', { new_endpoint: '/api/enrollments' }),
+  );
 }

@@ -6,6 +6,7 @@ import { errorResponse } from '@/lib/utils/api';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { BRAND } from '@/lib/constants/brand';
+import { serverEnv } from '@/lib/env';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com';
+    const fromAddress = serverEnv().RESEND_FROM_EMAIL;
     const toAddress = BRAND.contactEmail;
 
     const subjectLine = `${t('ContactEmail.subjectPrefix')} ${subject}`;

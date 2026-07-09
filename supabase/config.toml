@@ -1,43 +1,52 @@
-{
-  "$schema": "https://raw.githubusercontent.com/supabase/cli/main/specs/supabase_config.schema.json",
-  "projectId": "vedioconference",
-  "name": "Vedioconference Course Platform",
-  "version": "1.0.0",
-  "description": "Production-ready tutoring platform built on Supabase + Next.js + n8n.",
-  "api": {
-    "port": 54321,
-    "schemas": ["public", "storage", "graphql_public"],
-    "extra_search_path": ["public", "extensions"],
-    "max_rows": 1000
-  },
-  "db": {
-    "port": 54322,
-    "shadow_port": 54320,
-    "major_version": 15
-  },
-  "studio": {
-    "port": 54323
-  },
-  "storage": {
-    "file_size_limit": "50MiB"
-  },
-  "auth": {
-    "site_url": "http://localhost:3000",
-    "additional_redirect_urls": ["http://localhost:3000/auth/callback"],
-    "jwt_expiry": 3600,
-    "enable_signup": true,
-    "enable_anonymous_sign_ins": false,
-    "enable_manual_linking": false,
-    "minimum_password_length": 10,
-    "password_requirements": "lower_upper_letters_digits",
-    "email": {
-      "enable_confirmations": true,
-      "double_confirm_changes": true
-    }
-  },
-  "functions": {
-    "verify-jwt": {
-      "verify_jwt": true
-    }
-  }
-}
+# Supabase local development configuration.
+# Reference: https://supabase.com/docs/guides/local-development/cli/config
+#
+# This file is read by the Supabase CLI for `supabase start`,
+# `supabase stop`, `supabase db reset`, and the local Studio /
+# Auth / Storage emulators. It is NOT used for the linked
+# remote project (ffillswcwzefhlojtnkq) — the remote link is
+# held by the CLI outside of this file.
+#
+# Only keys accepted by the current Supabase CLI schema are
+# used. `name`, `version`, `description` are intentionally
+# omitted (the schema does not accept them).
+
+project_id = "vedioconference"
+
+[api]
+enabled            = true
+port               = 54321
+schemas            = ["public", "storage", "graphql_public"]
+extra_search_path  = ["public", "extensions"]
+max_rows           = 1000
+
+[db]
+port          = 54322
+shadow_port   = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port    = 54323
+
+[storage]
+enabled         = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled                    = true
+site_url                   = "http://localhost:3000"
+additional_redirect_urls   = ["http://localhost:3000/auth/callback"]
+jwt_expiry                 = 3600
+enable_signup              = true
+enable_anonymous_sign_ins  = false
+enable_manual_linking      = false
+minimum_password_length    = 10
+password_requirements      = "lower_upper_letters_digits"
+
+  [auth.email]
+  enable_confirmations   = true
+  double_confirm_changes = true
+
+[functions.verify-jwt]
+verify_jwt = true

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { getAllPublishedCourseSlugs } from '@/services/courses';
 import { getAllPublishedTutorSlugs } from '@/services/tutors';
+import { publicEnv } from '@/lib/env';
 
 /**
  * Public sitemap. Includes the static marketing pages plus every
@@ -8,7 +9,7 @@ import { getAllPublishedTutorSlugs } from '@/services/tutors';
  * pages) on Supabase errors so a transient DB blip doesn't kill SEO.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  const base = publicEnv().NEXT_PUBLIC_SITE_URL;
   const now = new Date();
 
   const staticPages: MetadataRoute.Sitemap = [

@@ -1,6 +1,6 @@
-﻿import { NextResponse, type NextRequest } from 'next/server';
+import { type NextRequest } from 'next/server';
 import { getCurrentUser } from '@/services/auth';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
 import { errorResponse } from '@/lib/utils/api';
 import { Unauthorized } from '@/lib/utils/errors';
 
@@ -10,12 +10,12 @@ export async function GET(_req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) throw Unauthorized();
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClientUntyped();
     const { data, error } = await supabase
       .from('resources')
       .select('*, course:courses(*)')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return NextResponse.json({ data: data ?? [] });
+    return Response.json({ data: data ?? [] });
   } catch (e) { return errorResponse(e); }
 }
