@@ -1,11 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Vedioconference">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#3B5BDB"/>
-      <stop offset="100%" stop-color="#1E3AA3"/>
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="7" fill="url(#g)"/>
-  <path d="M9 11.5C9 10.119 10.119 9 11.5 9h7A4.5 4.5 0 0 1 23 13.5v5A4.5 4.5 0 0 1 18.5 23h-7A2.5 2.5 0 0 1 9 20.5v-9Z" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="m25 12-3 3 3 3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2006/svg" viewBox="0 0 160 32" role="img" aria-label="Intégrale">
+  <text x="0" y="24"
+        font-family="'IBM Plex Serif', Georgia, serif" font-size="22" font-weight="600"
+        fill="#142B4D">Int<tspan font-size="26" font-weight="700">∫</tspan>grale</text>
 </svg>

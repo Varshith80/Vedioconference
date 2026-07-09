@@ -2,6 +2,10 @@ import { requireProfile } from '@/hooks/use-require-user';
 import { getStudentBookings } from '@/services/bookings';
 import { formatDateTime, formatCents } from '@/lib/utils/format';
 
+// Sprint B1 placeholder: opt out of static generation until
+// Chunk 9 of Sprint B1 wires the (dashboard) layout + useAuth().
+export const dynamic = 'force-dynamic';
+
 export const metadata = { title: 'Mes réservations' };
 
 export default async function DashboardBookingsPage() {

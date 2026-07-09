@@ -1,5 +1,12 @@
 import { requireProfile } from '@/hooks/use-require-user';
 
+// Sprint B1: the dashboard is a placeholder shell. We opt out of
+// static generation because `requireProfile` needs a request scope
+// to read the Supabase session cookie. Chunk 9 of Sprint B1 will
+// replace this with the full (dashboard) layout, sidebar, and
+// useAuth()-driven placeholder pages.
+export const dynamic = 'force-dynamic';
+
 export const metadata = { title: 'Tableau de bord' };
 
 export default async function DashboardPage() {

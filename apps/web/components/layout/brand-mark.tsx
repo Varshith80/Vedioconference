@@ -1,3 +1,5 @@
+import * as React from 'react';
+import { cn } from '@/lib/utils/cn';
 import { BRAND } from '@/lib/constants/brand';
 
 interface BrandMarkProps {
@@ -5,44 +7,58 @@ interface BrandMarkProps {
   showWordmark?: boolean;
   /** Icon size in Tailwind classes. */
   size?: 'sm' | 'md' | 'lg';
+  /** Foreground tone. `invert` is for use on dark surfaces (Bleu Plan, dark mode). */
+  tone?: 'default' | 'invert';
   className?: string;
 }
 
 const SIZES = {
-  sm: { box: 'h-7 w-7', text: 'text-base' },
-  md: { box: 'h-9 w-9', text: 'text-lg' },
-  lg: { box: 'h-12 w-12', text: 'text-2xl' },
+  sm: { box: 'h-7 w-7',  text: 'text-base',   glyph: 'text-xl'   },
+  md: { box: 'h-9 w-9',  text: 'text-lg',     glyph: 'text-2xl'  },
+  lg: { box: 'h-12 w-12', text: 'text-2xl',    glyph: 'text-4xl'  },
 } as const;
 
+const INTEGRAL_GLYPH = '∫'; // ∫
+
 /**
- * Brand mark used in the header, footer, dashboard sidebar, and
- * auth pages. The icon is inline SVG so it is cacheable, theme-
- * aware, and renders crisply at any DPI.
+ * Brand mark for the Intégrale platform. The wordmark replaces the
+ * second "é" of "Intégrale" with the integral sign (`∫`). Per the
+ * client brief, the `∫` is a *letter* — never a decorative icon —
+ * so the glyph is rendered with the same Plex Serif weight as the
+ * rest of the wordmark and inherits the foreground colour.
+ *
+ * Variants:
+ *   - `default`: Bleu Plan glyph + graphite wordmark (light surfaces).
+ *   - `invert`:  Vélin glyph + vélin wordmark (Bleu Plan / dark surfaces).
  */
-export function BrandMark({ showWordmark = true, size = 'md', className }: BrandMarkProps) {
+export function BrandMark({
+  showWordmark = true,
+  size = 'md',
+  tone = 'default',
+  className,
+}: BrandMarkProps) {
   const s = SIZES[size];
+  const fg = tone === 'invert' ? 'text-primary-foreground' : 'text-foreground';
+
   return (
-    <span className={`inline-flex items-center gap-2 ${className ?? ''}`}>
-      <span
-        className={`inline-flex shrink-0 items-center justify-center rounded-md bg-brand-gradient text-primary-foreground shadow-sm ${s.box}`}
-        aria-hidden="true"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.25"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-3/5 w-3/5"
+    <span
+      className={cn('inline-flex items-center gap-2', className)}
+      aria-label={BRAND.name}
+    >
+      {showWordmark ? (
+        <span aria-hidden="true" className={cn('font-heading font-semibold tracking-tight', s.text, fg)}>
+          Int<span className={cn('font-serif', s.glyph)}>{INTEGRAL_GLYPH}</span>grale
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'inline-flex items-center justify-center font-serif font-semibold',
+            s.box, s.glyph, fg,
+            'rounded-md',
+          )}
         >
-          <path d="M3 7.5C3 5.567 4.567 4 6.5 4h7A4.5 4.5 0 0 1 18 8.5v6A4.5 4.5 0 0 1 13.5 19h-7C4.567 19 3 17.433 3 15.5v-8Z" />
-          <path d="m21 8-4 4 4 4" />
-        </svg>
-      </span>
-      {showWordmark && (
-        <span className={`font-heading font-semibold tracking-tight text-foreground ${s.text}`}>
-          {BRAND.name}
+          {INTEGRAL_GLYPH}
         </span>
       )}
     </span>

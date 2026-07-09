@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="Favicon">
-  <rect width="16" height="16" rx="3" fill="#3B5BDB"/>
-  <path d="M4.5 5.5C4.5 4.95 4.95 4.5 5.5 4.5h3A2.5 2.5 0 0 1 11 7v2.5A2.5 2.5 0 0 1 8.5 12h-3a1 1 0 0 1-1-1V5.5Z" fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="m12 6-1.5 1.5L12 9" fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2006/svg" viewBox="0 0 64 64" role="img" aria-label="Intégrale">
+  <rect width="64" height="64" rx="12" fill="#EDF0EA"/>
+  <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central"
+        font-family="'IBM Plex Serif', Georgia, serif" font-size="46" font-weight="600"
+        fill="#142B4D">∫</text>
 </svg>

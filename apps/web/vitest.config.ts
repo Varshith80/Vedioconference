@@ -7,7 +7,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.{ts,tsx}', 'lib/**/*.test.{ts,tsx}', 'components/**/*.test.{ts,tsx}', 'app/**/*.test.{ts,tsx}'],
-    environment: 'node',
+    environment: 'jsdom',
     globals: false,
     coverage: {
       provider: 'v8',

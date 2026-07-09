@@ -8,7 +8,8 @@ export const contentType = 'image/png';
 
 /**
  * Open Graph image rendered at build time. Pure JSX, no client JS,
- * no external assets — keeps the social preview crisp and on-brand.
+ * no external assets. The composition uses the client palette:
+ * Bleu Plan background, Vélin text, Ambre Surligneur accent dot.
  */
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -22,31 +23,37 @@ export default function OpengraphImage() {
           justifyContent: 'space-between',
           padding: 80,
           backgroundImage:
-            'linear-gradient(135deg, #3B5BDB 0%, #1E3AA3 100%)',
-          color: 'white',
-          fontFamily: 'system-ui, sans-serif',
+            'linear-gradient(135deg, #142B4D 0%, #0D1F38 100%)',
+          color: '#EDF0EA',
+          fontFamily: 'Georgia, serif',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 56,
-              height: 56,
-              borderRadius: 12,
-              background: 'rgba(255,255,255,0.15)',
-              fontSize: 32,
+              width: 64,
+              height: 64,
+              borderRadius: 14,
+              background: '#EDF0EA',
+              color: '#142B4D',
+              fontSize: 40,
               fontWeight: 700,
+              fontFamily: 'Georgia, serif',
             }}
           >
-            V
+            ∫
           </div>
-          <div style={{ fontSize: 28, fontWeight: 600 }}>{BRAND.name}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, fontSize: 30, fontWeight: 600 }}>
+            <span>Int</span>
+            <span style={{ fontSize: 36, fontWeight: 700 }}>∫</span>
+            <span>grale</span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div
             style={{
               fontSize: 72,
@@ -55,10 +62,24 @@ export default function OpengraphImage() {
               letterSpacing: '-0.02em',
             }}
           >
-            Cours particuliers en visioconférence.
+            Comprendre, pas seulement retenir.
           </div>
-          <div style={{ fontSize: 28, opacity: 0.9 }}>
-            Lycée · Classes préparatoires · Réservez en 60 secondes
+          <div style={{ fontSize: 28, opacity: 0.85 }}>
+            {BRAND.tagline}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                background: '#E8A33D',
+              }}
+            />
+            <span style={{ fontSize: 22, opacity: 0.85 }}>
+              Cours en direct · Lycée → Licence
+            </span>
           </div>
         </div>
       </div>
