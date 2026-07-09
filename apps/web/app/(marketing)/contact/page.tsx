@@ -4,7 +4,7 @@ import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { PageHeader } from '@/components/shared/page-header';
 import { ContactForm } from '@/components/marketing/contact-form';
-import { BRAND } from '@/lib/constants/marketing';
+import { BRAND } from '@/lib/constants/brand';
 import { Mail, MapPin, Phone } from 'lucide-react';
 
 export const revalidate = 60;

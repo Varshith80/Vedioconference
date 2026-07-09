@@ -4,84 +4,87 @@
 
 /* =====================================================================
  * Design tokens — HSL components only, consumed by tailwind.config.ts.
- * Every color in the app MUST come from one of these tokens.
+ * Every colour in the app MUST come from one of these tokens. The
+ * canonical hex values live in `lib/constants/brand.ts` (Bleu Plan
+ * #142B4D, Vélin #EDF0EA, Vert Réactif #1F7A6C, Ambre Surligneur
+ * #E8A33D, Graphite #2B2E33, Blanc Carte #FFFFFF).
  * ===================================================================== */
 
 @layer base {
   :root {
-    /* Surfaces */
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* Surfaces — Vélin background, Graphite text, Blanc Carte cards. */
+    --background: 80 18% 92%;
+    --foreground: 220 9% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 220 9% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 220 9% 18%;
 
-    /* Brand — indigo 600 */
-    --primary: 224 76% 48%;
-    --primary-foreground: 210 40% 98%;
+    /* Brand — Bleu Plan primary. */
+    --primary: 217 60% 19%;
+    --primary-foreground: 80 18% 92%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 9% 26%;
+    --secondary: 80 14% 88%;
+    --secondary-foreground: 217 60% 19%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 80 14% 88%;
+    --muted-foreground: 220 6% 38%;
 
-    --accent: 220 14% 96%;
-    --accent-foreground: 220 9% 26%;
+    --accent: 170 65% 30%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
 
-    --success: 142 71% 45%;
-    --success-foreground: 210 40% 98%;
+    --success: 170 65% 30%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
+    --warning: 36 75% 57%;
+    --warning-foreground: 220 9% 18%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 224 76% 48%;
+    --border: 217 14% 80%;
+    --input: 217 14% 80%;
+    --ring: 217 60% 19%;
 
     --radius: 0.625rem;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    --background: 217 60% 8%;
+    --foreground: 80 18% 92%;
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
+    --card: 217 50% 11%;
+    --card-foreground: 80 18% 92%;
 
-    --popover: 222 47% 8%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 217 50% 11%;
+    --popover-foreground: 80 18% 92%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 6%;
+    --primary: 80 18% 92%;
+    --primary-foreground: 217 60% 19%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 217 30% 18%;
+    --secondary-foreground: 80 18% 92%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 217 30% 18%;
+    --muted-foreground: 215 16% 70%;
 
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 170 60% 45%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 63% 50%;
     --destructive-foreground: 210 40% 98%;
 
-    --success: 142 71% 45%;
-    --success-foreground: 210 40% 98%;
+    --success: 170 60% 45%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 6%;
+    --warning: 36 75% 57%;
+    --warning-foreground: 217 60% 8%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --border: 217 30% 22%;
+    --input: 217 30% 22%;
+    --ring: 80 18% 92%;
   }
 }
 
@@ -99,7 +102,7 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
-  /* Headings share a slightly tighter line-height and the heading stack. */
+  /* Headings default to Plex Serif. */
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight text-foreground;
   }
@@ -123,19 +126,29 @@
   .text-balance { text-wrap: balance; }
   .text-pretty  { text-wrap: pretty; }
 
-  /* Marketing gradient — uses tokens only. */
+  /* Brand gradient — Bleu Plan → Vélin-tinted dark. */
   .bg-brand-gradient {
     background-image: linear-gradient(
       135deg,
       hsl(var(--primary)) 0%,
-      hsl(224 76% 36%) 100%
+      hsl(217 60% 12%) 100%
     );
   }
   .bg-mesh-gradient {
     background-image:
-      radial-gradient(at 0% 0%, hsl(var(--primary) / 0.10) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsl(224 76% 60% / 0.10) 0px, transparent 50%),
-      radial-gradient(at 50% 100%, hsl(var(--primary) / 0.06) 0px, transparent 50%);
+      radial-gradient(at 0% 0%, hsl(var(--primary) / 0.08) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsl(170 65% 30% / 0.08) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, hsl(36 75% 57% / 0.06) 0px, transparent 50%);
+  }
+
+  /* "Papier millimétré" — subtle graph-paper grid for the
+   * marketing hero. Per the brief: low opacity, never dominant. */
+  .bg-paper-grid {
+    background-color: hsl(var(--background));
+    background-image:
+      linear-gradient(to right, hsl(var(--primary) / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
   }
 
   /* Accessible skip-to-content. */

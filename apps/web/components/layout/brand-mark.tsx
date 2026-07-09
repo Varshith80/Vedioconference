@@ -1,4 +1,4 @@
-import { BRAND } from '@/lib/constants/marketing';
+import { BRAND } from '@/lib/constants/brand';
 
 interface BrandMarkProps {
   /** Render the wordmark next to the icon. Default: true. */

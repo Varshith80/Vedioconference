@@ -3,8 +3,14 @@ import Link from 'next/link';
 import { BrandMark } from './brand-mark';
 import { Container } from '@/components/shared/container';
 import { Separator } from '@/components/ui/separator';
-import { BRAND, FOOTER_NAV } from '@/lib/constants/marketing';
+import { BRAND, FOOTER_LINKS } from '@/lib/constants/brand';
 
+/**
+ * Marketing site footer. The full rewrite (flat single-line per
+ * the client brief) lands in Chunk 2 of Sprint B1. For now this
+ * keeps the existing grid layout but pulls the data from the
+ * new `FOOTER_LINKS` constant so the build stays green.
+ */
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
@@ -18,23 +24,20 @@ export function SiteFooter() {
             </p>
           </div>
 
-          {Object.values(FOOTER_NAV).map((col) => (
-            <nav key={col.title} aria-label={col.title} className="text-sm">
-              <h2 className="text-sm font-semibold text-foreground">{col.title}</h2>
-              <ul className="mt-3 space-y-2">
-                {col.links.map((l) => (
-                  <li key={l.href}>
-                    <Link
-                      href={l.href}
-                      className="text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
+          <nav aria-label="Pied de page" className="text-sm md:col-span-3">
+            <ul className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {FOOTER_LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    className="text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
 
         <Separator className="my-8" />

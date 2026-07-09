@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { BRAND } from '@/lib/constants/marketing';
+import { BRAND } from '@/lib/constants/brand';
 
 export const runtime = 'edge';
 export const alt = `${BRAND.name} — ${BRAND.tagline}`;

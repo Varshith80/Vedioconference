@@ -4,7 +4,7 @@ import { contactSchema } from '@/lib/validations/contact';
 import { errorResponse } from '@/lib/utils/api';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { logger } from '@/lib/utils/logger';
-import { BRAND } from '@/lib/constants/marketing';
+import { BRAND } from '@/lib/constants/brand';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

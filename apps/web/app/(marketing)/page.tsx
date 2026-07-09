@@ -5,7 +5,7 @@ import { TutorPreview } from '@/components/marketing/tutor-preview';
 import { Testimonials } from '@/components/marketing/testimonials';
 import { CtaBand } from '@/components/marketing/cta-band';
 import { JsonLd } from '@/components/marketing/jsonld';
-import { BRAND } from '@/lib/constants/marketing';
+import { BRAND } from '@/lib/constants/brand';
 
 export const revalidate = 60;
 

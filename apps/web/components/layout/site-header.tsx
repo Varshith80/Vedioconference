@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { BrandMark } from './brand-mark';
 import { Container } from '@/components/shared/container';
 import { Button } from '@/components/ui/button';
-import { PRIMARY_NAV } from '@/lib/constants/marketing';
+import { PRIMARY_NAV } from '@/lib/constants/brand';
 import { cn } from '@/lib/utils/cn';
 
 interface SiteHeaderProps {
