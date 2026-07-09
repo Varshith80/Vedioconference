@@ -6,14 +6,15 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { CourseCard } from '@/components/marketing/course-card';
 import { getPublishedCourses } from '@/services/courses';
 import { BookOpen } from 'lucide-react';
+import { BRAND } from '@/lib/constants/brand';
 
 export const revalidate = 60;
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Cours',
+  title: `Cours — ${BRAND.name}`,
   description:
-    'Catalogue de cours particuliers en ligne : mathématiques, physique, français, anglais. Lycée et classes préparatoires.',
+    'Catalogue de cours particuliers en ligne : mathématiques, physique, chimie. Lycée, classes préparatoires, BTS et licence.',
   alternates: { canonical: '/courses' },
 };
 

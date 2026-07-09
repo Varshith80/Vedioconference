@@ -6,14 +6,15 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { TutorCard } from '@/components/marketing/tutor-card';
 import { listPublishedTutors } from '@/services/tutors';
 import { Users2 } from 'lucide-react';
+import { BRAND } from '@/lib/constants/brand';
 
 export const revalidate = 60;
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Tuteurs',
+  title: `Tuteurs — ${BRAND.name}`,
   description:
-    'Annuaire des tuteurs vérifiés de Vedioconference : sélectionnez votre professeur particulier en lycée ou classes préparatoires.',
+    'Annuaire des tuteurs vérifiés Intégrale : sélectionnez votre professeur particulier en lycée, classes préparatoires, BTS ou licence.',
   alternates: { canonical: '/tutors' },
 };
 

@@ -4,11 +4,12 @@ import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { PageHeader } from '@/components/shared/page-header';
 import { PricingTable } from '@/components/marketing/pricing-table';
+import { BRAND } from '@/lib/constants/brand';
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'Tarifs',
+  title: `Tarifs — ${BRAND.name}`,
   description:
     'Trois formules : à la carte, pack 5 séances, mentorat continu. Tarif clair, facturation automatique, reçu envoyé par e-mail.',
   alternates: { canonical: '/pricing' },

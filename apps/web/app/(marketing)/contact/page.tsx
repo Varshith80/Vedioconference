@@ -10,9 +10,9 @@ import { Mail, MapPin, Phone } from 'lucide-react';
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'Contact',
+  title: `Contact — ${BRAND.name}`,
   description:
-    'Contactez l’équipe Vedioconference : demande d’information, partenariat, presse. Réponse sous 24 heures ouvrées.',
+    'Contactez l’équipe Intégrale : demande d’information, niveau, premier cours offert. Réponse sous 24 heures ouvrées.',
   alternates: { canonical: '/contact' },
 };
 

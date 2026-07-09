@@ -5,40 +5,35 @@ import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { CtaBand } from '@/components/marketing/cta-band';
+import { SectionEyebrow } from '@/components/marketing/section-eyebrow';
+import { BRAND } from '@/lib/constants/brand';
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'À propos',
+  title: `À propos — ${BRAND.name}`,
   description:
-    'Vedioconference est née en 2026 à Paris : des cours particuliers de qualité, simples à réserver, transparents sur le prix.',
+    'Intégrale est une plateforme de cours particuliers en ligne, mathématiques et physique-chimie, du lycée à la licence.',
   alternates: { canonical: '/about' },
 };
 
 const VALUES = [
   {
-    title: 'Pédagogie d’abord',
+    title: 'Comprendre, pas seulement retenir',
     body:
-      'Nous recrutons nos tuteurs sur dossier, démonstration et entretien — pas sur une note moyenne.',
+      'Nos profs sont recrutés sur leur capacité à faire passer une idée, pas sur un classement. Une bonne réponse ne suffit pas — il faut une bonne explication.',
   },
   {
-    title: 'Transparence tarifaire',
+    title: 'Des maths et de la physique, au sérieux',
     body:
-      'Un prix clair par cours, facturation automatique, reçu envoyé. Pas de commission cachée, pas d’abonnement forcé.',
+      'Pas de promesse miracle. Un programme aligné sur les attendus du lycée et des classes préparatoires, des exercices calibrés, des corrections rédigées.',
   },
   {
-    title: 'Outils qui servent l’apprentissage',
+    title: 'La transparence, par défaut',
     body:
-      'Le tableau blanc, le partage d’écran, l’enregistrement et les notes sont disponibles par défaut, sans frais supplémentaires.',
+      'Prix clair par séance, créneau réel, facture envoyée. Pas d’abonnement caché, pas de commission opaque, pas d’effet de surprise.',
   },
-] as const;
-
-const STEPS = [
-  { n: '01', title: 'Choisissez un cours', body: 'Maths, physique, français, anglais — lycée ou classes prépa.' },
-  { n: '02', title: 'Réservez un créneau', body: 'Disponibilités en temps réel, paiement Stripe en moins d’une minute.' },
-  { n: '03', title: 'Recevez le lien', body: 'L’invitation calendrier et le lien de visioconférence arrivent par e-mail.' },
-  { n: '04', title: 'Rejoignez la séance', body: 'Un clic. Visio HD, partage d’écran, tableau blanc. C’est tout.' },
 ] as const;
 
 export default function AboutPage() {
@@ -46,19 +41,28 @@ export default function AboutPage() {
     <>
       <Section spacing="default" aria-labelledby="about-title">
         <Container size="prose">
-          <Badge>À propos</Badge>
+          <SectionEyebrow label="À propos" />
           <Heading id="about-title" level="h1" className="mt-4">
-            Des cours particuliers clairs, efficaces, sans surprise.
+            Une seule conviction&nbsp;: la qualité d’une explication
+            change tout.
           </Heading>
           <p className="mt-5 text-base text-muted-foreground sm:text-lg">
-            Vedioconference est née en 2026 à Paris d’un constat simple : réserver un cours particulier
-            de qualité reste trop souvent un parcours du combattant — créneaux opaques, prix flous,
-            outils en pagaille. Nous avons voulu une plateforme qui fasse le contraire.
+            Intégrale est née à Paris en 2026 d’un constat simple&nbsp;:
+            les élèves qui réussissent en sciences ne sont pas ceux qui
+            passent le plus d’heures, ce sont ceux qui ont compris un
+            bon prof, à un moment clé. Notre travail est de mettre ces
+            profs devant chaque élève, en visio, au bon moment.
+          </p>
+          <p className="mt-4 text-base text-muted-foreground sm:text-lg">
+            Mathématiques, physique, chimie&nbsp;— du lycée à la
+            licence. Pas de promesse miracle, pas de contenu
+            préfabriqué. Un prof, un élève, un programme, et
+            l’exigence qu’il faut.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <Button asChild>
-              <Link href="/courses">
-                Voir les cours
+              <Link href="/levels">
+                Voir les niveaux
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </Button>
@@ -69,60 +73,44 @@ export default function AboutPage() {
         </Container>
       </Section>
 
-      <Section id="how-it-works" spacing="default" tone="muted" aria-labelledby="how-title">
+      <Section spacing="default" tone="muted" aria-labelledby="values-title">
         <Container>
-          <div className="mx-auto max-w-2xl text-center">
-            <Heading id="how-title" level="h2">Comment ça marche</Heading>
-            <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-              Quatre étapes, du choix du cours à la séance.
-            </p>
+          <div className="mx-auto max-w-2xl">
+            <SectionEyebrow number="01" label="Convictions" />
+            <Heading id="values-title" level="h2" className="mt-3 text-3xl sm:text-4xl">
+              Ce que nous défendons.
+            </Heading>
           </div>
 
-          <ol
-            role="list"
-            className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4"
-          >
-            {STEPS.map((s) => (
-              <li
-                key={s.n}
-                className="rounded-xl border bg-card p-5 shadow-sm sm:p-6"
-              >
-                <span className="text-sm font-bold text-primary">{s.n}</span>
-                <h3 className="mt-2 text-base font-semibold text-foreground sm:text-lg">{s.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{s.body}</p>
-              </li>
-            ))}
-          </ol>
-        </Container>
-      </Section>
-
-      <Section spacing="default" aria-labelledby="values-title">
-        <Container>
-          <div className="mx-auto max-w-2xl text-center">
-            <Heading id="values-title" level="h2">Nos valeurs</Heading>
-          </div>
           <ul
             role="list"
-            className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5"
+            className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-6"
           >
             {VALUES.map((v) => (
-              <li key={v.title} className="rounded-xl border bg-card p-5 sm:p-6">
-                <h3 className="text-base font-semibold text-foreground">{v.title}</h3>
-                <Separator className="my-3" />
-                <p className="text-sm text-muted-foreground">{v.body}</p>
+              <li
+                key={v.title}
+                className="flex flex-col gap-3 rounded-lg border bg-card p-6 shadow-sm"
+              >
+                <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                  {v.title}
+                </h3>
+                <p className="text-pretty text-sm text-muted-foreground sm:text-base">
+                  {v.body}
+                </p>
               </li>
             ))}
           </ul>
         </Container>
       </Section>
-    </>
-  );
-}
 
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
-      {children}
-    </span>
+      <CtaBand
+        title="Réservez un premier cours gratuit"
+        description="Un premier échange de 20 minutes pour cibler vos besoins, puis un créneau offert avec un prof vérifié."
+        primaryHref="/contact"
+        primaryLabel="Réserver mon créneau"
+        secondaryHref="/pricing"
+        secondaryLabel="Voir les tarifs"
+      />
+    </>
   );
 }
