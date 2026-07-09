@@ -6,6 +6,7 @@ import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { Button } from '@/components/ui/button';
 import { CtaBand } from '@/components/marketing/cta-band';
+import { JsonLd } from '@/components/marketing/jsonld';
 import { LevelChip } from '@/components/marketing/level-chip';
 import { SectionEyebrow } from '@/components/marketing/section-eyebrow';
 import { LEARNING_PATHS, BRAND } from '@/lib/constants/brand';
@@ -86,6 +87,21 @@ export default function LevelsPage() {
         primaryLabel="Nous écrire"
         secondaryHref="/tutors"
         secondaryLabel="Voir les tuteurs"
+      />
+
+      <JsonLd
+        id="levels-faq"
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'ItemList',
+          name: `Niveaux proposés par ${BRAND.name}`,
+          itemListElement: LEARNING_PATHS.map((p, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: p.level,
+            description: p.blurb,
+          })),
+        }}
       />
     </>
   );
