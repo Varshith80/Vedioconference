@@ -6,6 +6,138 @@
 
 ## [Unreleased]
 
+## [1.3.0-phase2-sprint-b1-i18n] — 2026-07-09
+
+### Added — Sprint B1 i18n extension (English + French)
+
+#### i18n library + routing
+- `apps/web/i18n.ts` — single source of truth: `locales =
+  ['en', 'fr'] as const`, `defaultLocale = 'en'`, `Locale`
+  type, `isLocale` type guard.
+- `apps/web/package.json` — `next-intl@^4.13.1` installed.
+- `apps/web/next.config.mjs` — `createNextIntlPlugin('./i18n.ts')`.
+- `apps/web/middleware.ts` — composes `next-intl`
+  (`createMiddleware`) with the existing Supabase session
+  refresh; matcher excludes `/api/*` and static assets.
+- Sub-path routing: every marketing / auth / dashboard / admin
+  page now lives under `apps/web/app/[locale]/...`. The root
+  `app/layout.tsx` becomes a pass-through; `app/[locale]/layout.tsx`
+  owns `<html lang>`, fonts, the `<NextIntlClientProvider>` and
+  per-locale `<head>` metadata with `alternates.languages`
+  hreflang.
+
+#### Translation files
+- `apps/web/messages/en.json` and `apps/web/messages/fr.json`
+  — parallel namespace trees: `Brand`, `Nav`, `SiteHeader`,
+  `SiteFooter`, `Homepage`, `About`, `Levels`, `Pricing`,
+  `Contact`, `Tutors`, `Courses`, `Auth.*` (login, register,
+  forgot-password, reset-password, verify-email, layout),
+  `Dashboard.*`, `Admin`, `NotFound`, `Error`, `Common`,
+  `Validation`, `ApiErrors`, `ContactEmail`. Keys are stable;
+  only values are translated.
+
+#### Brand module refactor
+- `apps/web/lib/constants/brand.ts` is now *structural-only*
+  (palette, fonts, legal name, contact/support emails, address,
+  copyright year, social URLs). **No French copy.**
+- `apps/web/lib/i18n/brand.ts` — `getBrandCopy(t)` reads
+  locale-specific tagline and OG copy from the messages map.
+- `apps/web/lib/i18n/paths.ts` — `asArray` + `TLike` helpers
+  used by every component reading a translated array.
+- `apps/web/lib/i18n/nav.ts` — `getPrimaryNav(t)` and
+  `getFooterLinks(t)` produce the locale-aware nav and footer.
+- `apps/web/lib/i18n/server.ts` — `getApiTranslator(req)` for
+  route handlers; locale picked from the `NEXT_LOCALE` cookie
+  (set by `next-intl` middleware) or `Accept-Language`.
+
+#### Language switcher
+- `apps/web/components/layout/language-switcher.tsx` — small
+  client component, two pill buttons (EN | FR). Active locale
+  gets `aria-current="true"`. Sets the `NEXT_LOCALE` cookie,
+  rewrites the first URL segment, calls `router.push` +
+  `router.refresh`.
+- Inserted in the marketing header (desktop and mobile menu),
+  the auth layout header, and the dashboard header.
+
+#### Form / validation refactor (Zod factory pattern)
+- `apps/web/lib/validations/auth.ts` and
+  `apps/web/lib/validations/contact.ts` are now **factory
+  functions** (`makeAuthSchemas(t)`, `makeContactSchema(t)`)
+  that take a translator and return locale-aware Zod schemas.
+- The form components build the schema with
+  `useMemo(() => makeAuthSchemas(t), [t])`.
+- The API route handlers call the same factories with
+  `getApiTranslator(req)`. JSON contract is unchanged
+  (`{ ok: true }` or `{ error: { code, message } }`); only the
+  `message` string is localised.
+
+#### Locale-aware middleware + redirects
+- `apps/web/hooks/use-require-user.ts` — `requireUser()` and
+  `requireProfile()` redirect to `/${locale}/auth/login` where
+  the locale is read from the `x-next-intl-locale` header.
+- `apps/web/app/[locale]/dashboard/layout.tsx` and
+  `app/[locale]/admin/layout.tsx` — client-side `router.replace`
+  and server-side `redirect` are locale-aware.
+- `apps/web/components/forms/{login,register,forgot-password,reset-password}-form.tsx`
+  — `redirectTo` for the Supabase password-reset email is built
+  with the active locale prefix.
+
+#### Sitemap, robots, OG image, not-found
+- `apps/web/app/sitemap.ts` — emits one entry per static
+  route per locale, with `alternates.languages` populated for
+  hreflang.
+- `apps/web/app/[locale]/opengraph-image.tsx` — locale-aware
+  1200×630 image; tagline and footer line are translated.
+- `apps/web/app/[locale]/not-found.tsx` — locale-aware 404.
+- `apps/web/app/not-found.tsx` — root 404 reads the locale
+  from the `x-next-intl-locale` header.
+- `apps/web/app/error.tsx` — global error boundary uses
+  `useTranslations('Error')`.
+
+#### Tests
+- `apps/web/components/layout/site-footer.test.tsx` —
+  rewritten to wrap in `NextIntlClientProvider` and assert
+  both EN and FR footer copy.
+- `apps/web/components/dashboard/sidebar.test.tsx` —
+  rewritten with the same wrapper; asserts `aria-current`
+  on the active link.
+- `apps/web/components/marketing/primitives.test.tsx` —
+  rewritten to use the English translation file for the
+  presentational labels.
+- `apps/web/tests/unit/contact-schema.test.ts` — uses
+  `makeContactSchema(fakeT)` with a fake translator.
+- `apps/web/components/layout/language-switcher.test.tsx`
+  (new) — 3 tests covering rendering, `aria-current` on the
+  active locale, and navigation on click.
+- `apps/web/lib/constants/brand.test.ts` — rewritten to
+  assert the structural brand fields only.
+
+### Quality gates
+
+- `pnpm type-check` — ✅ exit 0.
+- `pnpm lint` — ✅ exit 0 (one pre-existing logger warning).
+- `pnpm test` — ✅ 49/49 pass.
+- `pnpm build` — ✅ exit 0; ~52 routes emitted (en/fr for
+  every page).
+
+### Notes
+
+- **Nothing architectural moved.** Database schema, auth
+  abstraction, dashboard architecture, API contracts, component
+  architecture, folder structure (no new top-level directories),
+  design system, technology stack, and business logic are
+  unchanged.
+- **Adding a third language** is a content operation: drop in
+  `messages/<lang>.json`, add the code to the `locales` list in
+  `apps/web/i18n.ts`, and add the language code to the language
+  switcher. No new components, no new pages, no new API routes,
+  no DB change.
+- **English is the default**; French is the second locale.
+- **Mid-migration content debt:** the marketing copy in the
+  English file is a 1:1 translation of the French brief, plus
+  structural copy. A professional English copy-edit pass is
+  tracked as a follow-up.
+
 ## [1.2.0-phase2-sprint-b1] — 2026-07-09
 
 ### Added — Marketing & Onboarding (Sprint B1)

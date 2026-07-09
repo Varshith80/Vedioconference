@@ -1,26 +1,66 @@
 import { z } from 'zod';
 
-export const emailSchema    = z.string().email('Adresse e-mail invalide.');
-export const passwordSchema = z
-  .string()
-  .min(10, 'Le mot de passe doit contenir au moins 10 caractères.')
-  .regex(/[a-z]/, 'Le mot de passe doit contenir une minuscule.')
-  .regex(/[A-Z]/, 'Le mot de passe doit contenir une majuscule.')
-  .regex(/\d/,   'Le mot de passe doit contenir un chiffre.');
+/**
+ * Translator shape used by the Zod factories in this module.
+ * Compatible with the `t` returned by `useTranslations()` (client)
+ * and by `getTranslations()` (RSC) — both expose a `(key, values?) => string`
+ * signature.
+ *
+ * The factories in this file are pure: they take a translator and return
+ * a Zod schema. Components call them inside `useMemo` keyed on `t` so the
+ * schema is rebuilt only when the locale changes.
+ */
+type TLike = (key: string) => string;
 
-export const registerSchema = z.object({
-  fullName: z.string().min(2, 'Le nom est trop court.').max(120),
-  email:    emailSchema,
-  password: passwordSchema,
-  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'Vous devez accepter les CGU.' }) }),
-});
-export type RegisterInput = z.infer<typeof registerSchema>;
+const tr = (t: TLike, k: string): string => t(`Validation.${k}`);
 
-export const loginSchema = z.object({
-  email:    emailSchema,
-  password: z.string().min(1, 'Mot de passe requis.'),
-});
-export type LoginInput = z.infer<typeof loginSchema>;
+/**
+ * Email shape. Always available; the error message is localised.
+ */
+export function makeEmailSchema(t: TLike) {
+  return z.string().email(tr(t, 'emailInvalid'));
+}
 
-export const forgotPasswordSchema = z.object({ email: emailSchema });
-export const resetPasswordSchema  = z.object({ password: passwordSchema });
+/**
+ * Password shape — 10 characters minimum, mixed case, digit.
+ */
+export function makePasswordSchema(t: TLike) {
+  return z
+    .string()
+    .min(10, tr(t, 'passwordMin'))
+    .regex(/[a-z]/, tr(t, 'passwordLower'))
+    .regex(/[A-Z]/, tr(t, 'passwordUpper'))
+    .regex(/\d/, tr(t, 'passwordDigit'));
+}
+
+export function makeAuthSchemas(t: TLike) {
+  const email = makeEmailSchema(t);
+  const password = makePasswordSchema(t);
+  return {
+    emailSchema: email,
+    passwordSchema: password,
+    registerSchema: z.object({
+      fullName: z.string().min(2, tr(t, 'nameShort')).max(120),
+      email,
+      password,
+      acceptTerms: z.literal(true, {
+        errorMap: () => ({ message: tr(t, 'terms') }),
+      }),
+    }),
+    loginSchema: z.object({
+      email,
+      password: z.string().min(1, tr(t, 'loginPasswordRequired')),
+    }),
+    forgotPasswordSchema: z.object({ email }),
+    resetPasswordSchema: z.object({ password }),
+  };
+}
+
+export type RegisterInput = z.infer<ReturnType<typeof makeAuthSchemas>['registerSchema']>;
+export type LoginInput = z.infer<ReturnType<typeof makeAuthSchemas>['loginSchema']>;
+export type ForgotPasswordInput = z.infer<
+  ReturnType<typeof makeAuthSchemas>['forgotPasswordSchema']
+>;
+export type ResetPasswordInput = z.infer<
+  ReturnType<typeof makeAuthSchemas>['resetPasswordSchema']
+>;

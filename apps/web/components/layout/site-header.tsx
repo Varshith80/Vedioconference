@@ -2,12 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Menu, X } from 'lucide-react';
 import { BrandMark } from './brand-mark';
 import { Container } from '@/components/shared/container';
 import { Button } from '@/components/ui/button';
-import { PRIMARY_NAV } from '@/lib/constants/brand';
+import { LanguageSwitcher } from './language-switcher';
 import { cn } from '@/lib/utils/cn';
+import { getPrimaryNav } from '@/lib/i18n/nav';
+import { BRAND } from '@/lib/constants/brand';
 
 interface SiteHeaderProps {
   /** Is the visitor signed in? When true, the right side shows "Mon espace". */
@@ -19,12 +22,13 @@ interface SiteHeaderProps {
 
 /**
  * Marketing site header — sticky, transparent-to-solid on scroll,
- * with a hamburger Sheet for mobile. The Sheet is a CSS+JS pattern
- * implemented with the existing Radix Dialog primitive to keep the
- * dep surface minimal (we don't need a separate Sheet primitive
- * for Phase 2).
+ * with a hamburger Sheet for mobile. All visible strings come
+ * from the active locale's `SiteHeader` and `Nav` namespaces.
  */
 export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeaderProps) {
+  const tHeader = useTranslations('SiteHeader');
+  const tNav = useTranslations('Nav');
+  const nav = getPrimaryNav(tNav);
   const [open, setOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
 
@@ -35,8 +39,6 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close the menu on route change. We don't use a router listener
-  // — we just key the dialog with the pathname-equivalent state.
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -57,17 +59,17 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
       <Container className="flex h-14 items-center justify-between gap-3 sm:h-16">
         <Link
           href="/"
-          aria-label="Intégrale — Accueil"
+          aria-label={tHeader('ariaHome')}
           className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BrandMark />
         </Link>
 
         {/* Desktop nav */}
-        <nav aria-label="Navigation principale" className="hidden md:flex md:items-center md:gap-1">
-          {PRIMARY_NAV.map((item) => (
+        <nav aria-label={tNav('ariaPrimary')} className="hidden md:flex md:items-center md:gap-1">
+          {nav.map((item) => (
             <Link
-              key={item.href}
+              key={item.id}
               href={item.href}
               className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -78,17 +80,18 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
 
         {/* Desktop CTAs */}
         <div className="hidden items-center gap-2 md:flex">
+          <LanguageSwitcher />
           {isAuthenticated ? (
             <Button asChild size="sm">
-              <Link href="/dashboard">Mon espace{userLabel ? ` — ${userLabel}` : ''}</Link>
+              <Link href="/dashboard">{tHeader('mySpace')}{userLabel ? ` — ${userLabel}` : ''}</Link>
             </Button>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">
-                <Link href="/auth/login">Connexion</Link>
+                <Link href="/auth/login">{tHeader('signin')}</Link>
               </Button>
               <Button asChild size="sm">
-                <Link href="/auth/register">Créer un compte</Link>
+                <Link href="/auth/register">{tHeader('signup')}</Link>
               </Button>
             </>
           )}
@@ -98,7 +101,7 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Ouvrir le menu"
+          aria-label={tHeader('openMenu')}
           aria-expanded={open}
           aria-controls="mobile-menu"
           className="inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
@@ -113,7 +116,7 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
           id="mobile-menu"
           role="dialog"
           aria-modal="true"
-          aria-label="Menu principal"
+          aria-label={tNav('ariaMobile')}
           className="fixed inset-0 z-50 md:hidden"
         >
           <div
@@ -127,16 +130,19 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Fermer le menu"
+                aria-label={tHeader('closeMenu')}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
-            <nav aria-label="Navigation principale" className="flex-1 overflow-y-auto p-4">
+            <nav aria-label={tNav('ariaPrimary')} className="flex-1 overflow-y-auto p-4">
+              <div className="mb-3 flex justify-end">
+                <LanguageSwitcher />
+              </div>
               <ul className="space-y-1">
-                {PRIMARY_NAV.map((item) => (
-                  <li key={item.href}>
+                {nav.map((item) => (
+                  <li key={item.id}>
                     <Link
                       href={item.href}
                       onClick={() => setOpen(false)}
@@ -150,15 +156,15 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
               <div className="mt-6 flex flex-col gap-2 border-t pt-4">
                 {isAuthenticated ? (
                   <Button asChild className="w-full">
-                    <Link href="/dashboard" onClick={() => setOpen(false)}>Mon espace</Link>
+                    <Link href="/dashboard" onClick={() => setOpen(false)}>{tHeader('mySpace')}</Link>
                   </Button>
                 ) : (
                   <>
                     <Button asChild variant="outline" className="w-full">
-                      <Link href="/auth/login" onClick={() => setOpen(false)}>Connexion</Link>
+                      <Link href="/auth/login" onClick={() => setOpen(false)}>{tHeader('signin')}</Link>
                     </Button>
                     <Button asChild className="w-full">
-                      <Link href="/auth/register" onClick={() => setOpen(false)}>Créer un compte</Link>
+                      <Link href="/auth/register" onClick={() => setOpen(false)}>{tHeader('signup')}</Link>
                     </Button>
                   </>
                 )}
@@ -170,3 +176,7 @@ export function SiteHeader({ isAuthenticated, userLabel, className }: SiteHeader
     </header>
   );
 }
+
+// Re-export the brand so consumers that import the brand-name from this
+// module (e.g. the layout) don't pull the constants module separately.
+export { BRAND };

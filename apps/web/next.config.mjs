@@ -1,3 +1,7 @@
+import createNextIntlPlugin from 'next-intl/plugin';
+
+const withNextIntl = createNextIntlPlugin('./i18n.ts');
+
 /** @type {import('next').NextConfig} */
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -20,8 +24,6 @@ const nextConfig = {
       "base-uri 'self'",
       "frame-ancestors 'none'",
       "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
-      // Stripe + Calendly + Zoom (iframes) are explicitly allowed; in dev we
-      // allow 'unsafe-eval' for the Next.js dev server.
       isProd
         ? "script-src 'self' 'unsafe-inline' https://js.stripe.com https://assets.calendly.com"
         : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://assets.calendly.com",
@@ -48,4 +50,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

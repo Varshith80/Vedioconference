@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { registerSchema, forgotPasswordSchema } from '@/lib/validations/auth';
+import { makeAuthSchemas } from '@/lib/validations/auth';
+import { getApiTranslator } from '@/lib/i18n/server';
 import { logger } from '@/lib/utils/logger';
 import { getAuthProvider } from '@/services/auth/auth-provider-factory';
 import { errorResponse } from '@/lib/utils/api';
@@ -25,6 +26,8 @@ async function constantTime(ms: number) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const t = await getApiTranslator(req);
+    const { registerSchema } = makeAuthSchemas(t);
     const body = registerSchema.parse(await req.json());
     const provider = getAuthProvider();
 
@@ -56,6 +59,8 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
+    const t = await getApiTranslator(req);
+    const { forgotPasswordSchema } = makeAuthSchemas(t);
     const { email } = forgotPasswordSchema.parse(await req.json());
     const provider = getAuthProvider();
 

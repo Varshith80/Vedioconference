@@ -1,0 +1,448 @@
+{
+  "_meta": {
+    "locale": "en",
+    "displayName": "English"
+  },
+  "Brand": {
+    "tagline": "Mathematics · Physics-Chemistry — high school through bachelor's",
+    "shortDescription": "Online private lessons in mathematics and physics-chemistry, from high school to bachelor's level.",
+    "ogCaption": "Live courses · high school → bachelor's"
+  },
+  "Nav": {
+    "primary": [
+      { "id": "levels", "label": "Levels", "href": "/levels" },
+      { "id": "tutors", "label": "Tutors", "href": "/tutors" },
+      { "id": "pricing", "label": "Pricing", "href": "/pricing" },
+      { "id": "about", "label": "About", "href": "/about" },
+      { "id": "contact", "label": "Contact", "href": "/contact" }
+    ],
+    "footer": [
+      { "label": "Levels", "href": "/levels" },
+      { "label": "Pricing", "href": "/pricing" },
+      { "label": "Contact", "href": "/contact" },
+      { "label": "Legal notice", "href": "/legal/notice" }
+    ],
+    "languageSwitcher": {
+      "aria": "Change language",
+      "en": "English",
+      "fr": "Français"
+    },
+    "skipLink": "Skip to main content",
+    "ariaPrimary": "Primary navigation",
+    "ariaMobile": "Main menu",
+    "ariaBreadcrumb": "Breadcrumb"
+  },
+  "Homepage": {
+    "livePill": "Live online courses",
+    "headline": "Understand, not just memorise.",
+    "subheadline": "Online private lessons, in video, with a verified tutor — mathematics, physics and chemistry from high school to bachelor's level.",
+    "ctaPrimary": "Book a free course",
+    "ctaSecondary": "See the levels",
+    "socialProof": "Live classes · small groups or one-to-one · High school → Bachelor's",
+    "pathsEyebrow": "01 — Tracks",
+    "pathsTitle": "Four tracks, one standard of rigour.",
+    "pathsIntro": "High school, prépa, BTS, bachelor's: every track has its own programme, its own exercises, and tutors who know the exam expectations. Pick yours, the rest follows.",
+    "methodEyebrow": "02 — Method",
+    "methodTitle": "How a session actually works.",
+    "methodIntro": "Three simple building blocks, designed to help you make real progress without drowning in content.",
+    "figuresEyebrow": "03 — By the numbers",
+    "figuresAria": "Key figures",
+    "ctaEyebrow": "04 — Get started",
+    "ctaTitle": "Book your first free session",
+    "ctaDescription": "A 20-minute exchange to map your needs, then a free slot with a verified tutor.",
+    "ctaButtonPrimary": "Book my slot",
+    "ctaButtonSecondary": "See pricing",
+    "seeAllLevels": "See the details by level",
+    "paths": [
+      {
+        "id": "lycee",
+        "level": "High school",
+        "badge": "HIGH SCHOOL",
+        "headline": "Grade 10 → Grade 12",
+        "blurb": "Specialisation maths and physics-chemistry, Bac preparation and Parcoursup guidance.",
+        "subjects": "Maths · Physics-Chemistry"
+      },
+      {
+        "id": "prepa",
+        "level": "Prépa",
+        "badge": "PRÉPA",
+        "headline": "MPSI / PCSI / MP / PC",
+        "blurb": "Oral-style practice, structured written answers, and competition-calibrated exercises.",
+        "subjects": "Maths · Physics · Chemistry"
+      },
+      {
+        "id": "bts",
+        "level": "BTS",
+        "badge": "BTS",
+        "headline": "Industrial tracks",
+        "blurb": "Applied mathematics and physical sciences targeted at BTS assessments.",
+        "subjects": "Maths · Physical Sciences"
+      },
+      {
+        "id": "licence",
+        "level": "Bachelor's",
+        "badge": "BACHELOR'S",
+        "headline": "L1 / L2 Sciences",
+        "blurb": "Analysis, algebra, mechanics, thermodynamics — catch-up or deepening.",
+        "subjects": "Maths · Physics · Chemistry"
+      }
+    ],
+    "steps": [
+      {
+        "n": "01",
+        "title": "Live video courses",
+        "body": "45 to 60-minute sessions with a tutor, in small groups or one-to-one — ask your questions in real time."
+      },
+      {
+        "n": "02",
+        "title": "Step-by-step corrections",
+        "body": "Every correction walks through the reasoning, not just the final result."
+      },
+      {
+        "n": "03",
+        "title": "Progress tracking",
+        "body": "A dashboard that surfaces your real weak points, session after session."
+      }
+    ],
+    "figures": [
+      { "value": "3 400+", "label": "Corrected exercises" },
+      { "value": "100%",   "label": "Live courses with a tutor" },
+      { "value": "4",      "label": "Tracks · High school → Bachelor's" }
+    ]
+  },
+  "About": {
+    "eyebrow": "About",
+    "title": "About — Intégrale",
+    "description": "Intégrale is an online tutoring platform in mathematics and physics-chemistry, from high school to undergraduate.",
+    "h1": "One conviction: the quality of an explanation changes everything.",
+    "body1": "Intégrale was founded in Paris in 2026 from a simple observation: students who succeed in science are not the ones who put in the most hours, they are the ones who had a good tutor, at the right moment. Our job is to put those tutors in front of every student, on video, at the right moment.",
+    "body2": "Mathematics, physics, chemistry — from high school to bachelor's. No miracle promises, no pre-baked content. One tutor, one student, one programme, and the rigour it takes.",
+    "valuesEyebrow": "01 — Convictions",
+    "valuesTitle": "What we stand for.",
+    "values": [
+      {
+        "title": "Understand, not just memorise",
+        "body": "Our tutors are hired on their ability to make an idea land, not on a ranking. A good answer is not enough — a good explanation is required."
+      },
+      {
+        "title": "Maths and physics, taken seriously",
+        "body": "No miracle promises. A programme aligned with high-school and prépa expectations, calibrated exercises, written corrections."
+      },
+      {
+        "title": "Transparency, by default",
+        "body": "Clear per-session pricing, real slots, invoices sent. No hidden subscription, no opaque commission, no surprises."
+      }
+    ],
+    "ctaPrimary": "See the levels",
+    "ctaSecondary": "Contact us",
+    "bandTitle": "Book your first free class",
+    "bandDescription": "A 20-minute chat to scope your needs, then a free slot with a verified tutor.",
+    "bandPrimary": "Book my slot",
+    "bandSecondary": "See pricing"
+  },
+  "Levels": {
+    "eyebrow": "Levels",
+    "h1": "Four tracks, one standard of rigour.",
+    "intro": "High school, classes préparatoires, BTS, bachelor's: every track has its own programme, its own exercises, and tutors who know the exam expectations. Pick yours, the rest follows.",
+    "requestQuote": "Request a quote",
+    "sectionAria": "Track details",
+    "ctaTitle": "A question about your level?",
+    "ctaDescription": "Get in touch — we will point you to the right track and the right tutor, no commitment.",
+    "ctaPrimary": "Write to us",
+    "ctaSecondary": "See the tutors"
+  },
+  "Pricing": {
+    "eyebrow": "Pricing",
+    "title": "Pricing — Intégrale",
+    "description": "Three plans: pay-as-you-go, 5-session pack, continuous mentoring. Clear pricing, automatic billing, receipt by email.",
+    "h1": "Simple pricing, no surprises",
+    "intro": "Pick the plan that matches your need. No hidden commitment, automatic billing, receipt sent by email.",
+    "tiersAria": "Plans and pricing",
+    "tiersTitle": "Plans and pricing",
+    "tiersHeading": "Plans and pricing",
+    "faqEyebrow": "Frequently asked questions",
+    "faqTitle": "Frequently asked questions",
+    "faqItems": [
+      {
+        "q": "Can I cancel a session?",
+        "a": "Yes, up to 1 hour before the start. Beyond that, the session is due."
+      },
+      {
+        "q": "How does payment work?",
+        "a": "Stripe Checkout, secured (Apple Pay, Google Pay, card, SEPA). You receive a receipt and an invoice automatically."
+      },
+      {
+        "q": "Does the price include the resources?",
+        "a": "Yes, the materials shared by the tutor are accessible for free for the full duration of the follow-up."
+      }
+    ]
+  },
+  "Contact": {
+    "eyebrow": "Contact",
+    "title": "Contact — Intégrale",
+    "description": "Get in touch with the Intégrale team: info request, level, first free class. Reply within 24 business hours.",
+    "h1": "Get in touch",
+    "intro": "A question, a project, a partnership? We read everything and reply within 24 business hours.",
+    "formTitle": "Send us a message",
+    "formHint": "Fields marked with an asterisk are required.",
+    "form": {
+      "name": "Full name",
+      "email": "Email",
+      "subject": "Subject",
+      "message": "Message",
+      "messageHint": "Describe your need in a few lines (20 characters minimum).",
+      "submit": "Send the message",
+      "submitting": "Sending…",
+      "successTitle": "Message sent",
+      "successBody": "Thank you, we will reply within 24 business hours.",
+      "toastSuccess": "Message sent. We will reply within 24 hours.",
+      "errorTitle": "Could not send",
+      "fallbackError": "Could not send the message.",
+      "networkError": "Network error. Please try again."
+    },
+    "cardTitle": "Direct contact",
+    "cardEmail": "Email",
+    "cardAddress": "Address",
+    "cardAddressValue": "Paris, FR",
+    "cardSupport": "Support",
+    "cardSupportHours": "Monday to Friday, 9am–6pm. Reply within 24h.",
+    "cardSupportNote": "For a technical issue on a session, please use the contact page and quote your booking number. Never share your password.",
+    "coordsTitle": "Direct contact details",
+    "emailLabel": "Email",
+    "addressLabel": "Address",
+    "supportLabel": "Support",
+    "supportHours": "Monday to Friday, 9am–6pm. Reply within 24h.",
+    "techIssue": "For a technical issue on a session, please use the {link} and quote your booking number. Never share your password.",
+    "techIssueRich": "For a technical issue on a session, please use the <link>contact page</link> and quote your booking number. Never share your password."
+  },
+  "Tutors": {
+    "eyebrow": "Tutors",
+    "title": "Tutors — Intégrale",
+    "description": "Directory of verified Intégrale tutors: pick your private teacher for high school, prépa, BTS or undergraduate.",
+    "h1": "Our tutors",
+    "intro": "All our tutors are verified on application, interview and teaching demonstration.",
+    "emptyTitle": "Profiles arriving at launch",
+    "emptyDescription": "The team is finalising the selection of the first tutors."
+  },
+  "Courses": {
+    "eyebrow": "Courses",
+    "title": "Courses — Intégrale",
+    "description": "Catalogue of online private courses: mathematics, physics, chemistry. High school, prépa, BTS, undergraduate.",
+    "h1": "All courses",
+    "intro": "Browse the full catalogue of subjects and levels.",
+    "emptyTitle": "No course published yet",
+    "emptyDescription": "The first courses will be added as the catalogue is filled."
+  },
+  "NotFound": {
+    "eyebrow": "404",
+    "h1": "Page not found",
+    "body": "The page you are looking for does not exist or has been moved.",
+    "home": "Back to home",
+    "contact": "Contact support"
+  },
+  "Error": {
+    "title": "An unexpected error occurred"
+  },
+  "Auth": {
+    "layout": {
+      "skipLink": "Skip to main content",
+      "brandAria": "Intégrale — Home"
+    },
+    "login": {
+      "h1": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "forgot": "Forgot password",
+      "create": "Create an account",
+      "fallbackError": "Unknown error."
+    },
+    "register": {
+      "h1": "Create an account",
+      "fullName": "Full name",
+      "email": "Email",
+      "password": "Password",
+      "passwordHint": "10 characters minimum, with an uppercase, a lowercase, and a digit.",
+      "terms": "I accept the <terms>terms of service</terms> and the <privacy>privacy policy</privacy>.",
+      "termsLink": "terms of service",
+      "privacyLink": "privacy policy",
+      "submit": "Create my account",
+      "submitting": "Creating…",
+      "alreadyHave": "Already have an account?",
+      "signin": "Sign in",
+      "fallbackError": "Unknown error."
+    },
+    "forgotPassword": {
+      "h1": "Forgot password",
+      "intro": "Enter the email of your account: we will send you a secure link to choose a new password.",
+      "email": "Email",
+      "submit": "Send the link",
+      "submitting": "Sending…",
+      "sentTitle": "Link sent",
+      "sentBody": "If an account exists for this address, you will receive a reset link within a few minutes.",
+      "backToLogin": "Back to sign in",
+      "fallbackError": "Unknown error."
+    },
+    "resetPassword": {
+      "h1": "New password",
+      "intro": "Choose a new password for your account. 10 characters minimum, with an uppercase, a lowercase, and a digit.",
+      "newPassword": "New password",
+      "submit": "Update",
+      "submitting": "Updating…",
+      "successTitle": "Password updated",
+      "successBody": "You will be redirected to your space…",
+      "goToSpace": "Go to the space",
+      "fallbackError": "Unknown error.",
+      "invalidLink": "Invalid link."
+    },
+    "verifyEmail": {
+      "h1": "Check your inbox",
+      "intro": "Confirm your email address to activate your account.",
+      "body": "We just sent a confirmation email to the address you provided. Open it and click the link to activate your account.",
+      "spam": "Did not receive anything? Check your spam folder, or <retry>try creating an account again</retry>.",
+      "retry": "try creating an account again",
+      "backHome": "Back to home"
+    }
+  },
+  "Dashboard": {
+    "loading": "Loading your space…",
+    "layout": {
+      "loading": "Loading your space…"
+    },
+    "home": {
+      "title": "Dashboard",
+      "welcome": "Welcome.",
+      "subline": "Find your courses, payments and resources.",
+      "open": "Open"
+    },
+    "cards": {
+      "bookings": {
+        "title": "My bookings",
+        "description": "View your upcoming sessions and history."
+      },
+      "resources": {
+        "title": "Resources",
+        "description": "Course materials, corrected exercises, shared notes."
+      },
+      "profile": {
+        "title": "My profile",
+        "description": "Personal information, level, preferences."
+      }
+    },
+    "bookings": {
+      "title": "My bookings",
+      "subline": "Your upcoming sessions and history.",
+      "emptyTitle": "No bookings yet",
+      "emptyDescription": "Your future sessions will appear here as soon as you book one."
+    },
+    "resources": {
+      "title": "Resources",
+      "subline": "Materials shared by your tutors will appear here.",
+      "emptyTitle": "No resources yet",
+      "emptyDescription": "PDFs, exercise sheets and course notes shared during your sessions will be listed here."
+    },
+    "profile": {
+      "title": "My profile",
+      "subline": "Your account information. Editing will be enabled in Sprint B2.",
+      "name": "Name",
+      "email": "Email",
+      "created": "Account created on",
+      "id": "ID",
+      "editDisabled": "Edit my profile (Sprint B2)"
+    },
+    "sidebar": {
+      "aria": "Personal space navigation",
+      "items": [
+        { "id": "dashboard", "label": "Dashboard", "href": "/dashboard" },
+        { "id": "bookings",  "label": "My bookings", "href": "/dashboard/bookings" },
+        { "id": "resources", "label": "Resources", "href": "/dashboard/resources" },
+        { "id": "profile",   "label": "Profile", "href": "/dashboard/profile" }
+      ]
+    },
+    "topNav": {
+      "aria": "Personal space navigation",
+      "items": [
+        { "id": "dashboard", "label": "Dashboard", "href": "/dashboard" },
+        { "id": "bookings",  "label": "My bookings", "href": "/dashboard/bookings" },
+        { "id": "resources", "label": "Resources", "href": "/dashboard/resources" },
+        { "id": "profile",   "label": "Profile", "href": "/dashboard/profile" }
+      ]
+    },
+    "breadcrumbs": {
+      "aria": "Breadcrumb",
+      "home": "Home",
+      "about": "About",
+      "levels": "Levels",
+      "pricing": "Pricing",
+      "contact": "Contact",
+      "tutors": "Tutors",
+      "courses": "Courses",
+      "login": "Log in",
+      "register": "Create account",
+      "forgotPassword": "Forgot password",
+      "resetPassword": "Reset password",
+      "verifyEmail": "Check your inbox",
+      "dashboard": "Dashboard"
+    },
+    "header": {
+      "fallbackName": "My space",
+      "subtitle": "Personal space",
+      "signOut": "Sign out",
+      "signOutAria": "Sign out"
+    },
+    "labels": {
+      "dashboard": "Dashboard",
+      "bookings": "My bookings",
+      "resources": "Resources",
+      "profile": "Profile"
+    }
+  },
+  "Admin": {
+    "title": "Overview",
+    "h1": "Overview",
+    "subline": "Key platform indicators."
+  },
+  "SiteHeader": {
+    "mySpace": "My space",
+    "signin": "Sign in",
+    "signup": "Create an account",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "ariaHome": "Intégrale — Home",
+    "languageSwitcher": {
+      "label": "Language",
+      "english": "English",
+      "french": "French"
+    }
+  },
+  "SiteFooter": {
+    "copyright": "© {year} Intégrale"
+  },
+  "Validation": {
+    "emailInvalid": "Invalid email address.",
+    "passwordMin": "Password must contain at least 10 characters.",
+    "passwordLower": "Password must contain a lowercase letter.",
+    "passwordUpper": "Password must contain an uppercase letter.",
+    "passwordDigit": "Password must contain a digit.",
+    "loginPasswordRequired": "Password is required.",
+    "nameShort": "The name is too short.",
+    "terms": "You must accept the terms of service.",
+    "contact": {
+      "nameShort": "The name is too short.",
+      "subjectShort": "The subject is too short.",
+      "messageMin": "The message must contain at least 20 characters."
+    }
+  },
+  "ApiErrors": {
+    "rateLimited": "Too many requests. Please try again later.",
+    "validation": "Please check the form fields.",
+    "sendFailed": "Could not send. Please try again later.",
+    "serverError": "Internal Server Error",
+    "missingCode": "Missing code parameter."
+  },
+  "ContactEmail": {
+    "subjectPrefix": "[Contact]",
+    "fromLabel": "From:"
+  }
+}

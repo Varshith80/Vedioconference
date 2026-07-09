@@ -4,7 +4,9 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BookOpen, CalendarRange, LayoutDashboard, User2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
+import { asArray, type TLike } from '@/lib/i18n/paths';
 
 interface NavItem {
   href: string;
@@ -13,12 +15,22 @@ interface NavItem {
   exact?: boolean;
 }
 
-const NAV: ReadonlyArray<NavItem> = [
-  { href: '/dashboard',           label: 'Tableau de bord', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/bookings',  label: 'Réservations',    icon: CalendarRange },
-  { href: '/dashboard/resources', label: 'Ressources',      icon: BookOpen },
-  { href: '/dashboard/profile',   label: 'Profil',          icon: User2 },
-];
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  dashboard: LayoutDashboard,
+  bookings: CalendarRange,
+  resources: BookOpen,
+  profile: User2,
+};
+
+function getNavItems(t: TLike & { raw: (key: string) => unknown }, locale: string): ReadonlyArray<NavItem> {
+  const items = asArray<{ id: string; label: string; href: string }>(t.raw('Dashboard.topNav.items'));
+  return items.map((it) => ({
+    href: `/${locale}${it.href}`,
+    label: it.label,
+    icon: ICONS[it.id] ?? LayoutDashboard,
+    exact: it.id === 'dashboard',
+  }));
+}
 
 /**
  * Horizontal tab nav used at the top of the dashboard on
@@ -26,13 +38,17 @@ const NAV: ReadonlyArray<NavItem> = [
  */
 export function DashboardTopNav() {
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations();
+  const tDash = useTranslations('Dashboard');
+  const nav = getNavItems(t, locale);
   return (
     <nav
-      aria-label="Navigation de l’espace personnel"
+      aria-label={tDash('topNav.aria')}
       className="border-b bg-card md:hidden"
     >
       <ul role="list" className="container flex gap-1 overflow-x-auto py-2">
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const Icon = item.icon;
           const active = item.exact
             ? pathname === item.href

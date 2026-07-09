@@ -1,0 +1,448 @@
+{
+  "_meta": {
+    "locale": "fr",
+    "displayName": "Français"
+  },
+  "Brand": {
+    "tagline": "Mathématiques · Physique-Chimie — du lycée à la licence",
+    "shortDescription": "Plateforme de cours particuliers en ligne, mathématiques et physique-chimie, du lycée à la licence.",
+    "ogCaption": "Cours en direct · Lycée → Licence"
+  },
+  "Nav": {
+    "primary": [
+      { "id": "levels", "label": "Niveaux", "href": "/levels" },
+      { "id": "tutors", "label": "Tuteurs", "href": "/tutors" },
+      { "id": "pricing", "label": "Tarifs", "href": "/pricing" },
+      { "id": "about", "label": "À propos", "href": "/about" },
+      { "id": "contact", "label": "Contact", "href": "/contact" }
+    ],
+    "footer": [
+      { "label": "Niveaux", "href": "/levels" },
+      { "label": "Tarifs", "href": "/pricing" },
+      { "label": "Contact", "href": "/contact" },
+      { "label": "Mentions légales", "href": "/legal/notice" }
+    ],
+    "languageSwitcher": {
+      "aria": "Changer de langue",
+      "en": "English",
+      "fr": "Français"
+    },
+    "skipLink": "Aller au contenu principal",
+    "ariaPrimary": "Navigation principale",
+    "ariaMobile": "Menu principal",
+    "ariaBreadcrumb": "Fil d’Ariane"
+  },
+  "Homepage": {
+    "livePill": "Cours en ligne en direct",
+    "headline": "Comprendre, pas seulement retenir.",
+    "subheadline": "Cours particuliers en ligne, en visio, avec un prof vérifié — maths, physique et chimie du lycée à la licence.",
+    "ctaPrimary": "Réserver un cours gratuit",
+    "ctaSecondary": "Voir les niveaux",
+    "socialProof": "Cours en direct · petits groupes ou individuel · Seconde → Licence",
+    "pathsEyebrow": "01 — Parcours",
+    "pathsTitle": "Quatre parcours, une seule exigence.",
+    "pathsIntro": "Lycée, classes préparatoires, BTS, licence : chaque parcours a son programme, ses exercices, et ses profs habitués aux attendus. Choisissez le vôtre, le reste suit.",
+    "methodEyebrow": "02 — Méthode",
+    "methodTitle": "Comment se passe une séance.",
+    "methodIntro": "Trois briques simples, pensées pour qu'on progresse sans se noyer dans le contenu.",
+    "figuresEyebrow": "03 — Chiffres clés",
+    "figuresAria": "Chiffres clés",
+    "ctaEyebrow": "04 — Démarrer",
+    "ctaTitle": "Réservez un premier cours gratuit",
+    "ctaDescription": "Un premier échange de 20 minutes pour cibler vos besoins, puis un créneau offert avec un prof vérifié.",
+    "ctaButtonPrimary": "Réserver mon créneau",
+    "ctaButtonSecondary": "Voir les tarifs",
+    "seeAllLevels": "Voir les détails par niveau",
+    "paths": [
+      {
+        "id": "lycee",
+        "level": "Lycée",
+        "badge": "LYCÉE",
+        "headline": "Seconde → Terminale",
+        "blurb": "Programme Spé Maths & Spé Physique-Chimie, préparation au Bac et à Parcoursup.",
+        "subjects": "Maths · Physique-Chimie"
+      },
+      {
+        "id": "prepa",
+        "level": "Prépa",
+        "badge": "PRÉPA",
+        "headline": "MPSI / PCSI / MP / PC",
+        "blurb": "Colles types, méthodes de rédaction et exercices calibrés difficulté concours.",
+        "subjects": "Maths · Physique · Chimie"
+      },
+      {
+        "id": "bts",
+        "level": "BTS",
+        "badge": "BTS",
+        "headline": "Filières industrielles",
+        "blurb": "Maths appliquées et sciences physiques ciblées sur les épreuves de BTS.",
+        "subjects": "Maths · Sciences Physiques"
+      },
+      {
+        "id": "licence",
+        "level": "Licence",
+        "badge": "LICENCE",
+        "headline": "L1 / L2 Sciences",
+        "blurb": "Analyse, algèbre, mécanique, thermodynamique — remise à niveau et approfondissement.",
+        "subjects": "Maths · Physique · Chimie"
+      }
+    ],
+    "steps": [
+      {
+        "n": "01",
+        "title": "Cours en visio en direct",
+        "body": "Séances de 45 à 60 minutes avec un professeur, en petit groupe ou en individuel — vous posez vos questions en temps réel."
+      },
+      {
+        "n": "02",
+        "title": "Exercices corrigés pas-à-pas",
+        "body": "Chaque correction détaille le raisonnement, pas seulement le résultat final."
+      },
+      {
+        "n": "03",
+        "title": "Suivi de progression",
+        "body": "Un tableau de bord qui repère vos points faibles réels, séance après séance."
+      }
+    ],
+    "figures": [
+      { "value": "3 400+", "label": "Exercices corrigés" },
+      { "value": "100%",   "label": "Cours en direct avec un prof" },
+      { "value": "4",      "label": "Niveaux · Lycée → Licence" }
+    ]
+  },
+  "About": {
+    "eyebrow": "À propos",
+    "title": "À propos — Intégrale",
+    "description": "Intégrale est une plateforme de cours particuliers en ligne, mathématiques et physique-chimie, du lycée à la licence.",
+    "h1": "Une seule conviction : la qualité d’une explication change tout.",
+    "body1": "Intégrale est née à Paris en 2026 d’un constat simple : les élèves qui réussissent en sciences ne sont pas ceux qui passent le plus d’heures, ce sont ceux qui ont compris un bon prof, à un moment clé. Notre travail est de mettre ces profs devant chaque élève, en visio, au bon moment.",
+    "body2": "Mathématiques, physique, chimie — du lycée à la licence. Pas de promesse miracle, pas de contenu préfabriqué. Un prof, un élève, un programme, et l’exigence qu’il faut.",
+    "valuesEyebrow": "01 — Convictions",
+    "valuesTitle": "Ce que nous défendons.",
+    "values": [
+      {
+        "title": "Comprendre, pas seulement retenir",
+        "body": "Nos profs sont recrutés sur leur capacité à faire passer une idée, pas sur un classement. Une bonne réponse ne suffit pas — il faut une bonne explication."
+      },
+      {
+        "title": "Des maths et de la physique, au sérieux",
+        "body": "Pas de promesse miracle. Un programme aligné sur les attendus du lycée et des classes préparatoires, des exercices calibrés, des corrections rédigées."
+      },
+      {
+        "title": "La transparence, par défaut",
+        "body": "Prix clair par séance, créneau réel, facture envoyée. Pas d’abonnement caché, pas de commission opaque, pas d’effet de surprise."
+      }
+    ],
+    "ctaPrimary": "Voir les niveaux",
+    "ctaSecondary": "Nous contacter",
+    "bandTitle": "Réservez un premier cours gratuit",
+    "bandDescription": "Un premier échange de 20 minutes pour cibler vos besoins, puis un créneau offert avec un prof vérifié.",
+    "bandPrimary": "Réserver mon créneau",
+    "bandSecondary": "Voir les tarifs"
+  },
+  "Levels": {
+    "eyebrow": "Niveaux",
+    "h1": "Quatre parcours, un seul niveau d’exigence.",
+    "intro": "Lycée, classes préparatoires, BTS, licence : chaque parcours a son programme, ses exercices, et ses profs habitués aux attendus. Choisissez le vôtre, le reste suit.",
+    "requestQuote": "Demander un devis",
+    "sectionAria": "Détail des parcours",
+    "ctaTitle": "Une question sur votre niveau ?",
+    "ctaDescription": "Écrivez-nous, on vous oriente vers le bon parcours et le bon prof — sans engagement.",
+    "ctaPrimary": "Nous écrire",
+    "ctaSecondary": "Voir les tuteurs"
+  },
+  "Pricing": {
+    "eyebrow": "Tarifs",
+    "title": "Tarifs — Intégrale",
+    "description": "Trois formules : à la carte, pack 5 séances, mentorat continu. Tarif clair, facturation automatique, reçu envoyé par e-mail.",
+    "h1": "Tarifs simples, sans surprise",
+    "intro": "Choisissez la formule qui correspond à votre besoin. Aucun engagement caché, facturation automatique, reçu envoyé par e-mail.",
+    "tiersAria": "Formules et tarifs",
+    "tiersTitle": "Formules et tarifs",
+    "tiersHeading": "Formules et tarifs",
+    "faqEyebrow": "Questions fréquentes",
+    "faqTitle": "Questions fréquentes",
+    "faqItems": [
+      {
+        "q": "Puis-je annuler une séance ?",
+        "a": "Oui, jusqu’à 1 heure avant le début. Au-delà, la séance est due."
+      },
+      {
+        "q": "Comment fonctionne le paiement ?",
+        "a": "Stripe Checkout, sécurisé (Apple Pay, Google Pay, CB, SEPA). Vous recevez un reçu et une facture automatiquement."
+      },
+      {
+        "q": "Le prix inclut-il les ressources ?",
+        "a": "Oui, les supports partagés par le tuteur sont accessibles gratuitement pendant toute la durée du suivi."
+      }
+    ]
+  },
+  "Contact": {
+    "eyebrow": "Contact",
+    "title": "Contact — Intégrale",
+    "description": "Contactez l’équipe Intégrale : demande d’information, niveau, premier cours offert. Réponse sous 24 heures ouvrées.",
+    "h1": "Nous contacter",
+    "intro": "Une question, un projet, un partenariat ? Nous lisons tout et revenons vers vous sous 24 heures ouvrées.",
+    "formTitle": "Envoyez-nous un message",
+    "formHint": "Les champs marqués sont obligatoires.",
+    "form": {
+      "name": "Nom complet",
+      "email": "E-mail",
+      "subject": "Sujet",
+      "message": "Message",
+      "messageHint": "Décrivez votre besoin en quelques lignes (20 caractères minimum).",
+      "submit": "Envoyer le message",
+      "submitting": "Envoi en cours…",
+      "successTitle": "Message envoyé",
+      "successBody": "Merci, nous vous répondons sous 24 heures ouvrées.",
+      "toastSuccess": "Message envoyé. Nous revenons vers vous sous 24h.",
+      "errorTitle": "Envoi impossible",
+      "fallbackError": "Impossible d’envoyer le message.",
+      "networkError": "Erreur réseau. Veuillez réessayer."
+    },
+    "cardTitle": "Coordonnées directes",
+    "cardEmail": "E-mail",
+    "cardAddress": "Adresse",
+    "cardAddressValue": "Paris, FR",
+    "cardSupport": "Support",
+    "cardSupportHours": "Du lundi au vendredi, 9h–18h. Réponse sous 24h.",
+    "cardSupportNote": "Pour un problème technique sur une séance, merci d’utiliser la page de contact en précisant le n° de réservation. Ne partagez jamais votre mot de passe.",
+    "coordsTitle": "Coordonnées directes",
+    "emailLabel": "E-mail",
+    "addressLabel": "Adresse",
+    "supportLabel": "Support",
+    "supportHours": "Du lundi au vendredi, 9h–18h. Réponse sous 24h.",
+    "techIssue": "Pour un problème technique sur une séance, merci d’utiliser la {link} en précisant le n° de réservation. Ne partagez jamais votre mot de passe.",
+    "techIssueRich": "Pour un problème technique sur une séance, merci d’utiliser la <link>page de contact</link> en précisant le n° de réservation. Ne partagez jamais votre mot de passe."
+  },
+  "Tutors": {
+    "eyebrow": "Tuteurs",
+    "title": "Tuteurs — Intégrale",
+    "description": "Annuaire des tuteurs vérifiés Intégrale : sélectionnez votre professeur particulier en lycée, classes préparatoires, BTS ou licence.",
+    "h1": "Nos tuteurs",
+    "intro": "Tous nos tuteurs sont vérifiés sur dossier, entretien et démonstration de cours.",
+    "emptyTitle": "Les profils arrivent au lancement",
+    "emptyDescription": "L’équipe finalise la sélection des premiers tuteurs."
+  },
+  "Courses": {
+    "eyebrow": "Cours",
+    "title": "Cours — Intégrale",
+    "description": "Catalogue de cours particuliers en ligne : mathématiques, physique, chimie. Lycée, classes préparatoires, BTS et licence.",
+    "h1": "Tous les cours",
+    "intro": "Parcourez l’ensemble du catalogue par matière et niveau.",
+    "emptyTitle": "Aucun cours publié pour l’instant",
+    "emptyDescription": "Les premiers cours seront ajoutés au fil du remplissage du catalogue."
+  },
+  "NotFound": {
+    "eyebrow": "404",
+    "h1": "Page introuvable",
+    "body": "La page que vous cherchez n’existe pas ou a été déplacée.",
+    "home": "Retour à l’accueil",
+    "contact": "Contacter le support"
+  },
+  "Error": {
+    "title": "Une erreur inattendue est survenue"
+  },
+  "Auth": {
+    "layout": {
+      "skipLink": "Aller au contenu principal",
+      "brandAria": "Intégrale — Accueil"
+    },
+    "login": {
+      "h1": "Connexion",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "submit": "Se connecter",
+      "submitting": "Connexion…",
+      "forgot": "Mot de passe oublié",
+      "create": "Créer un compte",
+      "fallbackError": "Erreur inconnue."
+    },
+    "register": {
+      "h1": "Créer un compte",
+      "fullName": "Nom complet",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "passwordHint": "10 caractères minimum, avec une majuscule, une minuscule et un chiffre.",
+      "terms": "J’accepte les <terms>conditions générales d’utilisation</terms> et la <privacy>politique de confidentialité</privacy>.",
+      "termsLink": "conditions générales d’utilisation",
+      "privacyLink": "politique de confidentialité",
+      "submit": "Créer mon compte",
+      "submitting": "Création…",
+      "alreadyHave": "Déjà un compte ?",
+      "signin": "Se connecter",
+      "fallbackError": "Erreur inconnue."
+    },
+    "forgotPassword": {
+      "h1": "Mot de passe oublié",
+      "intro": "Entrez l’adresse e-mail de votre compte : nous vous enverrons un lien sécurisé pour choisir un nouveau mot de passe.",
+      "email": "E-mail",
+      "submit": "Envoyer le lien",
+      "submitting": "Envoi…",
+      "sentTitle": "Lien envoyé",
+      "sentBody": "Si un compte existe pour cette adresse, vous recevrez un lien de réinitialisation dans quelques minutes.",
+      "backToLogin": "Retour à la connexion",
+      "fallbackError": "Erreur inconnue."
+    },
+    "resetPassword": {
+      "h1": "Nouveau mot de passe",
+      "intro": "Choisissez un nouveau mot de passe pour votre compte. 10 caractères minimum, avec une majuscule, une minuscule et un chiffre.",
+      "newPassword": "Nouveau mot de passe",
+      "submit": "Mettre à jour",
+      "submitting": "Mise à jour…",
+      "successTitle": "Mot de passe mis à jour",
+      "successBody": "Vous allez être redirigé vers votre espace…",
+      "goToSpace": "Aller à l’espace",
+      "fallbackError": "Erreur inconnue.",
+      "invalidLink": "Lien invalide."
+    },
+    "verifyEmail": {
+      "h1": "Vérifiez votre boîte mail",
+      "intro": "Confirmez votre adresse e-mail pour activer votre compte.",
+      "body": "Nous venons d’envoyer un e-mail de confirmation à l’adresse que vous avez indiquée. Ouvrez-le et cliquez sur le lien pour activer votre compte.",
+      "spam": "Vous n’avez rien reçu ? Vérifiez votre dossier de courrier indésirable, ou <retry>réessayez de créer un compte</retry>.",
+      "retry": "réessayez de créer un compte",
+      "backHome": "Retour à l’accueil"
+    }
+  },
+  "Dashboard": {
+    "loading": "Chargement de votre espace…",
+    "layout": {
+      "loading": "Chargement de votre espace…"
+    },
+    "home": {
+      "title": "Tableau de bord",
+      "welcome": "Bienvenue.",
+      "subline": "Retrouvez vos cours, vos paiements et vos ressources.",
+      "open": "Ouvrir"
+    },
+    "cards": {
+      "bookings": {
+        "title": "Mes réservations",
+        "description": "Consultez vos séances à venir et votre historique."
+      },
+      "resources": {
+        "title": "Ressources",
+        "description": "Supports de cours, exercices corrigés, notes partagées."
+      },
+      "profile": {
+        "title": "Mon profil",
+        "description": "Informations personnelles, niveau, préférences."
+      }
+    },
+    "bookings": {
+      "title": "Mes réservations",
+      "subline": "Vos séances à venir et votre historique.",
+      "emptyTitle": "Aucune réservation pour le moment",
+      "emptyDescription": "Vos futures séances apparaîtront ici dès que vous en aurez réservées une."
+    },
+    "resources": {
+      "title": "Ressources",
+      "subline": "Les supports partagés par vos profs apparaîtront ici.",
+      "emptyTitle": "Aucune ressource pour l’instant",
+      "emptyDescription": "Les PDF, fiches d’exercices et notes de cours partagés pendant vos séances seront listés ici."
+    },
+    "profile": {
+      "title": "Mon profil",
+      "subline": "Vos informations de compte. La modification sera activée en Sprint B2.",
+      "name": "Nom",
+      "email": "E-mail",
+      "created": "Compte créé le",
+      "id": "ID",
+      "editDisabled": "Modifier mon profil (Sprint B2)"
+    },
+    "sidebar": {
+      "aria": "Navigation de l’espace personnel",
+      "items": [
+        { "id": "dashboard", "label": "Tableau de bord", "href": "/dashboard" },
+        { "id": "bookings",  "label": "Mes réservations", "href": "/dashboard/bookings" },
+        { "id": "resources", "label": "Ressources", "href": "/dashboard/resources" },
+        { "id": "profile",   "label": "Profil", "href": "/dashboard/profile" }
+      ]
+    },
+    "topNav": {
+      "aria": "Navigation de l’espace personnel",
+      "items": [
+        { "id": "dashboard", "label": "Tableau de bord", "href": "/dashboard" },
+        { "id": "bookings",  "label": "Mes réservations", "href": "/dashboard/bookings" },
+        { "id": "resources", "label": "Ressources", "href": "/dashboard/resources" },
+        { "id": "profile",   "label": "Profil", "href": "/dashboard/profile" }
+      ]
+    },
+    "breadcrumbs": {
+      "aria": "Fil d’Ariane",
+      "home": "Accueil",
+      "about": "À propos",
+      "levels": "Niveaux",
+      "pricing": "Tarifs",
+      "contact": "Contact",
+      "tutors": "Tuteurs",
+      "courses": "Cours",
+      "login": "Connexion",
+      "register": "Créer un compte",
+      "forgotPassword": "Mot de passe oublié",
+      "resetPassword": "Nouveau mot de passe",
+      "verifyEmail": "Vérifiez votre boîte",
+      "dashboard": "Tableau de bord"
+    },
+    "header": {
+      "fallbackName": "Mon espace",
+      "subtitle": "Espace personnel",
+      "signOut": "Se déconnecter",
+      "signOutAria": "Se déconnecter"
+    },
+    "labels": {
+      "dashboard": "Tableau de bord",
+      "bookings": "Mes réservations",
+      "resources": "Ressources",
+      "profile": "Profil"
+    }
+  },
+  "Admin": {
+    "title": "Vue d’ensemble",
+    "h1": "Vue d’ensemble",
+    "subline": "Indicateurs clés de la plateforme."
+  },
+  "SiteHeader": {
+    "mySpace": "Mon espace",
+    "signin": "Connexion",
+    "signup": "Créer un compte",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "ariaHome": "Intégrale — Accueil",
+    "languageSwitcher": {
+      "label": "Langue",
+      "english": "Anglais",
+      "french": "Français"
+    }
+  },
+  "SiteFooter": {
+    "copyright": "© {year} Intégrale"
+  },
+  "Validation": {
+    "emailInvalid": "Adresse e-mail invalide.",
+    "passwordMin": "Le mot de passe doit contenir au moins 10 caractères.",
+    "passwordLower": "Le mot de passe doit contenir une minuscule.",
+    "passwordUpper": "Le mot de passe doit contenir une majuscule.",
+    "passwordDigit": "Le mot de passe doit contenir un chiffre.",
+    "loginPasswordRequired": "Mot de passe requis.",
+    "nameShort": "Le nom est trop court.",
+    "terms": "Vous devez accepter les CGU.",
+    "contact": {
+      "nameShort": "Le nom est trop court.",
+      "subjectShort": "Le sujet est trop court.",
+      "messageMin": "Le message doit contenir au moins 20 caractères."
+    }
+  },
+  "ApiErrors": {
+    "rateLimited": "Trop de requêtes. Réessayez plus tard.",
+    "validation": "Veuillez vérifier les champs du formulaire.",
+    "sendFailed": "Envoi impossible. Réessayez plus tard.",
+    "serverError": "Erreur interne du serveur",
+    "missingCode": "Paramètre code manquant."
+  },
+  "ContactEmail": {
+    "subjectPrefix": "[Contact]",
+    "fromLabel": "De :"
+  }
+}

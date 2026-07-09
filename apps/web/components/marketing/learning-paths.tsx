@@ -6,13 +6,28 @@ import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { LevelChip } from './level-chip';
 import { SectionEyebrow } from './section-eyebrow';
-import { LEARNING_PATHS } from '@/lib/constants/brand';
+import type { LocalisedLearningPath } from '@/lib/i18n/paths';
+
+type LearningPathsProps = {
+  /** Eyebrow above the section title, e.g. "01 — Tracks". */
+  eyebrow: string;
+  /** Section title. */
+  title: string;
+  /** Intro paragraph. */
+  intro: string;
+  /** Trailing "see the details by level" link label. */
+  seeAllLabel: string;
+  /** The four (or N) paths to render. */
+  paths: ReadonlyArray<LocalisedLearningPath>;
+};
 
 /**
- * Section 01 — Parcours. Four learning paths (Lycée, Prépa, BTS,
- * Licence). Copy is verbatim from the client brief.
+ * Section 01 — Parcours. Pure presentational: every string comes
+ * from the active locale's message file. The four learning paths
+ * are passed in as `paths` so the same component is shared between
+ * the home page and the `/levels` page.
  */
-export function LearningPaths() {
+export function LearningPaths({ eyebrow, title, intro, seeAllLabel, paths }: LearningPathsProps) {
   return (
     <Section
       aria-labelledby="parcours-title"
@@ -20,22 +35,21 @@ export function LearningPaths() {
     >
       <Container>
         <div className="mx-auto max-w-2xl text-center sm:text-left">
-          <SectionEyebrow number="01" label="Parcours" />
+          <SectionEyebrow number="01" label={eyebrow} />
           <Heading
             id="parcours-title"
             level="h2"
             className="mt-3 text-3xl font-bold sm:text-4xl"
           >
-            Quatre parcours, un seul niveau d’exigence.
+            {title}
           </Heading>
           <p className="mt-3 text-pretty text-base text-muted-foreground sm:text-lg">
-            Du lycée à la licence, nous accompagnons chaque élève avec un
-            contenu calibré sur le programme officiel et les concours visés.
+            {intro}
           </p>
         </div>
 
         <ul className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {LEARNING_PATHS.map((p) => (
+          {paths.map((p) => (
             <li
               key={p.id}
               className="flex flex-col gap-3 rounded-lg border bg-card p-6 shadow-sm"
@@ -60,7 +74,7 @@ export function LearningPaths() {
             href="/levels"
             className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--brand-accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Voir les détails par niveau
+            {seeAllLabel}
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>

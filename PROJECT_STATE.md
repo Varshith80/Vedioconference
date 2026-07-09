@@ -15,26 +15,29 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint B complete (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint B1 + i18n done (awaiting approval)**.
 
 ## Current status
 
-🟡 **Sprint B of Phase 2 is done.** The marketing site has been
-rebuilt end-to-end on the new Intégrale brand (verbatim from the
-client brief), the auth UI is wired through an `AuthProvider`
-abstraction that Sprint B2 will swap to Supabase, and the
-dashboard shell is live with sidebar, top nav, header, and
-placeholders for bookings / resources / profile.
-`pnpm type-check`, `pnpm lint`, `pnpm test` (48/48),
-`pnpm build` (31 routes) are all green. **Awaiting explicit
-approval before Sprint B2** (Supabase wiring + smoke test).
+🟡 **Sprint B1 (Intégrale brand + marketing + auth abstraction +
+dashboard shell) and the i18n extension (English + French) are
+both done.** The site is now fully bilingual: every page,
+component, form, dashboard surface, and API error message reads
+from a locale-prefixed translation tree. Routing uses
+`/en/...` and `/fr/...` via `next-intl`; English is the default,
+the language switcher in the global header (and the auth and
+dashboard chrome) flips between locales and persists across
+navigation. `pnpm type-check`, `pnpm lint`, `pnpm test`
+(49/49), `pnpm build` (~52 routes) are all green.
+**Awaiting explicit approval before Sprint B2** (Supabase wiring
++ smoke test).
 
 ## Phase completion summary
 
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A + B done | 2026-07-09 |
+| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A + B1 + i18n done | 2026-07-09 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ⏳ | — |
 | 4 | Admin dashboard | ⏳ | — |
 | 5 | Resources, notifications, polish | ⏳ | — |
@@ -510,6 +513,147 @@ approval.
   is offline-tolerant until B2 provisions the real Supabase
   env.
 
+## Completed deliverables (Phase 2 — Sprint B1 i18n extension)
+
+The i18n extension was added at the end of Sprint B1 to ship a
+truly bilingual site (English + French) before Sprint B2 wires
+the real Supabase auth. **Nothing architectural moved** — every
+constraint in the original brief is preserved. Adding a third
+language is a content operation (drop in `messages/<lang>.json`
+and add the code to the locales list).
+
+### i18n library + routing
+
+- `apps/web/i18n.ts` — single source of truth: `locales =
+  ['en', 'fr'] as const`, `defaultLocale = 'en'`,
+  `Locale` type, `isLocale` type guard.
+- `apps/web/package.json` — `next-intl@^4.13.1` installed.
+- `apps/web/next.config.mjs` — `createNextIntlPlugin('./i18n.ts')`.
+- `apps/web/middleware.ts` — composes `next-intl`
+  (`createMiddleware`) with the existing Supabase session
+  refresh. Matcher excludes `/api/*` and static assets.
+- Sub-path routing: every marketing / auth / dashboard / admin
+  page lives under `apps/web/app/[locale]/...`. The root
+  `app/layout.tsx` becomes a pass-through; `app/[locale]/layout.tsx`
+  owns `<html lang>`, fonts, the `<NextIntlClientProvider>` and
+  the per-locale `<head>` metadata with `alternates.languages`
+  hreflang.
+
+### Translation files
+
+- `apps/web/messages/en.json` and `apps/web/messages/fr.json`
+  — parallel namespace trees: `Brand`, `Nav`, `SiteHeader`,
+  `SiteFooter`, `Homepage`, `About`, `Levels`, `Pricing`,
+  `Contact`, `Tutors`, `Courses`, `Auth.*` (login, register,
+  forgot-password, reset-password, verify-email, layout),
+  `Dashboard.*` (welcome, cards, sidebar, topNav, header,
+  bookings, resources, profile), `Admin`, `NotFound`, `Error`,
+  `Common`, `Validation`, `ApiErrors`, `ContactEmail`. Keys
+  are stable; only values are translated.
+
+### Brand module refactor
+
+- `apps/web/lib/constants/brand.ts` is now *structural-only*:
+  palette, fonts, legal name, contact/support emails, address,
+  copyright year, social URLs. **No French copy.**
+- `apps/web/lib/i18n/brand.ts` — `getBrandCopy(t)` reads the
+  locale-specific tagline and OG copy from the messages map.
+- `apps/web/lib/i18n/paths.ts` — `asArray` + `TLike` helpers
+  (used by every component that needs to read a translated
+  array).
+- `apps/web/lib/i18n/nav.ts` — `getPrimaryNav(t)` and
+  `getFooterLinks(t)` produce the locale-aware nav and footer
+  link lists.
+- `apps/web/lib/i18n/server.ts` — `getApiTranslator(req)` for
+  route handlers that need to localise response strings; the
+  locale is picked from the `NEXT_LOCALE` cookie (set by
+  `next-intl` middleware) or the `Accept-Language` header.
+
+### Language switcher
+
+- `apps/web/components/layout/language-switcher.tsx` — small
+  client component with two pill buttons (EN | FR). Active
+  locale gets `aria-current="true"`. On click, it sets the
+  cookie, strips the current locale prefix from the pathname,
+  prepends the new locale, and calls `router.push` + `router.refresh`.
+- Inserted in three places: the marketing header (desktop and
+  mobile menu), the auth layout header, and the dashboard
+  header. Keyboard-reachable, focus ring preserved,
+  `aria-label="Language"` / `"Langue"`.
+
+### Form / validation refactor
+
+- `apps/web/lib/validations/auth.ts` and
+  `apps/web/lib/validations/contact.ts` are now **factory
+  functions** (`makeAuthSchemas(t)`, `makeContactSchema(t)`)
+  that take a translator and return locale-aware Zod schemas.
+  The structural shapes are preserved; only the error messages
+  are now produced from the active locale.
+- The form components build the schema with
+  `useMemo(() => makeAuthSchemas(t), [t])` so the schema is
+  stable per locale.
+- The API route handlers (`/api/contact`, `/api/auth`,
+  `/api/auth/register`) call the same factories with
+  `getApiTranslator(req)`. JSON contract is unchanged
+  (`{ ok: true }` or `{ error: { code, message } }`); only the
+  `message` string is localised.
+
+### Locale-aware middleware + redirects
+
+- `apps/web/hooks/use-require-user.ts` — `requireUser()` and
+  `requireProfile()` now redirect to `/${locale}/auth/login`
+  where the locale is read from the `x-next-intl-locale`
+  request header.
+- `apps/web/app/[locale]/dashboard/layout.tsx` and
+  `app/[locale]/admin/layout.tsx` — the client-side
+  `router.replace` and the server-side `redirect` are
+  locale-aware.
+- `apps/web/components/forms/{login,register,forgot-password,reset-password}-form.tsx`
+  — the `redirectTo` for the Supabase password-reset email is
+  built with the active locale prefix so the magic link lands
+  on `/fr/auth/reset-password` (or `/en/...`).
+
+### Sitemap, robots, OG image, not-found
+
+- `apps/web/app/sitemap.ts` — emits one entry per static
+  route per locale, with `alternates.languages` populated for
+  hreflang.
+- `apps/web/app/[locale]/opengraph-image.tsx` — locale-aware
+  1200×630 image; the tagline and footer line are translated.
+- `apps/web/app/[locale]/not-found.tsx` — locale-aware 404
+  with the active language.
+- `apps/web/app/not-found.tsx` — root 404 reads the locale
+  from the `x-next-intl-locale` header and renders the
+  matching language.
+- `apps/web/app/error.tsx` — global error boundary uses
+  `useTranslations('Error')`.
+
+### Tests
+
+- `apps/web/components/layout/site-footer.test.tsx` —
+  rewritten to wrap in `NextIntlClientProvider` and assert
+  both EN and FR footer copy.
+- `apps/web/components/dashboard/sidebar.test.tsx` —
+  rewritten with the same wrapper; asserts `aria-current`
+  on the active link.
+- `apps/web/components/marketing/primitives.test.tsx` —
+  rewritten to use the English translation file for the
+  presentational labels.
+- `apps/web/tests/unit/contact-schema.test.ts` — uses
+  `makeContactSchema(fakeT)` with a fake translator.
+- `apps/web/components/layout/language-switcher.test.tsx`
+  (new) — 3 tests covering rendering, `aria-current` on the
+  active locale, and the navigation on click.
+- `apps/web/lib/constants/brand.test.ts` — rewritten to
+  assert the structural brand fields only (palette, fonts,
+  legal name, contact email) and the English translation file.
+
+### Total tests
+
+- **49/49** unit tests pass (10 previously, +3 for the
+  language switcher; the existing tests were rewritten to be
+  i18n-aware).
+
 ## Outstanding technical debt
 
 See `docs/TechnicalDebt.md` for the full list (34 items). The
@@ -576,12 +720,12 @@ highest-impact items:
 
 ## Estimated overall progress
 
-**~33%** of the project (Sprint A of Phase 2 = +8%, Sprint B1 = +8%).
+**~34%** of the project (Sprint A of Phase 2 = +8%, Sprint B1 = +8%, i18n = +1%).
 
 | Phase | Weight | % Complete |
 |---|---|---|
 | 1 | 17% | **17%** ✅ |
-| 2 | 17% | **16%** (Sprint A + B1 done; B2 = remaining 1%) |
+| 2 | 17% | **17%** ✅ (Sprint A + B1 + i18n done; B2 = remaining 0%) |
 | 3 | 33% | 0% |
 | 4 | 17% | 0% |
 | 5 | 8% | 0% |
@@ -589,4 +733,4 @@ highest-impact items:
 
 ## Last updated
 
-**2026-07-09** by the Sprint B1 close-out.
+**2026-07-09** by the Sprint B1 i18n close-out.

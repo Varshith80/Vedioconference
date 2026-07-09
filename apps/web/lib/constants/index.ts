@@ -12,10 +12,5 @@ export {
   BRAND,
   BRAND_COLORS,
   BRAND_FONTS,
-  FOOTER_LINKS,
-  KEY_FIGURES,
-  LEARNING_PATHS,
-  METHOD_STEPS,
-  PRIMARY_NAV,
 } from './brand';
 export type { LearningPathId } from './brand';

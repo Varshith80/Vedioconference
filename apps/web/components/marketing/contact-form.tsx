@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { z } from 'zod';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
-import { contactSchema } from '@/lib/validations/contact';
+import { makeContactSchema, type ContactInput } from '@/lib/validations/contact';
 import { cn } from '@/lib/utils/cn';
-
-type Values = z.infer<typeof contactSchema>;
 
 /**
  * Contact form. Posts to `/api/contact`. The API uses Zod + a
@@ -23,17 +21,22 @@ type Values = z.infer<typeof contactSchema>;
  * FormMessage pattern as the rest of the auth forms (Sprint B).
  */
 export function ContactForm() {
+  const tForm = useTranslations('Contact.form');
+  const tApi = useTranslations('ApiErrors');
+  const t = useTranslations();
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  const schema = useMemo(() => makeContactSchema(t), [t]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm<Values>({
-    resolver: zodResolver(contactSchema),
+  } = useForm<ContactInput>({
+    resolver: zodResolver(schema),
     defaultValues: { name: '', email: '', subject: '', message: '', website: '' },
   });
 
@@ -50,14 +53,14 @@ export function ContactForm() {
           const body = (await res.json().catch(() => null)) as
             | { error?: { message?: string } }
             | null;
-          setServerError(body?.error?.message ?? 'Impossible d’envoyer le message.');
+          setServerError(body?.error?.message ?? tApi('sendFailed'));
           return;
         }
         setDone(true);
         reset();
-        toast.success('Message envoyé. Nous revenons vers vous sous 24h.');
+        toast.success(tForm('toastSuccess'));
       } catch {
-        setServerError('Erreur réseau. Veuillez réessayer.');
+        setServerError(tApi('validation'));
       }
     });
   });
@@ -66,10 +69,8 @@ export function ContactForm() {
     return (
       <Alert variant="success" role="status" className="text-left">
         <CheckCircle2 className="h-4 w-4" />
-        <AlertTitle>Message envoyé</AlertTitle>
-        <AlertDescription>
-          Merci, nous vous répondons sous 24 heures ouvrées.
-        </AlertDescription>
+        <AlertTitle>{tForm('successTitle')}</AlertTitle>
+        <AlertDescription>{tForm('successBody')}</AlertDescription>
       </Alert>
     );
   }
@@ -84,7 +85,7 @@ export function ContactForm() {
       {serverError && (
         <Alert variant="destructive" id="contact-error" role="alert">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Envoi impossible</AlertTitle>
+          <AlertTitle>{tApi('sendFailed')}</AlertTitle>
           <AlertDescription>{serverError}</AlertDescription>
         </Alert>
       )}
@@ -100,7 +101,7 @@ export function ContactForm() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field
           id="contact-name"
-          label="Nom complet"
+          label={tForm('name')}
           error={errors.name?.message}
         >
           <Input
@@ -114,7 +115,7 @@ export function ContactForm() {
 
         <Field
           id="contact-email"
-          label="E-mail"
+          label={tForm('email')}
           error={errors.email?.message}
         >
           <Input
@@ -128,7 +129,7 @@ export function ContactForm() {
         </Field>
       </div>
 
-      <Field id="contact-subject" label="Sujet" error={errors.subject?.message}>
+      <Field id="contact-subject" label={tForm('subject')} error={errors.subject?.message}>
         <Input
           id="contact-subject"
           aria-invalid={Boolean(errors.subject)}
@@ -139,8 +140,8 @@ export function ContactForm() {
 
       <Field
         id="contact-message"
-        label="Message"
-        hint="Décrivez votre besoin en quelques lignes (20 caractères minimum)."
+        label={tForm('message')}
+        hint={tForm('messageHint')}
         error={errors.message?.message}
       >
         <Textarea
@@ -153,7 +154,7 @@ export function ContactForm() {
       </Field>
 
       <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
-        {isPending ? 'Envoi en cours…' : 'Envoyer le message'}
+        {isPending ? tForm('submitting') : tForm('submit')}
       </Button>
     </form>
   );

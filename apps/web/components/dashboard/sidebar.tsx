@@ -4,8 +4,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BookOpen, CalendarRange, LayoutDashboard, User2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/layout/brand-mark';
 import { cn } from '@/lib/utils/cn';
+import { asArray, type TLike } from '@/lib/i18n/paths';
 
 interface NavItem {
   href: string;
@@ -15,30 +17,44 @@ interface NavItem {
   exact?: boolean;
 }
 
-const NAV: ReadonlyArray<NavItem> = [
-  { href: '/dashboard',           label: 'Tableau de bord', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/bookings',  label: 'Mes réservations', icon: CalendarRange },
-  { href: '/dashboard/resources', label: 'Ressources',        icon: BookOpen },
-  { href: '/dashboard/profile',   label: 'Profil',            icon: User2 },
-];
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  dashboard: LayoutDashboard,
+  bookings: CalendarRange,
+  resources: BookOpen,
+  profile: User2,
+};
+
+function getNavItems(t: TLike & { raw: (key: string) => unknown }, locale: string): ReadonlyArray<NavItem> {
+  const items = asArray<{ id: string; label: string; href: string }>(t.raw('Dashboard.sidebar.items'));
+  return items.map((it) => ({
+    href: `/${locale}${it.href}`,
+    label: it.label,
+    icon: ICONS[it.id] ?? LayoutDashboard,
+    exact: it.id === 'dashboard',
+  }));
+}
 
 /**
- * Sidebar used by the `(dashboard)` layout. The current item is
- * marked with `aria-current="page"` and a left-edge accent
+ * Sidebar used by the `([locale]/dashboard)` layout. The current
+ * item is marked with `aria-current="page"` and a left-edge accent
  * stripe. The sidebar is hidden on small screens — a top nav
  * takes over below `md`.
  */
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations();
+  const tDash = useTranslations('Dashboard');
+  const nav = getNavItems(t, locale);
   return (
     <aside
-      aria-label="Navigation de l’espace personnel"
+      aria-label={tDash('sidebar.aria')}
       className="hidden w-60 shrink-0 border-r bg-card md:flex md:flex-col"
     >
       <div className="flex h-16 items-center border-b px-5">
         <Link
-          href="/"
-          aria-label="Intégrale — Accueil"
+          href={`/${locale}`}
+          aria-label="Intégrale — Home"
           className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BrandMark />
@@ -46,7 +62,7 @@ export function DashboardSidebar() {
       </div>
       <nav className="flex-1 p-3">
         <ul role="list" className="flex flex-col gap-1">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const Icon = item.icon;
             const active = item.exact
               ? pathname === item.href

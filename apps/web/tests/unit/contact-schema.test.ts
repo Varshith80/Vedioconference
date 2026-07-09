@@ -1,9 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { contactSchema } from '@/lib/validations/contact';
+import { makeContactSchema } from '@/lib/validations/contact';
 
-describe('contactSchema', () => {
+const DICT: Record<string, string> = {
+  'Validation.emailInvalid': 'Invalid email address.',
+  'Validation.contact.nameShort': 'The name is too short.',
+  'Validation.contact.subjectShort': 'The subject is too short.',
+  'Validation.contact.messageMin': 'The message must contain at least 20 characters.',
+};
+const t = (k: string): string => DICT[k] ?? k;
+
+describe('makeContactSchema', () => {
+  const schema = makeContactSchema(t);
+
   it('accepts a valid payload', () => {
-    const r = contactSchema.safeParse({
+    const r = schema.safeParse({
       name: 'Jean Dupont',
       email: 'jean@example.com',
       subject: 'Question sur les tarifs',
@@ -12,8 +22,8 @@ describe('contactSchema', () => {
     expect(r.success).toBe(true);
   });
 
-  it('rejects an empty honeypot is fine, but a non-empty honeypot is rejected', () => {
-    const r = contactSchema.safeParse({
+  it('rejects a non-empty honeypot', () => {
+    const r = schema.safeParse({
       name: 'Jean Dupont',
       email: 'jean@example.com',
       subject: 'Question',
@@ -24,7 +34,7 @@ describe('contactSchema', () => {
   });
 
   it('rejects a too-short message', () => {
-    const r = contactSchema.safeParse({
+    const r = schema.safeParse({
       name: 'Jean',
       email: 'jean@example.com',
       subject: 'Question',
@@ -34,7 +44,7 @@ describe('contactSchema', () => {
   });
 
   it('rejects an invalid email', () => {
-    const r = contactSchema.safeParse({
+    const r = schema.safeParse({
       name: 'Jean',
       email: 'not-an-email',
       subject: 'Question',

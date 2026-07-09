@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { errorResponse } from '@/lib/utils/api';
 import { BadRequest, Unauthorized } from '@/lib/utils/errors';
-import { loginSchema } from '@/lib/validations/auth';
+import { makeAuthSchemas } from '@/lib/validations/auth';
+import { getApiTranslator } from '@/lib/i18n/server';
 import { getAuthProvider } from '@/services/auth/auth-provider-factory';
 
 /**
@@ -14,6 +15,8 @@ import { getAuthProvider } from '@/services/auth/auth-provider-factory';
  */
 export async function POST(req: NextRequest) {
   try {
+    const t = await getApiTranslator(req);
+    const { loginSchema } = makeAuthSchemas(t);
     const body = loginSchema.parse(await req.json());
     const provider = getAuthProvider();
     const result = await provider.signInWithPassword(body);

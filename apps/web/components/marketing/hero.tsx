@@ -6,19 +6,26 @@ import { Button } from '@/components/ui/button';
 import { HeroCurve } from './hero-curve';
 import { LivePill } from './live-pill';
 
+type HeroProps = {
+  /** Hero headline. */
+  headline: string;
+  /** Hero subheadline. */
+  subheadline: string;
+  /** Primary CTA label. */
+  primaryLabel: string;
+  /** Secondary CTA label. */
+  secondaryLabel: string;
+  /** Social proof line below the CTAs. */
+  socialProof: string;
+};
+
 /**
  * Above-the-fold marketing block. Server-rendered. Two responsive
  * columns from `md` upward; the visual collapses cleanly to a
- * single column on mobile.
- *
- * Copy is verbatim from the client homepage brief
- * (`page-accueil-Integrale-2.docx`):
- *   headline:    "Comprendre, pas seulement retenir."
- *   primary CTA: "Réserver un cours gratuit" → /contact
- *   secondary:   "Voir les niveaux" → /levels
- *   social:      "Cours en direct · petits groupes ou individuel · Seconde → Licence"
+ * single column on mobile. Every string is a prop so the same
+ * component serves both `/en` and `/fr`.
  */
-export function Hero() {
+export function Hero({ headline, subheadline, primaryLabel, secondaryLabel, socialProof }: HeroProps) {
   return (
     <section
       aria-labelledby="hero-title"
@@ -32,27 +39,26 @@ export function Hero() {
               id="hero-title"
               className="font-heading text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-5xl md:text-6xl"
             >
-              <span className="text-balance">Comprendre, pas seulement retenir.</span>
+              <span className="text-balance">{headline}</span>
             </h1>
-            <p className="mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
-              Cours particuliers en ligne, en visio, avec un prof vérifié —
-              maths, physique et chimie du lycée à la licence.
+            <p className="mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
+              {subheadline}
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button asChild size="lg">
                 <Link href="/contact">
-                  Réserver un cours gratuit
+                  {primaryLabel}
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link href="/levels">Voir les niveaux</Link>
+                <Link href="/levels">{secondaryLabel}</Link>
               </Button>
             </div>
 
             <p className="mt-8 text-sm text-muted-foreground sm:text-base">
-              Cours en direct · petits groupes ou individuel · Seconde → Licence
+              {socialProof}
             </p>
           </div>
 

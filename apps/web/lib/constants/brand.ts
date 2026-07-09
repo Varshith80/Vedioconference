@@ -1,13 +1,22 @@
 /**
- * Brand source of truth. This file is the single place where the
- * Intégrale brand identity lives. The marketing site, the
- * dashboard shell, the auth pages, the OG image, and the JSON-LD
- * all read from here. The values come from the client-provided
- * brand document (`charte-graphique-Integrale.docx`).
+ * Brand source of truth (structural only).
  *
- * Rule of thumb: components never hardcode a colour or a typeface.
- * They read from this file or from the CSS variables in
- * `styles/globals.css`, which are derived from the same hex codes.
+ * This file is the single place where the **locale-agnostic**
+ * Intégrale brand identity lives: the palette, the fonts, the
+ * legal entity, the contact email, the address, the copyright
+ * year, the social URLs. Everything in here is identical in every
+ * language.
+ *
+ * Locale-specific strings — the tagline, the short description,
+ * the primary nav, the footer links, the learning paths, the
+ * method steps, the key figures — live in `messages/<locale>.json`
+ * and are read via the helpers in `lib/i18n/` (e.g.
+ * `getBrandCopy(t)`, `getLearningPaths(t)`).
+ *
+ * The marketing site, the dashboard shell, the auth pages, the OG
+ * image, and the JSON-LD all read from either here (structural)
+ * or the message files (localised). Components never hardcode a
+ * colour, a typeface, or a user-facing string.
  */
 
 /** Hex codes (canonical). Keep in sync with the HSL tokens in `globals.css`. */
@@ -20,25 +29,24 @@ export const BRAND_COLORS = {
   blancCarte:       '#FFFFFF', // card surfaces
 } as const;
 
-/** Type stack (locked). All three are loaded in `app/layout.tsx`. */
+/** Type stack (locked). All three are loaded in `app/[locale]/layout.tsx`. */
 export const BRAND_FONTS = {
   serif: 'IBM Plex Serif', // display, titles, wordmark
   sans:  'IBM Plex Sans',  // body, UI
   mono:  'IBM Plex Mono',  // formulas, badges, numerals, level chips
 } as const;
 
+/**
+ * Structural brand identity. **No localised strings live here.**
+ * For the tagline and the short description, use `getBrandCopy(t)`
+ * from `lib/i18n/brand.ts`.
+ */
 export const BRAND = {
   /** Canonical brand name. The wordmark renders this string with
    *  the second "e" replaced by a `∫` glyph (handled in `BrandMark`). */
   name: 'Intégrale',
   /** The wordmark text exactly as it should be displayed. */
   wordmark: 'Intégrale',
-  /** Tagline shown under the wordmark and used as the default
-   *  meta description. */
-  tagline: 'Mathématiques · Physique-Chimie — du lycée à la licence',
-  /** One-sentence description for JSON-LD and OG. */
-  shortDescription:
-    'Plateforme de cours particuliers en ligne, mathématiques et physique-chimie, du lycée à la licence.',
   /** Legal entity. */
   legalName: 'Intégrale SAS',
   /** Public-facing e-mail. Placeholder until the client provisions
@@ -56,95 +64,11 @@ export const BRAND = {
   },
 } as const;
 
-/** The five top-level marketing pages, in the order they appear
- *  in the primary nav. The brief does not specify a nav, so this
- *  follows the page list the user gave us. The two legacy routes
- *  (`/courses`, `/tutors`) are reachable from the URL bar and
- *  from the sitemap, but are intentionally NOT in the nav. */
-export const PRIMARY_NAV = [
-  { label: 'Niveaux',  href: '/levels' },
-  { label: 'Tuteurs',  href: '/tutors' },
-  { label: 'Tarifs',   href: '/pricing' },
-  { label: 'À propos', href: '/about' },
-  { label: 'Contact',  href: '/contact' },
-] as const;
-
-/** Footer (single line, per the brief):
- *  Niveaux · Tarifs · Contact · Mentions légales · © 2026 Intégrale. */
-export const FOOTER_LINKS = [
-  { label: 'Niveaux',         href: '/levels' },
-  { label: 'Tarifs',          href: '/pricing' },
-  { label: 'Contact',         href: '/contact' },
-  { label: 'Mentions légales', href: '/legal/notice' },
-] as const;
-
-/** The four learning paths. Single source for the home, the
- *  /levels page, and the dashboard. */
-export const LEARNING_PATHS = [
-  {
-    id: 'lycee' as const,
-    level: 'Lycée',
-    badge: 'LYCÉE',
-    headline: 'Seconde → Terminale',
-    blurb:
-      'Programme Spé Maths & Spé Physique-Chimie, préparation au Bac et à Parcoursup.',
-    subjects: 'Maths · Physique-Chimie',
-  },
-  {
-    id: 'prepa' as const,
-    level: 'Prépa',
-    badge: 'PRÉPA',
-    headline: 'MPSI / PCSI / MP / PC',
-    blurb:
-      'Colles types, méthodes de rédaction et exercices calibrés difficulté concours.',
-    subjects: 'Maths · Physique · Chimie',
-  },
-  {
-    id: 'bts' as const,
-    level: 'BTS',
-    badge: 'BTS',
-    headline: 'Filières industrielles',
-    blurb:
-      'Maths appliquées et sciences physiques ciblées sur les épreuves de BTS.',
-    subjects: 'Maths · Sciences Physiques',
-  },
-  {
-    id: 'licence' as const,
-    level: 'Licence',
-    badge: 'LICENCE',
-    headline: 'L1 / L2 Sciences',
-    blurb:
-      'Analyse, algèbre, mécanique, thermodynamique — remise à niveau et approfondissement.',
-    subjects: 'Maths · Physique · Chimie',
-  },
-] as const;
-export type LearningPathId = (typeof LEARNING_PATHS)[number]['id'];
-
-/** The three method bricks (Section 02 — Méthode). */
-export const METHOD_STEPS = [
-  {
-    n: '01' as const,
-    title: 'Cours en visio en direct',
-    body:
-      'Séances de 45 à 60 minutes avec un professeur, en petit groupe ou en individuel — vous posez vos questions en temps réel.',
-  },
-  {
-    n: '02' as const,
-    title: 'Exercices corrigés pas-à-pas',
-    body:
-      'Chaque correction détaille le raisonnement, pas seulement le résultat final.',
-  },
-  {
-    n: '03' as const,
-    title: 'Suivi de progression',
-    body:
-      'Un tableau de bord qui repère vos points faibles réels, séance après séance.',
-  },
-] as const;
-
-/** The three key figures (Bleu Plan band). */
-export const KEY_FIGURES = [
-  { value: '3 400+', label: 'Exercices corrigés' },
-  { value: '100%',   label: 'Cours en direct avec un prof' },
-  { value: '4',      label: 'Niveaux · Lycée → Licence' },
-] as const;
+/**
+ * Stable, locale-agnostic identifier for each learning path.
+ * The `id` is the handle used in URLs, analytics, and DB foreign
+ * keys; the localised copy (`level`, `badge`, `headline`, `blurb`,
+ * `subjects`) lives in `messages/<locale>.json` under
+ * `Homepage.paths`.
+ */
+export type LearningPathId = 'lycee' | 'prepa' | 'bts' | 'licence';

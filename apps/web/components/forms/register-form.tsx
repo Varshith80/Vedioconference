@@ -3,38 +3,42 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { z } from 'zod';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { registerSchema } from '@/lib/validations/auth';
+import { makeAuthSchemas, type RegisterInput } from '@/lib/validations/auth';
 import { useAuth } from '@/services/auth/use-auth';
-
-type Values = z.infer<typeof registerSchema>;
 
 /**
  * Sign-up form. B1 uses the local stub; B2 will swap in the
  * Supabase provider with the same call surface. On success, the
- * user is signed in and redirected to /auth/verify-email so the
- * e-mail confirmation flow can run.
+ * user is signed in and redirected to the locale-aware
+ * /auth/verify-email page so the e-mail confirmation flow can run.
  */
 export function RegisterForm() {
   const router = useRouter();
   const auth = useAuth();
+  const locale = useLocale();
+  const t = useTranslations();
+  const tReg = useTranslations('Auth.register');
   const [submitting, setSubmitting] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
+
+  const { registerSchema } = useMemo(() => makeAuthSchemas(t), [t]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<Values>({
+  } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
   });
 
-  async function onSubmit(values: Values) {
+  async function onSubmit(values: RegisterInput) {
     setSubmitting(true);
     setServerError(null);
     try {
@@ -43,10 +47,10 @@ export function RegisterForm() {
         password: values.password,
         fullName: values.fullName,
       });
-      router.push('/auth/verify-email');
+      router.push(`/${locale}/auth/verify-email`);
       router.refresh();
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Erreur inconnue.');
+      setServerError(err instanceof Error ? err.message : tReg('fallbackError'));
     } finally {
       setSubmitting(false);
     }
@@ -55,11 +59,11 @@ export function RegisterForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm space-y-4" noValidate>
       <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-        Créer un compte
+        {tReg('h1')}
       </h1>
 
       <div className="space-y-1.5">
-        <Label htmlFor="fullName">Nom complet</Label>
+        <Label htmlFor="fullName">{tReg('fullName')}</Label>
         <Input
           id="fullName"
           type="text"
@@ -71,7 +75,7 @@ export function RegisterForm() {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="email">E-mail</Label>
+        <Label htmlFor="email">{tReg('email')}</Label>
         <Input
           id="email"
           type="email"
@@ -83,7 +87,7 @@ export function RegisterForm() {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="password">Mot de passe</Label>
+        <Label htmlFor="password">{tReg('password')}</Label>
         <Input
           id="password"
           type="password"
@@ -95,7 +99,7 @@ export function RegisterForm() {
           <p className="text-xs text-destructive">{errors.password.message}</p>
         )}
         <p className="text-xs text-muted-foreground">
-          10 caractères minimum, avec une majuscule, une minuscule et un chiffre.
+          {tReg('passwordHint')}
         </p>
       </div>
 
@@ -108,15 +112,18 @@ export function RegisterForm() {
           {...register('acceptTerms')}
         />
         <Label htmlFor="acceptTerms" className="text-xs text-muted-foreground">
-          J’accepte les{' '}
-          <Link href="/legal/cgu" className="underline">
-            conditions générales d’utilisation
-          </Link>{' '}
-          et la{' '}
-          <Link href="/legal/privacy" className="underline">
-            politique de confidentialité
-          </Link>
-          .
+          {tReg.rich('terms', {
+            terms: (chunks) => (
+              <Link href={`/${locale}/legal/cgu`} className="underline">
+                {chunks}
+              </Link>
+            ),
+            privacy: (chunks) => (
+              <Link href={`/${locale}/legal/privacy`} className="underline">
+                {chunks}
+              </Link>
+            ),
+          })}
         </Label>
       </div>
       {errors.acceptTerms && (
@@ -133,13 +140,13 @@ export function RegisterForm() {
       )}
 
       <Button type="submit" disabled={submitting} className="w-full">
-        {submitting ? 'Création…' : 'Créer mon compte'}
+        {submitting ? tReg('submitting') : tReg('submit')}
       </Button>
 
       <p className="text-sm text-muted-foreground">
-        Déjà un compte ?{' '}
-        <Link href="/auth/login" className="text-foreground underline">
-          Se connecter
+        {tReg('alreadyHave')}{' '}
+        <Link href={`/${locale}/auth/login`} className="text-foreground underline">
+          {tReg('signin')}
         </Link>
         .
       </p>

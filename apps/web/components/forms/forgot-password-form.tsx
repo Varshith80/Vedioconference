@@ -2,16 +2,15 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { z } from 'zod';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { forgotPasswordSchema } from '@/lib/validations/auth';
+import { makeAuthSchemas, type ForgotPasswordInput } from '@/lib/validations/auth';
 import { useAuth } from '@/services/auth/use-auth';
-
-type Values = z.infer<typeof forgotPasswordSchema>;
 
 /**
  * Forgot-password form. On submit, asks the auth provider to send
@@ -20,15 +19,20 @@ type Values = z.infer<typeof forgotPasswordSchema>;
  */
 export function ForgotPasswordForm() {
   const auth = useAuth();
+  const locale = useLocale();
+  const t = useTranslations();
+  const tFp = useTranslations('Auth.forgotPassword');
   const [done, setDone] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<Values>({
+  const { forgotPasswordSchema } = useMemo(() => makeAuthSchemas(t), [t]);
+
+  const { register, handleSubmit, formState: { errors } } = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),
   });
 
-  async function onSubmit(values: Values) {
+  async function onSubmit(values: ForgotPasswordInput) {
     setSubmitting(true);
     setServerError(null);
     try {
@@ -36,12 +40,12 @@ export function ForgotPasswordForm() {
         email: values.email,
         redirectTo:
           typeof window !== 'undefined'
-            ? `${window.location.origin}/auth/reset-password`
+            ? `${window.location.origin}/${locale}/auth/reset-password`
             : undefined,
       });
       setDone(true);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Erreur inconnue.');
+      setServerError(err instanceof Error ? err.message : tFp('fallbackError'));
     } finally {
       setSubmitting(false);
     }
@@ -51,17 +55,16 @@ export function ForgotPasswordForm() {
     return (
       <div className="w-full max-w-sm space-y-3">
         <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-          Lien envoyé
+          {tFp('sentTitle')}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Si un compte existe pour cette adresse, vous recevrez un lien
-          de réinitialisation dans quelques minutes.
+          {tFp('sentBody')}
         </p>
         <Link
-          href="/auth/login"
+          href={`/${locale}/auth/login`}
           className="text-sm text-foreground underline"
         >
-          Retour à la connexion
+          {tFp('backToLogin')}
         </Link>
       </div>
     );
@@ -70,14 +73,13 @@ export function ForgotPasswordForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm space-y-4" noValidate>
       <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-        Mot de passe oublié
+        {tFp('h1')}
       </h1>
       <p className="text-sm text-muted-foreground">
-        Entrez l’adresse e-mail de votre compte&nbsp;: nous vous enverrons
-        un lien sécurisé pour choisir un nouveau mot de passe.
+        {tFp('intro')}
       </p>
       <div className="space-y-1.5">
-        <Label htmlFor="email">E-mail</Label>
+        <Label htmlFor="email">{tFp('email')}</Label>
         <Input
           id="email"
           type="email"
@@ -98,12 +100,12 @@ export function ForgotPasswordForm() {
       )}
 
       <Button type="submit" disabled={submitting} className="w-full">
-        {submitting ? 'Envoi…' : 'Envoyer le lien'}
+        {submitting ? tFp('submitting') : tFp('submit')}
       </Button>
 
       <p className="text-sm text-muted-foreground">
-        <Link href="/auth/login" className="text-foreground underline">
-          Retour à la connexion
+        <Link href={`/${locale}/auth/login`} className="text-foreground underline">
+          {tFp('backToLogin')}
         </Link>
       </p>
     </form>
