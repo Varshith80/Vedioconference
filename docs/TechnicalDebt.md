@@ -39,3 +39,4 @@
 | TD-032 | Low | DB   | `subscriptions` table | **Done** in this review |
 | TD-033 | Low | DB   | `coupons` table | **Done** in this review |
 | TD-034 | Low | DB   | `invoices` table | **Done** in this review |
+| TD-035 | Low | Tests | B1-i18n `DashboardSidebar` test harness — provider receives a partial English messages stub that omits the `Dashboard` namespace; `useTranslations()` then throws `IntlError: MISSING_MESSAGE` on `t.raw('Dashboard.sidebar.items')` and the sidebar renders an empty list. Affects 2 of 66 unit tests. Byte-identical files between Sprint B2 (`1cde839`) and Sprint C (`682abaf`) — pre-existing, not a Sprint C regression. Fix: pass the full `messages/en.json` (or a minimal `{ Dashboard: { sidebar: { items, aria } } }` stub) to `NextIntlClientProvider` in `apps/web/components/dashboard/sidebar.test.tsx`. Tracked in `docs/review/PHASE2_SPRINT_C_SUMMARY.md` §6. | Phase 4 |

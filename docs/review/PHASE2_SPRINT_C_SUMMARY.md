@@ -107,10 +107,11 @@ B2-named files are now real workflow JSON.
 | `tests/unit/enrollments-checkout-route.test.ts` | 4 tests: 401, 400, 503 (mock-gated), 200 (n8n OK). |
 
 **64 / 66 tests passing.** The 2 failures are **pre-existing
-B1 `DashboardSidebar` tests** that were already failing before
-Sprint C (the locale-aware sidebar does not yet render the
-hard-coded B1 link labels in the test stub). They are not
-regressions of Sprint C and are tracked as a follow-up.
+B1-i18n `DashboardSidebar` tests** that were already failing
+before Sprint C — see §6 "Pre-existing technical debt" below
+for the full root-cause analysis, the byte-identical-file
+proof against the Sprint B2 commit `1cde839`, and the proposed
+fix. They are **not** regressions of Sprint C.
 
 ### 1.6 Infra (C-6)
 
@@ -134,8 +135,10 @@ regressions of Sprint C and are tracked as a follow-up.
 - [x] `pnpm lint` → exit 0 (1 pre-existing `console.log`
       warning in `lib/utils/logger.ts`, by design).
 - [x] `pnpm test` → 64/66 passing. 2 pre-existing
-      `DashboardSidebar` failures are documented above; not
-      Sprint C regressions.
+      `DashboardSidebar` failures are documented in §6 below
+      (B1-i18n test-harness debt, not Sprint C regressions;
+      byte-identical files between B2 commit `1cde839` and
+      C commit `682abaf`).
 - [ ] `pnpm build` → not run in this environment (no
       `pnpm` in PATH; user to run locally).
 - [x] Sprint summary written.
@@ -204,7 +207,118 @@ regressions of Sprint C and are tracked as a follow-up.
 
 ---
 
-## 5. STOP condition
+## 6. Pre-existing technical debt (B1-i18n `DashboardSidebar` tests)
+
+The 2 failing unit tests in `pnpm test` are **pre-existing
+B1-i18n debt**, not Sprint C regressions. They are documented
+here at the user's explicit request (Sprint C sign-off review
+§4).
+
+### 6.1 Tests that fail
+
+Both are in `apps/web/components/dashboard/sidebar.test.tsx`:
+
+1. `DashboardSidebar > marks the active link with aria-current="page"`
+   — `getByRole('link', { name: /My bookings/i })` not found.
+2. `DashboardSidebar > does not mark inactive links`
+   — `getByRole('link', { name: /Profile/i })` not found.
+
+### 6.2 Root cause
+
+`apps/web/components/dashboard/sidebar.tsx` calls
+`useTranslations()` with **no namespace** and then
+`t.raw('Dashboard.sidebar.items')` to read the nav-item array,
+plus `t('Dashboard.sidebar.aria')` for the aria-label. The
+test wraps the component in a `NextIntlClientProvider` with a
+**partial** English messages object that does not include the
+`Dashboard` namespace. The current `use-intl@4.13.1` runtime
+throws an `IntlError: MISSING_MESSAGE` on the `t.raw(...)` call
+in the sidebar's `getNavItems()` helper, which causes the
+sidebar to render an empty `<ul role="list" />`. Hence no
+links, hence the `getByRole('link', …)` queries find nothing.
+
+The full stack trace (run locally):
+
+```
+IntlError: MISSING_MESSAGE: Could not resolve `Dashboard.sidebar.items`
+  in messages for locale `en`.
+    at translateFn.raw (.../use-intl/dist/esm/development/...:204:14)
+    at getNavItems (apps/web/components/dashboard/sidebar.tsx:28:72)
+    at DashboardSidebar (apps/web/components/dashboard/sidebar.tsx:48:15)
+  …
+IntlError: MISSING_MESSAGE: Could not resolve `Dashboard.sidebar.aria`
+  in messages for locale `en`.
+    at translateBaseFn (.../use-intl/dist/esm/development/...:129:18)
+    at translateFn      (.../use-intl/dist/esm/development/...:161:20)
+    at DashboardSidebar (apps/web/components/dashboard/sidebar.tsx:51:19)
+  …
+TestingLibraryElementError: Unable to find an accessible element
+  with the role "link" and name `/My bookings/i`
+```
+
+### 6.3 Proof it is pre-existing (not a Sprint C regression)
+
+Sprint C did not touch the sidebar or its test. The two
+relevant files are **byte-identical** between the Sprint B2
+close-out commit `1cde839` and the Sprint C close-out commit
+`682abaf`:
+
+```
+$ git show 1cde839:apps/web/components/dashboard/sidebar.tsx \
+  | diff - <(git show 682abaf:apps/web/components/dashboard/sidebar.tsx)
+$ git show 1cde839:apps/web/components/dashboard/sidebar.test.tsx \
+  | diff - <(git show 682abaf:apps/web/components/dashboard/sidebar.test.tsx)
+# (both diffs empty)
+```
+
+`git log -- apps/web/components/dashboard/sidebar.test.tsx`
+and the same for `sidebar.tsx` show that neither file has been
+modified since the Sprint B1-i18n chunk 6 close-out
+(`d15ad3f` was the last commit to touch `sidebar.tsx`; the
+test was last touched in the same chunk). The 2 failures
+already existed on `main` when Sprint C began.
+
+### 6.4 Why Sprint C did not fix them
+
+CLAUDE.md §3.2 ("Never redesign the architecture") and the
+sprint kick-off rule "Do not modify completed Sprint B work
+unless required to integrate Sprint C features" — the sidebar
+and its test are a B1-i18n deliverable, not a Sprint C
+integration dependency. Per the user's standing rule and the
+"Do not modify completed Sprint B work unless required to
+integrate Sprint C features" rule, fixing these tests is a
+**Phase 4 (admin + admin UI + tests-stabilization) follow-up**,
+not a Sprint C scope item. The Phase 4 task list will include:
+"Stabilize B1-i18n test harness — provide the full
+`apps/web/messages/en.json` to the test wrapper for components
+that read from the `Dashboard.*` namespace".
+
+### 6.5 Proposed fix (one line of test code)
+
+In `apps/web/components/dashboard/sidebar.test.tsx`, the
+`NextIntlClientProvider` should receive the full English
+messages (not a partial stub). Two options:
+
+1. **Lightest** — import the real
+   `apps/web/messages/en.json` and pass it to the provider:
+   ```tsx
+   import enMessages from '@/messages/en.json';
+   <NextIntlClientProvider locale="en" messages={enMessages}>
+     …
+   </NextIntlClientProvider>
+   ```
+2. **Equally correct** — pass `{ Dashboard: { sidebar:
+   { items: […], aria: '…' } } }` to the provider as a
+   minimal stub. This is the current intent of the test
+   author and is the option to take if we want to keep the
+   test independent of the production messages file.
+
+Either fix is a 1–2 line change in the test file only. It is
+queued for Phase 4.
+
+---
+
+## 7. STOP condition
 
 Sprint C stops at the close-out commit + tag
 `v1.5.0-phase2-sprint-c`. The user is the only one who can
