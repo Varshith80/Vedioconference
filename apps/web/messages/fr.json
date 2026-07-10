@@ -444,5 +444,112 @@
   "ContactEmail": {
     "subjectPrefix": "[Contact]",
     "fromLabel": "De :"
+  },
+  "Checkout": {
+    "enrollment": {
+      "title": "Finaliser votre inscription",
+      "description": "Vous êtes à une étape d'accéder au cours. Le paiement sécurisé est géré par Stripe — votre carte ne touche jamais nos serveurs.",
+      "payButton": "Payer avec Stripe",
+      "secureNote": "Les paiements sont sécurisés par Stripe. Les cartes sont tokenisées ; nous ne les stockons jamais.",
+      "backToCourse": "Retour au cours",
+      "alreadyPaid": "Cette inscription est déjà active.",
+      "goToDashboard": "Accéder à mon espace",
+      "enrollmentInactive": "Cette inscription n'est pas active (statut : {status}).",
+      "errorGeneric": "Le paiement n'a pas pu être démarré. Veuillez réessayer.",
+      "errorNetwork": "Erreur réseau. Vérifiez votre connexion et réessayez.",
+      "errorCheckoutUnavailable": "Le paiement est en cours de préparation. Réessayez dans un instant."
+    },
+    "success": {
+      "title": "Paiement reçu",
+      "description": "Votre inscription est maintenant active. Le cours apparaît dans votre espace et les modules peuvent être réservés.",
+      "enrollmentId": "Identifiant d'inscription",
+      "goToDashboard": "Voir mes cours",
+      "browseMore": "Voir d'autres cours"
+    },
+    "cancel": {
+      "title": "Paiement annulé",
+      "description": "Votre carte n'a pas été débitée. Vous pouvez reprendre le paiement depuis votre espace, ou découvrir d'autres cours.",
+      "goToDashboard": "Accéder à mon espace",
+      "browseMore": "Voir les cours",
+      "retry": "Reprendre le paiement"
+    }
+  },
+  "Dashboard": {
+    "module": {
+      "title": "Modules",
+      "bookCta": "Réserver",
+      "bookAgainCta": "Réserver à nouveau",
+      "joinCta": "Rejoindre la session",
+      "viewCta": "Voir",
+      "status": {
+        "not_started":  "Non commencé",
+        "in_progress":  "En cours",
+        "completed":    "Terminé",
+        "locked":       "Verrouillé"
+      },
+      "lockedReason": "Terminez le module précédent pour débloquer celui-ci.",
+      "duration": "{minutes} min",
+      "noModules": "Ce cours n'a pas encore de module publié.",
+      "enrolledOn": "Inscrit le {date}",
+      "scheduledOn": "Prévu le {date}",
+      "cancelledReason": "Motif d'annulation : {reason}",
+      "backToCourses": "Retour à mes cours"
+    },
+    "book": {
+      "title": "Réserver une session — {moduleTitle}",
+      "description": "Choisissez un créneau ci-dessous. Vous recevrez un email de confirmation avec le lien de participation dès que le tuteur aura confirmé.",
+      "moduleMeta": "Module {position} sur {total} · {duration} min",
+      "lockedTitle": "Ce module est verrouillé",
+      "lockedDescription": "Vous devez terminer le module précédent avant de pouvoir réserver celui-ci.",
+      "backToCourse": "Retour au cours"
+    }
+  },
+  "Emails": {
+    "enrollmentConfirmed": {
+      "subject": "Bienvenue dans {courseTitle}",
+      "title": "Votre inscription est active",
+      "greeting": "Bonjour {name},",
+      "body": "Votre inscription au cours {courseTitle} est maintenant active. Le premier module est débloqué — accédez à votre espace pour réserver une session.",
+      "cta": "Accéder à mon espace",
+      "footer": "Pour toute question, répondez simplement à cet email — nous sommes là pour vous aider."
+    },
+    "moduleBookingConfirmed": {
+      "subject": "Session confirmée — {moduleTitle}",
+      "title": "Votre session est réservée",
+      "greeting": "Bonjour {name},",
+      "body": "Votre session pour {moduleTitle} ({courseTitle}) est confirmée. Le lien de participation se trouve ci-dessous.",
+      "when": "Quand",
+      "duration": "{minutes} minutes",
+      "joinCta": "Rejoindre la session",
+      "dashboardLink": "Ouvrir le module dans mon espace"
+    },
+    "reminder24h": {
+      "subject": "Rappel — {moduleTitle} demain",
+      "title": "Votre session est demain",
+      "greeting": "Bonjour {name},",
+      "body": "Un petit rappel : votre session sur {moduleTitle} est prévue dans environ 24 heures. Le lien de participation se trouve ci-dessous.",
+      "joinCta": "Rejoindre la session"
+    },
+    "reminder1h": {
+      "subject": "Démarrage imminent — {moduleTitle}",
+      "title": "Votre session commence dans 1 heure",
+      "greeting": "Bonjour {name},",
+      "body": "Votre session sur {moduleTitle} commence dans environ 1 heure. Cliquez ci-dessous pour rejoindre quand vous êtes prêt(e).",
+      "joinCta": "Rejoindre maintenant"
+    },
+    "moduleCancelled": {
+      "subject": "Session annulée — {moduleTitle}",
+      "title": "Votre session a été annulée",
+      "greeting": "Bonjour {name},",
+      "body": "Votre session sur {moduleTitle} ({courseTitle}) a été annulée.",
+      "reasonLabel": "Motif",
+      "dashboardCta": "Accéder à mon espace"
+    },
+    "adminDeadLetter": {
+      "subject": "[n8n] Échec de {workflow}",
+      "title": "Workflow en dead-letter",
+      "body": "Le workflow n8n {workflow} a échoué et l'événement a été mis en file d'attente. Le payload d'origine se trouve ci-dessous.",
+      "errorLabel": "Erreur"
+    }
   }
 }

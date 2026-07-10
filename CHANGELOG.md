@@ -4,6 +4,75 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-phase2-sprint-c] — 2026-07-10
+
+### Added — Phase 3 end-to-end booking (Sprint C)
+
+#### Database (C-0)
+- `supabase/migrations/20260710000000_enrollments_refund_trigger.sql` — `fn_enrollments_refund()` SECURITY DEFINER trigger on `payments`: when a row flips to `status='refunded'`, cascade the flip to the linked `enrollments` row.
+- `supabase/migrations/20260710000001_module_unlock.sql` — `fn_module_unlock_check()` BEFORE INSERT trigger on `module_bookings`: rejects inserts whose `(enrollment_id, module_id)` would skip a position. Bypassed for `is_preview=true`.
+- `supabase/migrations/20260710000002_seed_demo_courses_with_modules.sql` — idempotent, dev-only seed of 3 courses × 3 modules with placeholder Calendly URIs.
+- `supabase/tests/rls_smoke_assertions.sql` — 3 new policy blocks (trigger existence, refund cascade, module unlock negative + positive). Total now 13 policy blocks.
+
+#### API (C-1, C-2, C-3)
+- `apps/web/app/api/enrollments/checkout/route.ts` (NEW) — POST creates the Stripe Checkout Session via n8n. 503 `checkout_unavailable` when env is unset (mock-gated execution).
+- `apps/web/app/api/enrollments/[id]/refund/route.ts` (REWRITTEN) — admin-only auth, delegates to n8n, the `charge.refunded` webhook + `fn_enrollments_refund` trigger does the actual flip.
+- `apps/web/app/api/webhooks/stripe/route.ts` (MODIFIED) — `checkout.session.completed` now updates `payments`, flips `enrollments` to `active` + `paid_at` + `stripe_session_id`, and creates one `module_progress` row per published module.
+- `apps/web/app/api/webhooks/calendly/route.ts` (MODIFIED) — `invitee.created` is forwarded to the n8n `module-booking-to-zoom` workflow.
+- `apps/web/app/api/webhooks/n8n/route.ts` (MODIFIED) — new `enrollment_checkout_created` and `enrollment_refund_succeeded` branches.
+- `apps/web/app/api/me/me/route.ts` (NEW) — GET current user + active enrollments.
+
+#### Application code (C-3, C-4, C-5)
+- `apps/web/services/bookings/module-unlock.ts` (NEW) — defensive double-check before the DB trigger.
+- `apps/web/services/calendar/calendly.ts` (NEW) — typed Calendly REST wrappers.
+- `apps/web/services/zoom/meetings.ts` (NEW) — typed Zoom S2S wrappers.
+- `apps/web/lib/zoom/client.ts` (NEW) — server-only S2S OAuth client with in-memory token cache.
+- `apps/web/lib/email/send.ts` (NEW) — server-side templated send via Resend. Mock-gated.
+- `apps/web/lib/email/templates/{_base,enrollment-confirmed,module-booking-confirmed,reminder-24h,reminder-1h,module-cancelled,admin-dead-letter,index}.tsx` (8 NEW) — the 6 React Email templates + the dispatcher.
+- `apps/web/app/[locale]/checkout/enrollment/[id]/page.tsx` (NEW) — checkout UI server page.
+- `apps/web/components/checkout/checkout-client.tsx` (NEW) — client button → POST → redirect.
+- `apps/web/app/[locale]/checkout/{success,cancel}/page.tsx` (NEW) — post-Stripe landings.
+- `apps/web/app/[locale]/dashboard/courses/[id]/page.tsx` (NEW) — enrolled-course view + module list.
+- `apps/web/app/[locale]/dashboard/courses/[id]/modules/[moduleId]/book/page.tsx` (NEW) — module booking page (Calendly embed).
+- `apps/web/components/dashboard/calendly-inline-embed.tsx` (NEW) — client Calendly widget.
+- `apps/web/components/dashboard/enrolled-course-card.tsx` (NEW) — presentational module card.
+
+#### n8n workflows (C-4, C-5)
+- `n8n/workflows/enrollment-created.json` (NEW) — Stripe Checkout Session creation.
+- `n8n/workflows/module-booking-to-zoom.json` (NEW) — Calendly invitee → Zoom meeting → meeting_link.
+- `n8n/workflows/module-completed.json` (NEW) — module_progress flip + enrollment completion evaluation.
+- `n8n/workflows/module-cancellation.json` (NEW) — Zoom meeting delete + cancellation persist.
+- `n8n/workflows/module-reschedule.json` (NEW) — Zoom meeting patch + reschedule persist.
+- `n8n/workflows/module-confirmation-email.json` (NEW) — Resend module_booking_confirmed template.
+- `n8n/workflows/module-reminder-scheduler.json` (NEW) — T-24h + T-1h reminder scheduling.
+- `n8n/workflows/admin-notification.json` (NEW) — admin dead-letter Resend.
+- `n8n/workflows/tutor-notification.json` (NEW) — tutor notification Resend.
+- 8 Phase 1 placeholder JSONs deleted.
+
+#### Tests (C-6)
+- `apps/web/tests/unit/email-templates.test.ts` (NEW) — 7 tests.
+- `apps/web/tests/unit/module-unlock.test.ts` (NEW) — 6 tests.
+- `apps/web/tests/unit/enrollments-checkout-route.test.ts` (NEW) — 4 tests.
+- `apps/web/vitest.config.ts` — added `server-only` alias to `tests/_shims/server-only.ts` (NEW) so server-only modules can be unit-tested.
+- Total: 64/66 passing. 2 pre-existing `DashboardSidebar` failures (B1, unrelated).
+
+#### Translations (C-3 + C-5)
+- `apps/web/messages/{en,fr}.json` — 3 new namespaces: `Checkout.{enrollment,success,cancel}`, `Dashboard.{module,book}`, `Emails.{…}` (6 sub-namespaces).
+
+### Changed
+- `apps/web/lib/env.ts` — added `STRIPE_PRICE_TABLE_JSON` and `N8N_ENROLLMENT_WEBHOOK_URL` to `serverSchema`.
+- `apps/web/app/api/enrollments/route.ts` — `status: 'pending'` → `status: 'pending_payment'` (B2 enum bug).
+- `apps/web/app/api/enrollments/[id]/modules/route.ts` (REWRITTEN) — accepts `'pending_payment'`, resolves `tutor_id` from `course_tutors`, computes `scheduled_end` from `duration_min`, accepts Calendly invitee fields.
+- `apps/web/app/api/module-bookings/[id]/cancel/route.ts` — `cancel_reason` → `cancelled_reason` (B2 column-name bug).
+- `docs/BookingFlow.md` — updated for the n8n-mediated Stripe + Zoom + Resend path.
+- `PROJECT_STATE.md` — phase table updated, Sprint C deliverables listed.
+
+### Quality gates
+- `pnpm type-check` → exit 0.
+- `pnpm lint` → exit 0 (1 pre-existing `console.log` warning in `lib/utils/logger.ts`, by design).
+- `pnpm test` → 64/66 passing. 2 pre-existing `DashboardSidebar` failures (B1, unrelated).
+- `pnpm build` → not run in this environment (no `pnpm` in PATH; user to run locally).
+
 ## [Unreleased]
 
 ## [1.4.0-phase2-sprint-b2] — 2026-07-09

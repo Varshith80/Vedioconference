@@ -444,5 +444,112 @@
   "ContactEmail": {
     "subjectPrefix": "[Contact]",
     "fromLabel": "From:"
+  },
+  "Checkout": {
+    "enrollment": {
+      "title": "Complete your enrollment",
+      "description": "You're one step away from unlocking the course. Secure payment is handled by Stripe — your card never touches our servers.",
+      "payButton": "Pay with Stripe",
+      "secureNote": "Payments are secured by Stripe. Cards are tokenised; we never store them.",
+      "backToCourse": "Back to the course",
+      "alreadyPaid": "This enrollment is already active.",
+      "goToDashboard": "Go to my dashboard",
+      "enrollmentInactive": "This enrollment is not active (status: {status}).",
+      "errorGeneric": "The payment could not be started. Please try again.",
+      "errorNetwork": "Network error. Please check your connection and try again.",
+      "errorCheckoutUnavailable": "Checkout is being prepared. Please try again in a moment."
+    },
+    "success": {
+      "title": "Payment received",
+      "description": "Your enrollment is now active. The course appears in your dashboard and the modules are ready to be booked.",
+      "enrollmentId": "Enrollment ID",
+      "goToDashboard": "Go to my courses",
+      "browseMore": "Browse more courses"
+    },
+    "cancel": {
+      "title": "Payment cancelled",
+      "description": "Your card was not charged. You can resume the payment from your dashboard, or browse other courses.",
+      "goToDashboard": "Go to my dashboard",
+      "browseMore": "Browse courses",
+      "retry": "Retry payment"
+    }
+  },
+  "Dashboard": {
+    "module": {
+      "title": "Modules",
+      "bookCta": "Book",
+      "bookAgainCta": "Book again",
+      "joinCta": "Join the session",
+      "viewCta": "View",
+      "status": {
+        "not_started":  "Not started",
+        "in_progress":  "In progress",
+        "completed":    "Completed",
+        "locked":       "Locked"
+      },
+      "lockedReason": "Complete the previous module to unlock this one.",
+      "duration": "{minutes} min",
+      "noModules": "This course has no published modules yet.",
+      "enrolledOn": "Enrolled on {date}",
+      "scheduledOn": "Scheduled for {date}",
+      "cancelledReason": "Cancellation reason: {reason}",
+      "backToCourses": "Back to my courses"
+    },
+    "book": {
+      "title": "Book a session — {moduleTitle}",
+      "description": "Pick a time slot below. You'll receive a confirmation email with the join link as soon as the tutor confirms.",
+      "moduleMeta": "Module {position} of {total} · {duration} min",
+      "lockedTitle": "This module is locked",
+      "lockedDescription": "You need to complete the previous module before you can book this one.",
+      "backToCourse": "Back to the course"
+    }
+  },
+  "Emails": {
+    "enrollmentConfirmed": {
+      "subject": "Welcome to {courseTitle}",
+      "title": "Your enrollment is active",
+      "greeting": "Hi {name},",
+      "body": "Your enrollment in {courseTitle} is now active. The first module is unlocked — head to your dashboard to book a session.",
+      "cta": "Go to my dashboard",
+      "footer": "If you have any questions, just reply to this email — we're here to help."
+    },
+    "moduleBookingConfirmed": {
+      "subject": "Session confirmed — {moduleTitle}",
+      "title": "Your session is booked",
+      "greeting": "Hi {name},",
+      "body": "Your session for {moduleTitle} ({courseTitle}) is confirmed. The join link is below.",
+      "when": "When",
+      "duration": "{minutes} minutes",
+      "joinCta": "Join the session",
+      "dashboardLink": "Open the module in my dashboard"
+    },
+    "reminder24h": {
+      "subject": "Reminder — {moduleTitle} tomorrow",
+      "title": "Your session is tomorrow",
+      "greeting": "Hi {name},",
+      "body": "A quick reminder that your session on {moduleTitle} is scheduled in about 24 hours. The join link is below.",
+      "joinCta": "Join the session"
+    },
+    "reminder1h": {
+      "subject": "Starting soon — {moduleTitle}",
+      "title": "Your session starts in 1 hour",
+      "greeting": "Hi {name},",
+      "body": "Your session on {moduleTitle} starts in about 1 hour. Click below to join when you're ready.",
+      "joinCta": "Join now"
+    },
+    "moduleCancelled": {
+      "subject": "Session cancelled — {moduleTitle}",
+      "title": "Your session has been cancelled",
+      "greeting": "Hi {name},",
+      "body": "Your session on {moduleTitle} ({courseTitle}) has been cancelled.",
+      "reasonLabel": "Reason",
+      "dashboardCta": "Go to my dashboard"
+    },
+    "adminDeadLetter": {
+      "subject": "[n8n] {workflow} failed",
+      "title": "Workflow dead-letter",
+      "body": "The n8n workflow {workflow} failed and the event was dead-lettered. The original payload is below.",
+      "errorLabel": "Error"
+    }
   }
 }

@@ -1,15 +1,100 @@
 {
   "name": "admin-notification",
-  "nodes": [],
-  "connections": {},
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin-notification",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "name": "Webhook: admin notification",
+      "webhookId": "admin-notification-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "if-hmac",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "={{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [460, 300],
+      "name": "Verify webhook secret"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/n8n/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type", "value": "email"},
+            {"name": "template", "value": "admin_dead_letter"},
+            {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
+            {"name": "locale", "value": "en"},
+            {"name": "props[workflow]",      "value": "={{ $json.body.workflow }}"},
+            {"name": "props[errorMessage]",  "value": "={{ $json.body.error_message }}"},
+            {"name": "props[originalEvent]", "value": "={{ $json.body.original_event }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "name": "Send admin dead-letter"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300],
+      "name": "Respond OK"
+    }
+  ],
+  "connections": {
+    "Webhook: admin notification": {
+      "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
+    },
+    "Verify webhook secret": {
+      "main": [[{"node": "Send admin dead-letter", "type": "main", "index": 0}]]
+    },
+    "Send admin dead-letter": {
+      "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
+    }
+  },
   "active": false,
   "settings": {
     "executionOrder": "v1",
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{ "name": "phase-3" }],
+  "tags": [{"name": "phase-3"}],
   "meta": {
-    "description": "Resend digest to ADMIN_EMAIL on every important workflow event. Documented in n8n/docs/WORKFLOWS.md §2.7."
+    "description": "Catch-all dead-letter workflow. Triggered by any other workflow's error branch to send an admin notification email. Documented in n8n/docs/WORKFLOWS.md §2.8."
   }
 }

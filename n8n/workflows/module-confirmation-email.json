@@ -1,18 +1,18 @@
 {
-  "name": "tutor-notification",
+  "name": "module-confirmation-email",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "tutor-notification",
+        "path": "module-confirmation-email",
         "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [240, 300],
-      "name": "Webhook: tutor notification",
-      "webhookId": "tutor-notification-webhook"
+      "name": "Webhook: confirmation email",
+      "webhookId": "module-confirmation-email-webhook"
     },
     {
       "parameters": {
@@ -49,11 +49,17 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type", "value": "email_tutor"},
-            {"name": "to", "value": "={{ $json.body.tutor_email }}"},
-            {"name": "subject", "value": "={{ $json.body.subject }}"},
-            {"name": "body", "value": "={{ $json.body.body }}"},
-            {"name": "module_booking_id", "value": "={{ $json.body.module_booking_id }}"}
+            {"name": "type", "value": "email"},
+            {"name": "template", "value": "module_booking_confirmed"},
+            {"name": "to", "value": "={{ $json.body.to }}"},
+            {"name": "locale", "value": "={{ $json.body.locale }}"},
+            {"name": "props[studentName]",      "value": "={{ $json.body.student_name }}"},
+            {"name": "props[moduleTitle]",      "value": "={{ $json.body.module_title }}"},
+            {"name": "props[courseTitle]",      "value": "={{ $json.body.course_title }}"},
+            {"name": "props[scheduledStartIso]","value": "={{ $json.body.scheduled_start }}"},
+            {"name": "props[durationMin]",      "value": "={{ $json.body.duration_min }}"},
+            {"name": "props[joinUrl]",          "value": "={{ $json.body.join_url }}"},
+            {"name": "props[dashboardUrl]",     "value": "={{ $json.body.dashboard_url }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
@@ -61,7 +67,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300],
-      "name": "Send tutor notification"
+      "name": "Ask Next.js to send the email"
     },
     {
       "parameters": {
@@ -91,9 +97,9 @@
             {"name": "template", "value": "admin_dead_letter"},
             {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
             {"name": "locale", "value": "en"},
-            {"name": "props[workflow]",      "value": "tutor-notification"},
+            {"name": "props[workflow]",      "value": "module-confirmation-email"},
             {"name": "props[errorMessage]",  "value": "={{ $json.error.message }}"},
-            {"name": "props[originalEvent]", "value": "={{ $('Webhook: tutor notification').first().json }}"}
+            {"name": "props[originalEvent]", "value": "={{ $('Webhook: confirmation email').first().json }}"}
           ]
         }
       },
@@ -104,18 +110,18 @@
     }
   ],
   "connections": {
-    "Webhook: tutor notification": {
+    "Webhook: confirmation email": {
       "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
     },
     "Verify webhook secret": {
       "main": [
-        [{"node": "Send tutor notification", "type": "main", "index": 0}],
-        [{"node": "Dead-letter: notify admin","type": "main", "index": 0}]
+        [{"node": "Ask Next.js to send the email", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin",     "type": "main", "index": 0}]
       ]
     },
-    "Send tutor notification": {
+    "Ask Next.js to send the email": {
       "main": [
-        [{"node": "Respond OK",                "type": "main", "index": 0}],
+        [{"node": "Respond OK",            "type": "main", "index": 0}],
         [{"node": "Dead-letter: notify admin", "type": "main", "index": 0}]
       ]
     }
@@ -128,6 +134,6 @@
   },
   "tags": [{"name": "phase-3"}],
   "meta": {
-    "description": "Triggered by the tutor lifecycle events (booking, reschedule, cancellation). Asks Next.js to send a tutor notification email. Documented in n8n/docs/WORKFLOWS.md §2.9."
+    "description": "Triggered after a Zoom meeting is created and persisted. Asks Next.js to render the module_booking_confirmed template and send via Resend. Documented in n8n/docs/WORKFLOWS.md §2.6."
   }
 }

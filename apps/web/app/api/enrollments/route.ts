@@ -45,12 +45,14 @@ export async function POST(req: NextRequest) {
 
   // Insert a pending enrollment row. The `student_id` is taken
   // from the authenticated user (RLS will reject any mismatch).
+  // Sprint C fix: the `enrollment_status` enum value is
+  // `pending_payment`, not `pending` (B2 used the legacy name).
   const { data: enrollment, error: insertError } = await supabase
     .from('enrollments')
     .insert({
       student_id: user.id,
       course_id: courseRow.id,
-      status: 'pending',
+      status: 'pending_payment',
     } as never)
     .select('id')
     .single();

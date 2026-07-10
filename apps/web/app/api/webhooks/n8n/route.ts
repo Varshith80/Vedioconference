@@ -87,6 +87,46 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+      case 'enrollment_checkout_created': {
+        // Sprint C: n8n created the Stripe Checkout Session.
+        // Persist the session id on the enrollment row so the
+        // `checkout.session.completed` webhook can resolve the
+        // enrollment back to the session.
+        const { enrollment_id, stripe_session_id } = body;
+        if (!enrollment_id || !stripe_session_id) {
+          throw BadRequest('enrollment_checkout_created requires enrollment_id and stripe_session_id.');
+        }
+        await admin
+          .from('enrollments')
+          .update({ stripe_session_id } as never)
+          .eq('id', enrollment_id);
+        break;
+      }
+      case 'enrollment_refund_succeeded': {
+        // Sprint C: n8n performed the Stripe refund. The
+        // payments row + the linked enrollments row have been
+        // updated by the `charge.refunded` webhook + the
+        // `fn_enrollments_refund` trigger. This branch exists
+        // for observability (a `notifications` row) and is
+        // safe to receive out-of-order.
+        const { enrollment_id } = body;
+        if (!enrollment_id) break;
+        const { data: enrollment } = await admin
+          .from('enrollments')
+          .select('student_id')
+          .eq('id', enrollment_id)
+          .single();
+        const enrollmentRow = enrollment as unknown as { student_id: string } | null;
+        if (enrollmentRow) {
+          await admin.from('notifications').insert({
+            user_id: enrollmentRow.student_id,
+            type:    'enrollment_refund_succeeded',
+            channel: 'email',
+            payload: body,
+          } as never);
+        }
+        break;
+      }
       case 'payment_succeeded': {
         const { payment_id, stripe_payment_intent_id, amount_cents, stripe_receipt_url } = body;
         const { error } = await admin.from('payments').update({

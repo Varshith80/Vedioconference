@@ -1,18 +1,18 @@
 {
-  "name": "tutor-notification",
+  "name": "module-reminder-scheduler",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "tutor-notification",
+        "path": "module-reminder-scheduler",
         "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [240, 300],
-      "name": "Webhook: tutor notification",
-      "webhookId": "tutor-notification-webhook"
+      "name": "Webhook: reminder scheduler",
+      "webhookId": "module-reminder-scheduler-webhook"
     },
     {
       "parameters": {
@@ -49,11 +49,14 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type", "value": "email_tutor"},
-            {"name": "to", "value": "={{ $json.body.tutor_email }}"},
-            {"name": "subject", "value": "={{ $json.body.subject }}"},
-            {"name": "body", "value": "={{ $json.body.body }}"},
-            {"name": "module_booking_id", "value": "={{ $json.body.module_booking_id }}"}
+            {"name": "type", "value": "schedule_reminder"},
+            {"name": "module_booking_id", "value": "={{ $json.body.module_booking_id }}"},
+            {"name": "scheduled_start",   "value": "={{ $json.body.scheduled_start }}"},
+            {"name": "to",                "value": "={{ $json.body.to }}"},
+            {"name": "locale",            "value": "={{ $json.body.locale }}"},
+            {"name": "student_name",      "value": "={{ $json.body.student_name }}"},
+            {"name": "module_title",      "value": "={{ $json.body.module_title }}"},
+            {"name": "join_url",          "value": "={{ $json.body.join_url }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
@@ -61,7 +64,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300],
-      "name": "Send tutor notification"
+      "name": "Ask Next.js to schedule T-24h + T-1h reminders"
     },
     {
       "parameters": {
@@ -91,9 +94,9 @@
             {"name": "template", "value": "admin_dead_letter"},
             {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
             {"name": "locale", "value": "en"},
-            {"name": "props[workflow]",      "value": "tutor-notification"},
+            {"name": "props[workflow]",      "value": "module-reminder-scheduler"},
             {"name": "props[errorMessage]",  "value": "={{ $json.error.message }}"},
-            {"name": "props[originalEvent]", "value": "={{ $('Webhook: tutor notification').first().json }}"}
+            {"name": "props[originalEvent]", "value": "={{ $('Webhook: reminder scheduler').first().json }}"}
           ]
         }
       },
@@ -104,16 +107,16 @@
     }
   ],
   "connections": {
-    "Webhook: tutor notification": {
+    "Webhook: reminder scheduler": {
       "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
     },
     "Verify webhook secret": {
       "main": [
-        [{"node": "Send tutor notification", "type": "main", "index": 0}],
-        [{"node": "Dead-letter: notify admin","type": "main", "index": 0}]
+        [{"node": "Ask Next.js to schedule T-24h + T-1h reminders", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin",                       "type": "main", "index": 0}]
       ]
     },
-    "Send tutor notification": {
+    "Ask Next.js to schedule T-24h + T-1h reminders": {
       "main": [
         [{"node": "Respond OK",                "type": "main", "index": 0}],
         [{"node": "Dead-letter: notify admin", "type": "main", "index": 0}]
@@ -128,6 +131,6 @@
   },
   "tags": [{"name": "phase-3"}],
   "meta": {
-    "description": "Triggered by the tutor lifecycle events (booking, reschedule, cancellation). Asks Next.js to send a tutor notification email. Documented in n8n/docs/WORKFLOWS.md §2.9."
+    "description": "Triggered after a booking is confirmed. Schedules T-24h and T-1h reminder emails via Next.js. Documented in n8n/docs/WORKFLOWS.md §2.7."
   }
 }

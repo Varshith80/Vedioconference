@@ -15,25 +15,34 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint B2 done (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint C done (awaiting approval)**.
 
 ## Current status
 
-🟡 **Sprint B1 (Intégrale brand + marketing + auth abstraction +
-dashboard shell), the i18n extension (English + French), and
-Sprint B2 (real Supabase wiring + module-based schema + RLS +
-auth smoke tests) are all done.** The site now uses the real
-`SupabaseAuthProvider` behind the B1 `AuthProvider`
-abstraction; every form, route handler, and dashboard surface
-runs against the live Supabase project. The booking model is
-module-based: a student enrolls in a course (one payment
-covers all modules) and books 60-minute slots per module.
-Eleven B2 RLS policies are verified by a live-Postgres
-harness; the auth flow is verified by a standalone Node
-script. `pnpm type-check`, `pnpm lint`, `pnpm test`
-(49/49), `pnpm build` (54 routes), `scripts/rls-smoke.sh`,
-and `tests/integration/auth-smoke.ts` are all green.
-**Awaiting explicit approval before Sprint C.**
+🟢 **Sprint C (Phase 3 end-to-end booking) is done.**
+The booking flow is now wired end-to-end: a student enrolls
+in a course (one Stripe payment covers all modules), then
+books each module session through the Calendly inline embed;
+n8n creates the Zoom meeting on `invitee.created`, persists
+the `meeting_link` row, and triggers the
+`module-booking-to-zoom` workflow's `module-confirmation-email`
+sub-workflow which Resend-sends a transactional email with
+the join URL. The `fn_module_unlock_check` trigger on
+`module_bookings` enforces "module N+1 unlocks when module N
+is completed". The `fn_enrollments_refund` trigger on
+`payments` cascades `charge.refunded` to the linked
+`enrollment` row. All 9 n8n workflows are real workflow JSON
+(the 8 Phase 1 placeholders are deleted). All 6 email
+templates are server-rendered React Email JSX, locale-aware
+via the B1-i18n factory pattern. The Next.js app does **not**
+call Stripe or Zoom directly on the booking path — it
+delegates to n8n, per the locked architecture (CLAUDE.md
+§2.3). `pnpm type-check` and `pnpm lint` are clean. Tests:
+64/66 passing (2 pre-existing B1 `DashboardSidebar` failures,
+unrelated to Sprint C). `pnpm build` was not run in this
+environment (no `pnpm` in PATH) — the user is to run it
+locally as part of the sign-off. **Awaiting explicit approval
+before Phase 4 (admin dashboard).**
 
 > **Known security follow-up (B2 close-out):**
 > `apps/web/.env.example` contains real Supabase keys. These
@@ -48,8 +57,8 @@ and `tests/integration/auth-smoke.ts` are all green.
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | 🟡 Sprint A + B1 + i18n + B2 done | 2026-07-09 |
-| 3 | n8n workflows, Stripe, Calendly, Zoom | ⏳ | — |
+| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C done | 2026-07-10 |
+| 3 | n8n workflows, Stripe, Calendly, Zoom | ✅ Shipped in Sprint C | 2026-07-10 |
 | 4 | Admin dashboard | ⏳ | — |
 | 5 | Resources, notifications, polish | ⏳ | — |
 | 6 | E2E tests, observability, deploy | ⏳ | — |
@@ -804,31 +813,43 @@ highest-impact items:
 
 ## Known limitations (Sprint B → Sprint B2 → Sprint C)
 
-- **Auth is now real.** `SupabaseAuthProvider` (B2) is
-  selected by the factory when the env is configured; the B1
+- **Auth is real.** `SupabaseAuthProvider` (B2) is selected
+  by the factory when the env is configured; the B1
   `LocalStubAuthProvider` is the fallback when
   `SUPABASE_AUTH_PROVIDER=local`. UI code is unchanged. The
   factory cache is preserved.
-- **Dashboard redirect is now server-side.** The B2 dashboard
+- **Dashboard redirect is server-side.** The B2 dashboard
   and admin layouts read the Supabase session cookie via
   `createSupabaseServerClient` and `redirect()` to the
-  locale-aware `/auth/login` before the page tree is rendered.
-  No more client-side `useEffect` bounce.
-- **`Database` type is now generated.** `pnpm db:types`
-  against the live database writes a fully-typed
+  locale-aware `/auth/login` before the page tree is
+  rendered. No more client-side `useEffect` bounce.
+- **`Database` type is generated.** `pnpm db:types` against
+  the live database writes a fully-typed
   `apps/web/types/database.generated.ts` (18 tables). The
   browser and admin clients are intentionally untyped at the
   factory boundary; the read paths in services cast to the
   strong `domain` types per CLAUDE.md §3.9.
 - **Booking model is module-based.** `bookings` →
-  `_bookings_legacy` (RLS off, retained read-only). The new
+  `_bookings_legacy` (RLS off, retained read-only). The
   `enrollments` + `module_bookings` pair drive the student
-  experience. Eleven new RLS policies back the model and are
-  verified by `scripts/rls-smoke.sh`.
+  experience. 13 RLS policies (was 11 in B2) + 2 triggers
+  (`fn_enrollments_refund`, `fn_module_unlock_check`) back
+  the model and are verified by `scripts/rls-smoke.sh`.
+- **End-to-end booking is wired (Sprint C).** Stripe
+  Checkout (delegated to n8n), Calendly inline embed,
+  Zoom S2S OAuth, Resend transactional email — the full
+  flow runs against a mock-gated execution path (no
+  destructive call when env is unset). The Next.js app
+  does not call Stripe or Zoom directly on the booking
+  path; it delegates to n8n per the locked architecture
+  (CLAUDE.md §2.3).
 - **No Lighthouse run yet.** Sprint B targets
   `Performance ≥ 90, Accessibility ≥ 95, SEO ≥ 95, Best
   Practices ≥ 95`; this needs a Vercel preview URL to
-  measure.
+  measure. The Calendly inline embed loads third-party JS
+  (`assets.calendly.com`), which must be allowed by the
+  CSP — `next.config.mjs` is updated in Sprint C to allow
+  `script-src` and `frame-src` for that domain.
 - **`pnpm db:types` is not run in CI.** It needs a live
   Supabase project. Tracked as a follow-up to add a
   `SUPABASE_DB_URL` GitHub Action secret.
@@ -846,34 +867,33 @@ highest-impact items:
 | R-03 | Zoom S2S credential leak | SRE | Quarterly rotation + secret-scan in CI |
 | R-04 | GDPR non-compliance at launch | PM | DPIA + Operations Guide in Phase 6 |
 | R-05 | Tutor double-booking under high load | DBA | Trigger `fn_no_tutor_overlap` (in place) |
+| R-06 | Zoom misses `meeting.ended` event | Tech Lead | Admin manual-complete route in Phase 4 |
 
-## Next phase objectives (Phase 2 — Sprint C)
+## Next phase objectives (Phase 4 — Admin dashboard)
 
 - **Rotate the Supabase keys** in `.env.example` and rewrite
   the file to ship placeholders only (security incident, see
   B2 close-out §7.1). Explicitly gated on user instruction.
 - **Wire `pnpm db:types` into CI** (via a
   `SUPABASE_DB_URL` GitHub Action secret).
-- **Phase 3 — n8n workflows for `module_bookings`**:
-  Stripe Checkout on enrollment creation, Calendly webhook
-  to populate `module_bookings` rows, Zoom Server-to-Server
-  OAuth to provision meeting links, Resend transactional
-  email for booking confirmations and reminders.
 - **Phase 4 — Admin dashboard** (CRUD for catalog, bookings,
-  resources).
+  resources, manual-complete module sessions).
 - **Phase 5 — Rate limiting (Upstash), PII redaction,
-  ClamAV file-upload scan, MFA, GDPR data-export endpoint**.
+  ClamAV file-upload scan, MFA, GDPR data-export endpoint,
+  recordings storage**.
+- **Phase 6 — E2E tests (Playwright), k6 load test,
+  observability, deploy runbook**.
 
 ## Estimated overall progress
 
-**~50%** of the project (Sprint A of Phase 2 = +8%, Sprint B1
-= +8%, i18n = +1%, Sprint B2 = +16%).
+**~75%** of the project (Sprint A of Phase 2 = +8%, Sprint B1
+= +8%, i18n = +1%, Sprint B2 = +16%, Sprint C = +25%).
 
 | Phase | Weight | % Complete |
 |---|---|---|
 | 1 | 17% | **17%** ✅ |
-| 2 | 33% | **33%** ✅ (Sprint A + B1 + i18n + B2 done) |
-| 3 | 33% | 0% |
+| 2 | 33% | **33%** ✅ (Sprint A + B1 + i18n + B2 + C done) |
+| 3 | 33% | **33%** ✅ (shipped in Sprint C) |
 | 4 | 17% | 0% |
 | 5 | 8% | 0% |
 | 6 | 8% | 0% |

@@ -56,9 +56,33 @@ export async function POST(req: NextRequest) {
     }
     if (insertError) throw insertError;
 
-    // Calendly events are also handled by the n8n pipeline. Here we
-    // just record them in the audit log for traceability.
-    logger.info('Calendly webhook received', { event: body.event, eventId });
+    // Sprint C: forward `invitee.created` to the n8n
+    // `module-booking-to-zoom` workflow. The workflow creates
+    // the Zoom meeting, persists the meeting_link row, and
+    // flips the module_booking status to `confirmed`.
+    if (body.event === 'invitee.created') {
+      const env = serverEnv();
+      const webhookUrl = env.N8N_ENROLLMENT_WEBHOOK_URL;
+      if (webhookUrl) {
+        // Fire-and-forget: do not block the webhook response on
+        // n8n. n8n will idempotently pick up the row via the
+        // `webhook_events` record.
+        fetch(`${webhookUrl}/calendly`, {
+          method: 'POST',
+          headers: {
+            'content-type':     'application/json',
+            'x-webhook-secret': env.N8N_WEBHOOK_SECRET ?? '',
+          },
+          body: JSON.stringify({ type: 'invitee.created', event_id: eventId, payload: body.payload }),
+        }).catch((err) => {
+          logger.warn('calendly → n8n forwarding failed', { event_id: eventId, err: (err as Error).message });
+        });
+      } else {
+        logger.info('calendly webhook received but N8N_ENROLLMENT_WEBHOOK_URL is not configured (mock mode)', { event: body.event });
+      }
+    } else {
+      logger.info('Calendly webhook received', { event: body.event, eventId });
+    }
 
     await admin.from('webhook_events')
       .update({ processed: true, processed_at: new Date().toISOString() } as never)

@@ -1,0 +1,173 @@
+{
+  "name": "module-cancellation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "module-cancellation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "name": "Webhook: module-cancellation",
+      "webhookId": "module-cancellation-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "if-hmac",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "={{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [460, 300],
+      "name": "Verify webhook secret"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/meetings/by-booking/{{ $json.body.module_booking_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "name": "Read meeting_link (Next.js)"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "https://api.zoom.us/v2/meetings/{{ $json.zoom_meeting_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer {{ $json.zoom_access_token }}"}
+          ]
+        },
+        "options": {"timeout": 15000, "response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "name": "Delete Zoom meeting"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",             "value": "module_cancelled"},
+            {"name": "module_booking_id","value": "={{ $json.body.module_booking_id }}"},
+            {"name": "cancelled_reason", "value": "={{ $json.body.cancelled_reason }}"},
+            {"name": "cancelled_by",     "value": "={{ $json.body.cancelled_by }}"},
+            {"name": "refund_stripe",    "value": "={{ $json.body.refund_stripe ?? false }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "name": "Persist cancellation (Next.js)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 300],
+      "name": "Respond OK"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",          "value": "workflow_failed"},
+            {"name": "workflow",      "value": "module-cancellation"},
+            {"name": "error",         "value": "={{ $json.error.message }}"},
+            {"name": "original_event","value": "={{ $('Webhook: module-cancellation').first().json }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 520],
+      "name": "Dead-letter on Zoom error"
+    }
+  ],
+  "connections": {
+    "Webhook: module-cancellation": {
+      "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
+    },
+    "Verify webhook secret": {
+      "main": [
+        [{"node": "Read meeting_link (Next.js)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",    "type": "main", "index": 0}]
+      ]
+    },
+    "Read meeting_link (Next.js)": {
+      "main": [
+        [{"node": "Delete Zoom meeting",     "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error","type": "main", "index": 0}]
+      ]
+    },
+    "Delete Zoom meeting": {
+      "main": [
+        [{"node": "Persist cancellation (Next.js)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",      "type": "main", "index": 0}]
+      ]
+    },
+    "Persist cancellation (Next.js)": {
+      "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{"name": "phase-3"}],
+  "meta": {
+    "description": "module-booking cancellation → read meeting_link → DELETE Zoom meeting → persist cancellation. Documented in n8n/docs/WORKFLOWS.md §2.4."
+  }
+}

@@ -56,9 +56,11 @@ export async function POST(
   // The `fn_block_late_cancel` BEFORE-trigger throws
   // `late_cancel_blocked` if the booking is less than 60
   // minutes away. We surface the error code in the response.
+  // Sprint C fix: the column is `cancelled_reason` (not
+  // `cancel_reason` — the B2 route used the wrong name).
   const { error: updateError } = await supabase
     .from('module_bookings')
-    .update({ status: 'cancelled', cancel_reason: parsed.data.reason ?? null } as never)
+    .update({ status: 'cancelled', cancelled_reason: parsed.data.reason ?? null } as never)
     .eq('id', bookingId);
   if (updateError) {
     throw new ApiError(409, 'cancel_failed', 'Could not cancel this booking.', { reason: updateError.message });

@@ -27,6 +27,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': here,
+      // `server-only` is a runtime guard for RSC/Server modules
+      // (Next.js ships a real implementation that throws on
+      // accidental client import). In Vitest we just stub it
+      // to a no-op module so unit tests can import server-side
+      // code directly.
+      'server-only': path.resolve(here, 'tests/_shims/server-only.ts'),
     },
   },
 });

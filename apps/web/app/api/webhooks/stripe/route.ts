@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        // Sprint B2: the unit of payment is the *enrollment*
+        // Sprint C: the unit of payment is the *enrollment*
         // (`enrollment_id`), not the legacy `booking_id`. The
         // metadata key is now `enrollment_id`; we still accept
         // `booking_id` from older n8n workflows as a transitional
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
           session.client_reference_id) as string | undefined;
         const legacyBookingId = session.metadata?.booking_id as string | undefined;
         if (enrollmentId) {
+          // 1. Update the payments row keyed by enrollment_id.
           await admin.from('payments')
             .update({
               status: 'succeeded',
@@ -73,6 +74,49 @@ export async function POST(req: NextRequest) {
               amount_cents: session.amount_total ?? 0,
             } as never)
             .eq('enrollment_id', enrollmentId);
+          // 2. Sprint C: flip the enrollment to `active`. The
+          //    B2 handler only updated `payments`; the
+          //    enrollment row was left `pending_payment`
+          //    forever.
+          await admin.from('enrollments')
+            .update({
+              status: 'active',
+              paid_at: new Date().toISOString(),
+              stripe_session_id: session.id,
+              stripe_payment_intent_id: typeof session.payment_intent === 'string'
+                ? session.payment_intent
+                : session.payment_intent?.id ?? null,
+            } as never)
+            .eq('id', enrollmentId);
+          // 3. Create one module_progress row per published
+          //    module in the course. Idempotent on
+          //    (enrollment_id, module_id).
+          const { data: enrollment } = await admin
+            .from('enrollments')
+            .select('course_id')
+            .eq('id', enrollmentId)
+            .single();
+          const enrollmentRow = enrollment as unknown as { course_id: string } | null;
+          if (enrollmentRow) {
+            const { data: modules } = await admin
+              .from('modules')
+              .select('id')
+              .eq('course_id', enrollmentRow.course_id)
+              .eq('is_published', true);
+            const moduleList = (modules ?? []) as unknown as Array<{ id: string }>;
+            for (const m of moduleList) {
+              await admin
+                .from('module_progress')
+                .upsert(
+                  {
+                    enrollment_id: enrollmentId,
+                    module_id:     m.id,
+                    status:        'not_started',
+                  } as never,
+                  { onConflict: 'enrollment_id,module_id' },
+                );
+            }
+          }
         } else if (legacyBookingId) {
           await admin.from('payments')
             .update({
@@ -97,6 +141,10 @@ export async function POST(req: NextRequest) {
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge;
         if (charge.payment_intent) {
+          // 1. Update the payments row. The DB trigger
+          //    `trg_enrollments_refund` (added in Sprint C
+          //    migration `20260710000000_…`) cascades the
+          //    flip to the linked enrollment.
           await admin.from('payments')
             .update({
               status: 'refunded',

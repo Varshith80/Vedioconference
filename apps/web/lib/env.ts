@@ -111,6 +111,13 @@ const serverSchema = z.object({
   STRIPE_WEBHOOK_SECRET:     z.string().min(1).optional(),
   STRIPE_PRICE_PAYG:         z.string().min(1).optional(),
   STRIPE_PRICE_SUBSCRIPTION: z.string().min(1).optional(),
+  // Sprint C: per-course price map. JSON string of the form
+  //   { "<course-uuid>": "price_xxx", ... }
+  // Empty in dev → the checkout route returns 503 with a clear
+  // "no_price_table" error code (the route never calls Stripe
+  // directly — it delegates to n8n — so the env var is read by
+  // the n8n workflow, not by the route).
+  STRIPE_PRICE_TABLE_JSON:   z.string().optional(),
   ZOOM_ACCOUNT_ID:           z.string().min(1).optional(),
   ZOOM_CLIENT_ID:            z.string().min(1).optional(),
   ZOOM_CLIENT_SECRET:        z.string().min(1).optional(),
@@ -122,6 +129,13 @@ const serverSchema = z.object({
   N8N_BASE_URL:              z.string().url().optional().or(z.literal('').transform(() => undefined)),
   N8N_API_KEY:               z.string().min(1).optional(),
   N8N_WEBHOOK_SECRET:        z.string().min(1).optional(),
+  // Sprint C: the n8n webhook URL the Next.js
+  // /api/enrollments/checkout route calls to have n8n create
+  // the Stripe Checkout Session. The Next.js app does NOT call
+  // Stripe directly (locked architecture — n8n is the only
+  // system that calls Stripe on the booking path). When this
+  // var is empty the route returns 503.
+  N8N_ENROLLMENT_WEBHOOK_URL: z.string().url().optional().or(z.literal('').transform(() => undefined)),
   LOG_LEVEL:                 z
     .enum(['debug', 'info', 'warn', 'error'])
     .default('info'),
@@ -145,6 +159,7 @@ export function serverEnv(): ServerEnv {
     STRIPE_WEBHOOK_SECRET:        process.env.STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_PAYG:            process.env.STRIPE_PRICE_PAYG,
     STRIPE_PRICE_SUBSCRIPTION:    process.env.STRIPE_PRICE_SUBSCRIPTION,
+    STRIPE_PRICE_TABLE_JSON:      process.env.STRIPE_PRICE_TABLE_JSON,
     ZOOM_ACCOUNT_ID:              process.env.ZOOM_ACCOUNT_ID,
     ZOOM_CLIENT_ID:               process.env.ZOOM_CLIENT_ID,
     ZOOM_CLIENT_SECRET:           process.env.ZOOM_CLIENT_SECRET,
@@ -156,6 +171,7 @@ export function serverEnv(): ServerEnv {
     N8N_BASE_URL:                 process.env.N8N_BASE_URL,
     N8N_API_KEY:                  process.env.N8N_API_KEY,
     N8N_WEBHOOK_SECRET:           process.env.N8N_WEBHOOK_SECRET,
+    N8N_ENROLLMENT_WEBHOOK_URL:   process.env.N8N_ENROLLMENT_WEBHOOK_URL,
     LOG_LEVEL:                    process.env.LOG_LEVEL,
     SENTRY_DSN:                   process.env.SENTRY_DSN,
   });

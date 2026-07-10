@@ -388,7 +388,58 @@ double-send.
   ensures the enrollment exists; the application check ensures
   `enrollments.status='active'` and `enrollments.student_id =
   auth.uid()`.
+- **Booking a module whose `position` skips an unfinished
+  predecessor (Sprint C precondition 2):** the
+  `fn_module_unlock_check` BEFORE INSERT trigger on
+  `module_bookings` raises `P0001 / module_locked` with a
+  count of blocking predecessors. The
+  `services/bookings/module-unlock.ts` helper runs the same
+  check on the application side and returns a friendlier
+  `409 module_locked` response with the structured
+  `blockingModuleIds` list before the round-trip.
 
 ---
 
-*Last updated: 2026-07-09. Owner: project lead. Sprint B2 change.*
+## Sprint C update (2026-07-10)
+
+The booking flow is now wired end-to-end. The locked
+architecture (CLAUDE.md §2.3) — *n8n is the only system that
+calls Stripe or Zoom on the booking path* — is enforced at
+the Next.js boundary. The Next.js app exposes:
+
+- A `POST /api/enrollments/checkout` route that delegates
+  the Stripe Checkout Session creation to the n8n
+  `enrollment-created` workflow (mock-gated: when
+  `N8N_ENROLLMENT_WEBHOOK_URL` is unset, the route returns
+  `503 checkout_unavailable` — no destructive call).
+- A `POST /api/webhooks/stripe` handler that, on
+  `checkout.session.completed`, updates `payments`, flips
+  the `enrollments` row to `active` + `paid_at` +
+  `stripe_session_id`, and creates one `module_progress`
+  row per published module.
+- A `POST /api/webhooks/calendly` handler that, on
+  `invitee.created`, forwards the event to the n8n
+  `module-booking-to-zoom` workflow (which creates the Zoom
+  meeting, persists the `meeting_link` row, and triggers
+  the `module-confirmation-email` sub-workflow that
+  Resend-sends the join URL).
+- 6 server-rendered React Email templates, locale-aware via
+  the B1-i18n factory pattern.
+
+Two new DB triggers back the policy:
+
+- `fn_enrollments_refund` (Sprint C precondition 1) — when
+  a `payments` row flips to `status='refunded'`, cascades
+  the flip to the linked `enrollments` row.
+- `fn_module_unlock_check` (Sprint C precondition 2) —
+  rejects `module_bookings` inserts that would skip an
+  unfinished predecessor module.
+
+The 9 n8n workflows (the 8 Phase 1 placeholders are deleted)
+are real workflow JSON ready to import via
+`n8n import:workflow --input=<file>`. Their contracts are
+documented in `n8n/docs/WORKFLOWS.md` §2.
+
+---
+
+*Last updated: 2026-07-10. Owner: project lead. Sprint C change.*

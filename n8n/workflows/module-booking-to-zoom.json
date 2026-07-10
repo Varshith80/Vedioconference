@@ -1,0 +1,203 @@
+{
+  "name": "module-booking-to-zoom",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calendly",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "name": "Webhook: calendly invitee.created",
+      "webhookId": "calendly-invitee-created-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "if-hmac",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "={{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": {"type": "string", "operation": "equals"}
+            },
+            {
+              "id": "if-event-type",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "invitee.created",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [460, 300],
+      "name": "Verify secret + event type"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/enrollments/by-calendly-invitee",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "calendly_invitee_uri", "value": "={{ $json.body.payload.uri }}"},
+            {"name": "calendly_event_uri",   "value": "={{ $json.body.payload.event }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "name": "Resolve booking context (Next.js)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.zoom.us/v2/users/{{ $json.zoom_user_id }}/meetings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer {{ $json.zoom_access_token }}"},
+            {"name": "Content-Type",  "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "topic",      "value": "={{ $json.module_title }} — {{ $json.student_name }}"},
+            {"name": "type",       "value": "2"},
+            {"name": "start_time", "value": "={{ $json.scheduled_start }}"},
+            {"name": "duration",   "value": "={{ $json.duration_min }}"},
+            {"name": "timezone",   "value": "={{ $json.timezone }}"},
+            {"name": "settings[join_before_host]", "value": "false"},
+            {"name": "settings[waiting_room]",     "value": "true"},
+            {"name": "settings[mute_upon_entry]",  "value": "true"},
+            {"name": "settings[audio]",            "value": "voip"}
+          ]
+        },
+        "options": {"timeout": 20000, "response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "name": "Create Zoom meeting"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",            "value": "meeting_created"},
+            {"name": "module_booking_id","value": "={{ $json.module_booking_id }}"},
+            {"name": "zoom_meeting_id", "value": "={{ $node['Create Zoom meeting'].json.id }}"},
+            {"name": "join_url",        "value": "={{ $node['Create Zoom meeting'].json.join_url }}"},
+            {"name": "start_url",       "value": "={{ $node['Create Zoom meeting'].json.start_url }}"},
+            {"name": "passcode",        "value": "={{ $node['Create Zoom meeting'].json.password }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "name": "Persist meeting_link (Next.js)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"zoom_meeting_id\": \"{{ $node['Create Zoom meeting'].json.id }}\"\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 300],
+      "name": "Respond OK"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",          "value": "workflow_failed"},
+            {"name": "workflow",      "value": "module-booking-to-zoom"},
+            {"name": "error",         "value": "={{ $json.error.message }}"},
+            {"name": "original_event","value": "={{ $('Webhook: calendly invitee.created').first().json }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 520],
+      "name": "Dead-letter on Zoom error"
+    }
+  ],
+  "connections": {
+    "Webhook: calendly invitee.created": {
+      "main": [[{"node": "Verify secret + event type", "type": "main", "index": 0}]]
+    },
+    "Verify secret + event type": {
+      "main": [
+        [{"node": "Resolve booking context (Next.js)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",          "type": "main", "index": 0}]
+      ]
+    },
+    "Resolve booking context (Next.js)": {
+      "main": [
+        [{"node": "Create Zoom meeting",       "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error", "type": "main", "index": 0}]
+      ]
+    },
+    "Create Zoom meeting": {
+      "main": [
+        [{"node": "Persist meeting_link (Next.js)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",      "type": "main", "index": 0}]
+      ]
+    },
+    "Persist meeting_link (Next.js)": {
+      "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{"name": "phase-3"}],
+  "meta": {
+    "description": "Calendly invitee.created → resolve booking context → create Zoom meeting → persist meeting_link via Next.js. Documented in n8n/docs/WORKFLOWS.md §2.2."
+  }
+}

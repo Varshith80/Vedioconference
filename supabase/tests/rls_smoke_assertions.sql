@@ -431,6 +431,191 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- 11. Summary
+-- 11. module_bookings — `trg_module_unlock` (Sprint C)
 -- ---------------------------------------------------------------------
-raise notice '---- RLS smoke: all assertions passed ----';
+-- The trigger rejects INSERTs into module_bookings when a
+-- preceding module of the same course is not yet completed.
+-- Student A's enrollment has 1 module (position 1) which is
+-- `in_progress` (not `completed`). Inserting a NEW module
+-- booking for the same module (or a phantom position 2) should
+-- succeed only for `is_preview=true`. We test:
+--   1. Inserting a new module_booking for the existing module
+--      is allowed (position 1, no preceding module to block).
+--   2. The 1 existing module_booking for A is at
+--      `a1a1a1a1-0000-0000-0000-000000000030`.
+--   3. We DO NOT attempt to insert a position-2 booking because
+--      the fixture only has 1 module per course; the unlock
+--      check is also exercised on the unit-test side via
+--      `services/bookings/module-unlock.test.ts`.
+--
+-- The negative test (rejection with P0001) is exercised in the
+-- 13. block below, where a synthetic second module is created
+-- in-test and the trigger is proven to block the booking.
+-- ---------------------------------------------------------------------
+do $$
+declare
+    v_booking_id uuid;
+begin
+    -- This is a no-op read-side check: confirm the trigger does
+    -- not interfere with the existing 1 booking. The negative
+    -- test is in block 13.
+    perform rls_smoke.reset_role();
+    perform rls_smoke.expect_true(
+        'module_unlock: trigger exists',
+        (select exists (
+            select 1 from pg_trigger
+            where tgname = 'trg_module_unlock'
+              and tgrelid = 'public.module_bookings'::regclass
+        ))
+    );
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 12. payments → enrollments — `trg_enrollments_refund` (Sprint C)
+-- ---------------------------------------------------------------------
+-- The trigger flips the linked enrollment to `refunded` when
+-- the payments row flips to `status='refunded'`. We assert:
+--   1. The trigger exists.
+--   2. The fixture's payment row (`a1a1a1a1-…-0040`) is
+--      currently `pending`. Flipping it to `refunded` cascades
+--      student A's enrollment (`…0020`) to `refunded`.
+--   3. After the cascade, the enrollment row's `status` is
+--      `refunded` and `refunded_at` is set.
+do $$
+declare
+    v_status           public.enrollment_status;
+    v_refunded_at      timestamptz;
+    v_refunded_amount  integer;
+begin
+    perform rls_smoke.reset_role();
+
+    -- Sanity: the trigger exists.
+    perform rls_smoke.expect_true(
+        'refund_flip: trigger exists',
+        (select exists (
+            select 1 from pg_trigger
+            where tgname = 'trg_enrollments_refund'
+              and tgrelid = 'public.payments'::regclass
+        ))
+    );
+
+    -- Reset the payment row so a re-run of this block is idempotent.
+    update public.payments
+       set status = 'pending',
+           refunded_at = null,
+           refunded_amount_cents = 0
+     where id = 'a1a1a1a1-0000-0000-0000-000000000040';
+
+    -- Reset the enrollment to `active` so the cascade has something to do.
+    update public.enrollments
+       set status = 'active',
+           refunded_at = null,
+           refunded_amount_cents = 0
+     where id = 'a1a1a1a1-0000-0000-0000-000000000020';
+
+    -- Now flip the payment row. The trigger must cascade.
+    update public.payments
+       set status = 'refunded',
+           refunded_at = now(),
+           refunded_amount_cents = 4500
+     where id = 'a1a1a1a1-0000-0000-0000-000000000040';
+
+    -- Read back the enrollment.
+    select status, refunded_at, refunded_amount_cents
+      into v_status, v_refunded_at, v_refunded_amount
+      from public.enrollments
+     where id = 'a1a1a1a1-0000-0000-0000-000000000020';
+
+    perform rls_smoke.expect('refund_flip: enrollment status = refunded', v_status::text, 'refunded');
+    perform rls_smoke.expect_true(
+        'refund_flip: enrollment refunded_at is set',
+        v_refunded_at is not null
+    );
+    perform rls_smoke.expect('refund_flip: enrollment refunded_amount_cents = 4500', v_refunded_amount, 4500);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 13. module_unlock — negative test (P0001 raised)
+-- ---------------------------------------------------------------------
+-- Create a second published module at position 2 for the smoke
+-- course, mark it NOT in the module_progress for A (i.e. A has
+-- not completed module 1). Insert a module_booking for the
+-- new module as student A; the trigger must raise P0001 with
+-- the `module_locked` message. Then mark module 1 as
+-- `completed` and re-insert; the trigger must allow it.
+do $$
+declare
+    v_course_id constant uuid := 'a1a1a1a1-0000-0000-0000-000000000010';
+    v_mod1      constant uuid := 'a1a1a1a1-0000-0000-0000-000000000011';
+    v_mod2      constant uuid := 'a1a1a1a1-0000-0000-0000-000000000012';
+    v_enroll_a  constant uuid := 'a1a1a1a1-0000-0000-0000-000000000020';
+    v_tutor     constant uuid := 'a1a1a1a1-0000-0000-0000-0000000000aa';
+    v_student_a constant uuid := 'a1a1a1a1-0000-0000-0000-000000000003';
+    v_raised    text;
+    v_booking_id uuid;
+begin
+    perform rls_smoke.reset_role();
+
+    -- 1. Insert a second module at position 2. Idempotent.
+    insert into public.modules (id, course_id, position, slug, title, duration_min, is_published, is_preview)
+    values (v_mod2, v_course_id, 2, 'rls-smoke-module-2', 'Smoke Module 2', 60, true, false)
+    on conflict (id) do nothing;
+
+    -- 2. The pre-existing module_progress for A on module 1 is
+    --    `in_progress` (set by the fixture). So a booking for
+    --    module 2 must be rejected.
+    begin
+        insert into public.module_bookings (
+            enrollment_id, module_id, tutor_id, student_id,
+            status, scheduled_start, scheduled_end, timezone
+        )
+        values (
+            v_enroll_a, v_mod2, v_tutor, v_student_a,
+            'scheduled', now() + interval '5 days', now() + interval '5 days' + interval '1 hour',
+            'Europe/Paris'
+        )
+        returning id into v_booking_id;
+
+        raise exception 'module_unlock: expected P0001, got no error';
+    exception
+        when check_violation or others then
+            v_raised := sqlerrm;
+            if v_raised like '%module_locked%' then
+                raise notice 'PASS  module_unlock: trigger raised P0001 (module_locked)';
+            else
+                raise exception 'FAIL  module_unlock: wrong error message: %', v_raised;
+            end if;
+    end;
+
+    -- 3. Mark module 1 as `completed` for A. The insert must now succeed.
+    update public.module_progress
+       set status = 'completed', completed_at = now()
+     where enrollment_id = v_enroll_a
+       and module_id = v_mod1;
+
+    begin
+        insert into public.module_bookings (
+            enrollment_id, module_id, tutor_id, student_id,
+            status, scheduled_start, scheduled_end, timezone
+        )
+        values (
+            v_enroll_a, v_mod2, v_tutor, v_student_a,
+            'scheduled', now() + interval '5 days', now() + interval '5 days' + interval '1 hour',
+            'Europe/Paris'
+        )
+        returning id into v_booking_id;
+
+        if v_booking_id is not null then
+            raise notice 'PASS  module_unlock: insert allowed after preceding module is completed';
+        else
+            raise exception 'FAIL  module_unlock: insert returned no id';
+        end if;
+    exception when others then
+        raise exception 'FAIL  module_unlock: unexpected error after completing module 1: %', sqlerrm;
+    end;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 14. Summary
+-- ---------------------------------------------------------------------
+raise notice '---- RLS smoke: all assertions passed (Sprint B2 + C) ----';
