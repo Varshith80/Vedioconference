@@ -30,7 +30,23 @@
     "skipLink": "Skip to main content",
     "ariaPrimary": "Primary navigation",
     "ariaMobile": "Main menu",
-    "ariaBreadcrumb": "Breadcrumb"
+    "ariaBreadcrumb": "Breadcrumb",
+    "breadcrumbs": {
+      "aria": "Breadcrumb",
+      "home": "Home",
+      "about": "About",
+      "levels": "Levels",
+      "pricing": "Pricing",
+      "contact": "Contact",
+      "tutors": "Tutors",
+      "courses": "Courses",
+      "login": "Log in",
+      "register": "Create account",
+      "forgotPassword": "Forgot password",
+      "resetPassword": "Reset password",
+      "verifyEmail": "Check your inbox",
+      "dashboard": "Dashboard"
+    }
   },
   "Homepage": {
     "livePill": "Live online courses",
@@ -39,19 +55,217 @@
     "ctaPrimary": "Book a free course",
     "ctaSecondary": "See the levels",
     "socialProof": "Live classes · small groups or one-to-one · High school → Bachelor's",
+    "trustAria": "Ils nous font confiance",
+    "trustItems": [
+      "Lycée Henri-IV",
+      "Lycée Louis-le-Grand",
+      "MPSI Fermat",
+      "CPGE Hoche",
+      "Université Paris-Saclay",
+      "INSA Lyon"
+    ],
+    "tutorsEyebrow": "Featured tutors",
+    "tutorsTitle": "Tutors who teach the way you learn.",
+    "tutorsIntro": "A handful of the verified tutors teaching on Intégrale this term. Every profile is interview-screened and demo-screened before it goes live.",
+    "tutorsSeeAll": "See all tutors",
+    "tutors": [
+      {
+        "slug": "elise-morel",
+        "name": "Élise Morel",
+        "headline": "Maths · MPSI / MP*",
+        "bio": "Normalienne (ENS Paris-Saclay), 6 years of experience with prépa students. Specialised in oral-style written answers and admission contests.",
+        "rating": 4.9,
+        "sessions": 412,
+        "subjects": ["Maths", "MP", "MPI"]
+      },
+      {
+        "slug": "antoine-rousseau",
+        "name": "Antoine Rousseau",
+        "headline": "Physics · Terminale → Prépa",
+        "bio": "PhD candidate in theoretical physics. Patient, methodical, and unusually clear on thermodynamics and electromagnetism.",
+        "rating": 4.8,
+        "sessions": 287,
+        "subjects": ["Physics", "Chemistry"]
+      },
+      {
+        "slug": "sophie-nguyen",
+        "name": "Sophie Nguyen",
+        "headline": "Maths & Physics · Lycée",
+        "bio": "Agrégée de maths, 8 years of experience with high-school and prépa students. Strong on Bac speciality and Parcoursup preparation.",
+        "rating": 4.9,
+        "sessions": 503,
+        "subjects": ["Maths", "Physics", "Bac"]
+      }
+    ],
+    "coursesEyebrow": "Popular courses",
+    "coursesTitle": "Programmes built for the exam, not for the catalogue.",
+    "coursesIntro": "A small selection of the programmes running this term — from one-shot catch-up sessions to full Bac and prépa tracks.",
+    "coursesSeeAll": "See all courses",
+    "courses": [
+      {
+        "id": "bac-specialite",
+        "slug": "bac-specialite-maths",
+        "title": "Baccalauréat — Maths Spécialité",
+        "track": "High school",
+        "level": "Terminale",
+        "summary": "Full programme aligned with the official speciality curriculum, calibrated exercises, Bac blanc corrections.",
+        "duration": "12 sessions",
+        "price": "39 €",
+        "accent": "primary"
+      },
+      {
+        "id": "prepa-mp",
+        "slug": "prepa-mp-maths",
+        "title": "Prépa MP — Maths écrit & oral",
+        "track": "Classes prépa",
+        "level": "MP / MP*",
+        "summary": "Written-style proofs, oral practice, and competition-calibrated exercises for Centrale, Mines and ENS admissibility.",
+        "duration": "20 sessions",
+        "price": "55 €",
+        "accent": "accent"
+      },
+      {
+        "id": "licence-analyse",
+        "slug": "licence-analyse",
+        "title": "Licence — Analyse L1/L2",
+        "track": "Bachelor's",
+        "level": "L1 / L2 Sciences",
+        "summary": "Sequences, series, integrals, metric spaces. Catch-up or deepening, paced to your current syllabus.",
+        "duration": "10 sessions",
+        "price": "39 €",
+        "accent": "muted"
+      }
+    ],
     "pathsEyebrow": "01 — Tracks",
     "pathsTitle": "Four tracks, one standard of rigour.",
     "pathsIntro": "High school, prépa, BTS, bachelor's: every track has its own programme, its own exercises, and tutors who know the exam expectations. Pick yours, the rest follows.",
     "methodEyebrow": "02 — Method",
     "methodTitle": "How a session actually works.",
     "methodIntro": "Three simple building blocks, designed to help you make real progress without drowning in content.",
-    "figuresEyebrow": "03 — By the numbers",
+    "benefitsEyebrow": "03 — Why Intégrale",
+    "benefitsTitle": "Everything you need, nothing you don't.",
+    "benefitsIntro": "Six reasons students and parents choose Intégrale over a one-off tutor or a content library.",
+    "benefits": [
+      {
+        "icon": "award",
+        "title": "Verified tutors",
+        "body": "Profiles are screened on application, pedagogical interview, and a live teaching demo. Only the strongest make it onto the platform."
+      },
+      {
+        "icon": "check",
+        "title": "Vetted curricula",
+        "body": "Every programme is mapped to a real exam: Bac, prépa rank, BTS assessment, or university module. No generic content."
+      },
+      {
+        "icon": "calendar",
+        "title": "Book in 60 seconds",
+        "body": "Pick a course, a slot, pay — calendar invite and Zoom link arrive by email. Reschedule or cancel from your dashboard."
+      },
+      {
+        "icon": "video",
+        "title": "Frictionless video",
+        "body": "A private Zoom room per session. No install, screen-share and white-board included. Mobile, tablet, laptop — same experience."
+      },
+      {
+        "icon": "card",
+        "title": "Honest pricing",
+        "body": "Stripe Checkout, Apple Pay, Google Pay, SEPA. Receipt and invoice emailed automatically. No hidden fees, no subscriptions."
+      },
+      {
+        "icon": "chart",
+        "title": "Real progress",
+        "body": "A dashboard that surfaces the topics you actually struggle with, session after session. Less guesswork, more progress."
+      }
+    ],
+    "howEyebrow": "04 — Process",
+    "howTitle": "From sign-up to first session in under five minutes.",
+    "howIntro": "A predictable, no-surprise booking experience. You always know what's next, and what's expected of you.",
+    "howSteps": [
+      {
+        "n": "01",
+        "title": "Tell us about you",
+        "body": "Level, subject, goal — Bac, prépa rank, or a university module. We use this to point you to the right tutor.",
+        "detail": "2 minutes"
+      },
+      {
+        "n": "02",
+        "title": "Pick a tutor & a slot",
+        "body": "Browse verified profiles and book a slot that fits your week. Real availability, no back-and-forth emails.",
+        "detail": "1 minute"
+      },
+      {
+        "n": "03",
+        "title": "Pay, securely",
+        "body": "Stripe Checkout, card or Apple Pay. Receipt and invoice sent automatically. Your first slot is on us.",
+        "detail": "30 seconds"
+      },
+      {
+        "n": "04",
+        "title": "Meet on Zoom",
+        "body": "Calendar invite and Zoom link land in your inbox 24 h before, then 1 h before. Join from any device.",
+        "detail": "0 install"
+      }
+    ],
+    "testimonialsEyebrow": "Testimonials",
+    "testimonialsTitle": "What students and parents say.",
+    "testimonialsIntro": "Real outcomes from real sessions. A few of the messages we get after a term of work.",
+    "testimonials": [
+      {
+        "quote": "In two months of sessions I gained 4 points of average in maths. The reminders before each session save me from forgetting.",
+        "author": "Léa B.",
+        "role": "Terminale S — Paris",
+        "rating": 5
+      },
+      {
+        "quote": "The interface is clean, the tutor knows the MPSI programme inside out. I recommend it for any prépa student.",
+        "author": "Mehdi R.",
+        "role": "MPSI — Lyon",
+        "rating": 5
+      },
+      {
+        "quote": "Payment and automatic invoicing — nothing to manage. My parents get a monthly recap without asking.",
+        "author": "Camille V.",
+        "role": "1ère Générale — Bordeaux",
+        "rating": 5
+      }
+    ],
+    "figuresEyebrow": "05 — By the numbers",
     "figuresAria": "Key figures",
-    "ctaEyebrow": "04 — Get started",
+    "ctaEyebrow": "06 — Get started",
     "ctaTitle": "Book your first free session",
     "ctaDescription": "A 20-minute exchange to map your needs, then a free slot with a verified tutor.",
     "ctaButtonPrimary": "Book my slot",
     "ctaButtonSecondary": "See pricing",
+    "faqEyebrow": "FAQ",
+    "faqTitle": "Frequently asked questions.",
+    "faqIntro": "The questions we get most often. If yours isn't here, drop us a line — we usually reply within 24 hours.",
+    "faqContact": "Can't find your answer? Write to us at",
+    "faqItems": [
+      {
+        "q": "How does the first free session work?",
+        "a": "It's a 20-minute call with a tutor: we map your level, your goal, and your timeframe, then we propose a programme. If we can't help, we tell you — and we point you to the right resource."
+      },
+      {
+        "q": "Can I cancel or reschedule a session?",
+        "a": "Yes, from your dashboard, up to 1 hour before the start. After that, the session is due. We track every change so there's no surprise charge."
+      },
+      {
+        "q": "How are tutors selected?",
+        "a": "Three filters: a written application, a 30-minute pedagogical interview, and a live teaching demo. We turn down most applicants — the average tutor has 6+ years of experience."
+      },
+      {
+        "q": "What if I don't connect with my tutor?",
+        "a": "Tell us. We'll switch you to another tutor at no cost, no question asked. The tutor-student fit matters more than any other variable."
+      },
+      {
+        "q": "Do you offer invoices and receipts?",
+        "a": "Yes — Stripe sends a receipt at payment, an invoice is sent at the end of the month, and your dashboard keeps a full history exportable as PDF."
+      },
+      {
+        "q": "Which subjects and levels are covered?",
+        "a": "Mathematics, physics and chemistry, from high school (Seconde → Terminale) through classes préparatoires (MPSI / MP / PC / PSI) and bachelor's (L1 / L2 Sciences)."
+      }
+    ],
     "seeAllLevels": "See the details by level",
     "paths": [
       {
@@ -368,22 +582,6 @@
         { "id": "resources", "label": "Resources", "href": "/dashboard/resources" },
         { "id": "profile",   "label": "Profile", "href": "/dashboard/profile" }
       ]
-    },
-    "breadcrumbs": {
-      "aria": "Breadcrumb",
-      "home": "Home",
-      "about": "About",
-      "levels": "Levels",
-      "pricing": "Pricing",
-      "contact": "Contact",
-      "tutors": "Tutors",
-      "courses": "Courses",
-      "login": "Log in",
-      "register": "Create account",
-      "forgotPassword": "Forgot password",
-      "resetPassword": "Reset password",
-      "verifyEmail": "Check your inbox",
-      "dashboard": "Dashboard"
     },
     "header": {
       "fallbackName": "My space",

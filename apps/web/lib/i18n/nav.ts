@@ -9,9 +9,14 @@
  *
  * The translator parameter is typed loosely because next-intl's
  * type-level guarantee is that `t(key)` returns a `string`; for
- * keys whose value is an object or an array, the runtime returns
- * the object/array but the static type still says `string`. We
- * cast at the boundary.
+ * keys whose value is an object or an array, the static type
+ * still says `string`. We cast at the boundary.
+ *
+ * IMPORTANT: arrays must be read with `t.raw(key)`, not `t(key)`.
+ * The next-intl runtime throws `IntlError: INVALID_MESSAGE` when
+ * `t(key)` resolves to a non-string (a value next-intl considers
+ * un-formattable). `t.raw(key)` returns the underlying object or
+ * array as-is.
  */
 export type PrimaryNavItem = {
   id: string;
@@ -24,16 +29,24 @@ export type FooterLink = {
   href: string;
 };
 
-type TLike = (key: string, values?: Record<string, string | number | Date>) => unknown;
+/**
+ * Minimal translator shape. `getTranslations` / `useTranslations`
+ * return a function that ALSO has a `.raw()` method for accessing
+ * structured values without ICU formatting.
+ */
+type TLike = {
+  (key: string, values?: Record<string, string | number | Date>): string;
+  raw: (key: string) => unknown;
+};
 
 function asArray<T>(value: unknown): ReadonlyArray<T> {
   return Array.isArray(value) ? (value as ReadonlyArray<T>) : [];
 }
 
 export function getPrimaryNav(t: TLike): ReadonlyArray<PrimaryNavItem> {
-  return asArray<PrimaryNavItem>(t('primary'));
+  return asArray<PrimaryNavItem>(t.raw('primary'));
 }
 
 export function getFooterLinks(t: TLike): ReadonlyArray<FooterLink> {
-  return asArray<FooterLink>(t('footer'));
+  return asArray<FooterLink>(t.raw('footer'));
 }

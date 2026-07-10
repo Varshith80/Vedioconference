@@ -1,17 +1,23 @@
 import Link from 'next/link';
-import { setRequestLocale } from 'next-intl/server';
 import { getTranslations } from 'next-intl/server';
 import { Container } from '@/components/shared/container';
 import { Button } from '@/components/ui/button';
+import { defaultLocale, isLocale } from '@/i18n';
 
-export default async function LocaleNotFound({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  setRequestLocale(locale);
-  const t = await getTranslations('NotFound');
+/**
+ * Locale-aware 404. In Next.js 15 `params` may be `undefined`
+ * (the not-found boundary is hit before route resolution) so we
+ * read the active locale from the `x-next-intl-locale` request
+ * header (set by `next-intl/middleware`), and fall back to the
+ * default locale. This matches the pattern in `app/not-found.tsx`
+ * for the global (non-locale) 404.
+ */
+export default async function LocaleNotFound() {
+  const { headers } = await import('next/headers');
+  const h = await headers();
+  const candidate = h.get('x-next-intl-locale');
+  const locale = isLocale(candidate) ? candidate : defaultLocale;
+  const t = await getTranslations({ locale, namespace: 'NotFound' });
   return (
     <Container className="flex min-h-[60vh] flex-col items-center justify-center py-16 text-center">
       <p className="text-sm font-semibold uppercase tracking-widest text-primary">

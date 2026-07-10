@@ -27,7 +27,7 @@ export async function generateMetadata({
 }
 
 function getValues(t: TLike) {
-  return asArray<{ title: string; body: string }>(t('values'));
+  return asArray<{ title: string; body: string }>(t.raw('values'));
 }
 
 export default async function AboutPage({

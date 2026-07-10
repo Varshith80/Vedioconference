@@ -24,7 +24,7 @@ export async function generateMetadata({
 }
 
 function getFaq(t: TLike) {
-  return asArray<{ q: string; a: string }>(t('faqItems'));
+  return asArray<{ q: string; a: string }>(t.raw('faqItems'));
 }
 
 export default async function PricingPage({
@@ -43,8 +43,8 @@ export default async function PricingPage({
         title={t('h1')}
         description={t('intro')}
         breadcrumbs={[
-          { label: tNav('breadcrumb.home'), href: '/' },
-          { label: tNav('breadcrumb.pricing') },
+          { label: tNav('breadcrumbs.home'), href: '/' },
+          { label: tNav('breadcrumbs.pricing') },
         ]}
       />
 

@@ -12,11 +12,16 @@
  * foreign keys. The `LearningPathId` type is exported from here and
  * re-exported from the marketing components.
  *
- * The translator parameter is typed loosely (`Translator` from
- * next-intl) because next-intl's type-level guarantee is that
- * `t(key)` returns a `string`; for keys whose value is an object
- * or an array, the runtime returns the object/array but the
- * static type still says `string`. We cast at the boundary.
+ * The translator parameter is typed loosely because next-intl's
+ * type-level guarantee is that `t(key)` returns a `string`; for
+ * keys whose value is an object or an array, the static type
+ * still says `string`. We cast at the boundary.
+ *
+ * IMPORTANT: arrays must be read with `t.raw(key)`, not `t(key)`.
+ * The next-intl runtime throws `IntlError: INVALID_MESSAGE` when
+ * `t(key)` resolves to a non-string (a value next-intl considers
+ * un-formattable). `t.raw(key)` returns the underlying object or
+ * array as-is.
  */
 import type { LearningPathId } from '@/lib/constants/brand';
 
@@ -41,11 +46,15 @@ export type LocalisedKeyFigure = {
 };
 
 /**
- * Minimal translator shape — anything callable with a string key.
- * Compatible with both `getTranslations` (RSC) and `useTranslations`
- * (client) return values.
+ * Minimal translator shape — anything callable with a string key
+ * that ALSO has a `.raw()` accessor. Compatible with both
+ * `getTranslations` (RSC) and `useTranslations` (client) return
+ * values.
  */
-export type TLike = (key: string, values?: Record<string, string | number | Date>) => unknown;
+export type TLike = {
+  (key: string, values?: Record<string, string | number | Date>): string;
+  raw: (key: string) => unknown;
+};
 
 /**
  * Runtime helper: turn whatever the translator returns for a given
@@ -62,13 +71,96 @@ export function asArray<T>(value: unknown): ReadonlyArray<T> {
  * TypeScript's `as` cast — the JSON file is the contract.
  */
 export function getLearningPaths(t: TLike): ReadonlyArray<LocalisedLearningPath> {
-  return asArray<LocalisedLearningPath>(t('paths'));
+  return asArray<LocalisedLearningPath>(t.raw('paths'));
 }
 
 export function getMethodSteps(t: TLike): ReadonlyArray<LocalisedMethodStep> {
-  return asArray<LocalisedMethodStep>(t('steps'));
+  return asArray<LocalisedMethodStep>(t.raw('steps'));
 }
 
 export function getKeyFigures(t: TLike): ReadonlyArray<LocalisedKeyFigure> {
-  return asArray<LocalisedKeyFigure>(t('figures'));
+  return asArray<LocalisedKeyFigure>(t.raw('figures'));
+}
+
+// ─── Homepage marketing arrays ────────────────────────────────────────────
+
+export type LocalisedTrustItem = string;
+
+export type LocalisedFeaturedTutor = {
+  slug: string;
+  name: string;
+  headline: string;
+  bio: string;
+  rating: number;
+  sessions: number;
+  subjects: ReadonlyArray<string>;
+};
+
+export type CourseAccent = 'primary' | 'accent' | 'muted';
+
+export type LocalisedPopularCourse = {
+  id: string;
+  slug: string;
+  title: string;
+  track: string;
+  level: string;
+  summary: string;
+  duration: string;
+  price: string;
+  accent: CourseAccent;
+};
+
+export type BenefitIcon = 'award' | 'check' | 'calendar' | 'video' | 'card' | 'chart';
+
+export type LocalisedBenefit = {
+  icon: BenefitIcon;
+  title: string;
+  body: string;
+};
+
+export type LocalisedHowStep = {
+  n: '01' | '02' | '03' | '04';
+  title: string;
+  body: string;
+  detail?: string;
+};
+
+export type LocalisedTestimonial = {
+  quote: string;
+  author: string;
+  role: string;
+  rating?: number;
+};
+
+export type LocalisedFaqItem = {
+  q: string;
+  a: string;
+};
+
+export function getTrustItems(t: TLike): ReadonlyArray<LocalisedTrustItem> {
+  return asArray<LocalisedTrustItem>(t.raw('trustItems'));
+}
+
+export function getFeaturedTutors(t: TLike): ReadonlyArray<LocalisedFeaturedTutor> {
+  return asArray<LocalisedFeaturedTutor>(t.raw('tutors'));
+}
+
+export function getPopularCourses(t: TLike): ReadonlyArray<LocalisedPopularCourse> {
+  return asArray<LocalisedPopularCourse>(t.raw('courses'));
+}
+
+export function getBenefits(t: TLike): ReadonlyArray<LocalisedBenefit> {
+  return asArray<LocalisedBenefit>(t.raw('benefits'));
+}
+
+export function getHowSteps(t: TLike): ReadonlyArray<LocalisedHowStep> {
+  return asArray<LocalisedHowStep>(t.raw('howSteps'));
+}
+
+export function getTestimonials(t: TLike): ReadonlyArray<LocalisedTestimonial> {
+  return asArray<LocalisedTestimonial>(t.raw('testimonials'));
+}
+
+export function getFaqItems(t: TLike): ReadonlyArray<LocalisedFaqItem> {
+  return asArray<LocalisedFaqItem>(t.raw('faqItems'));
 }

@@ -30,7 +30,23 @@
     "skipLink": "Aller au contenu principal",
     "ariaPrimary": "Navigation principale",
     "ariaMobile": "Menu principal",
-    "ariaBreadcrumb": "Fil d’Ariane"
+    "ariaBreadcrumb": "Fil d’Ariane",
+    "breadcrumbs": {
+      "aria": "Fil d’Ariane",
+      "home": "Accueil",
+      "about": "À propos",
+      "levels": "Niveaux",
+      "pricing": "Tarifs",
+      "contact": "Contact",
+      "tutors": "Tuteurs",
+      "courses": "Cours",
+      "login": "Connexion",
+      "register": "Créer un compte",
+      "forgotPassword": "Mot de passe oublié",
+      "resetPassword": "Nouveau mot de passe",
+      "verifyEmail": "Vérifiez votre boîte",
+      "dashboard": "Tableau de bord"
+    }
   },
   "Homepage": {
     "livePill": "Cours en ligne en direct",
@@ -39,19 +55,217 @@
     "ctaPrimary": "Réserver un cours gratuit",
     "ctaSecondary": "Voir les niveaux",
     "socialProof": "Cours en direct · petits groupes ou individuel · Seconde → Licence",
+    "trustAria": "Ils nous font confiance",
+    "trustItems": [
+      "Lycée Henri-IV",
+      "Lycée Louis-le-Grand",
+      "MPSI Fermat",
+      "CPGE Hoche",
+      "Université Paris-Saclay",
+      "INSA Lyon"
+    ],
+    "tutorsEyebrow": "Profils à la une",
+    "tutorsTitle": "Des profs qui enseignent comme vous apprenez.",
+    "tutorsIntro": "Quelques-uns des profs vérifiés qui enseignent sur Intégrale ce trimestre. Chaque profil passe un entretien pédagogique et une démo de cours avant d'être publié.",
+    "tutorsSeeAll": "Voir tous les profs",
+    "tutors": [
+      {
+        "slug": "elise-morel",
+        "name": "Élise Morel",
+        "headline": "Maths · MPSI / MP*",
+        "bio": "Normalienne (ENS Paris-Saclay), 6 ans d'expérience avec des étudiants de prépa. Spécialisée dans les rédactions type oral et la préparation aux concours.",
+        "rating": 4.9,
+        "sessions": 412,
+        "subjects": ["Maths", "MP", "MPI"]
+      },
+      {
+        "slug": "antoine-rousseau",
+        "name": "Antoine Rousseau",
+        "headline": "Physique · Terminale → Prépa",
+        "bio": "Doctorant en physique théorique. Pédagogue, méthodique, particulièrement clair sur la thermodynamique et l'électromagnétisme.",
+        "rating": 4.8,
+        "sessions": 287,
+        "subjects": ["Physique", "Chimie"]
+      },
+      {
+        "slug": "sophie-nguyen",
+        "name": "Sophie Nguyen",
+        "headline": "Maths & Physique · Lycée",
+        "bio": "Agrégée de maths, 8 ans d'expérience avec des lycéens et des prépa. Solide sur la Spé et la préparation Parcoursup.",
+        "rating": 4.9,
+        "sessions": 503,
+        "subjects": ["Maths", "Physique", "Bac"]
+      }
+    ],
+    "coursesEyebrow": "Cours populaires",
+    "coursesTitle": "Des programmes pensés pour l'examen, pas pour le catalogue.",
+    "coursesIntro": "Une sélection des programmes qui tournent ce trimestre — de la remise à niveau ponctuelle au suivi complet Bac / prépa.",
+    "coursesSeeAll": "Voir tous les cours",
+    "courses": [
+      {
+        "id": "bac-specialite",
+        "slug": "bac-specialite-maths",
+        "title": "Baccalauréat — Maths Spécialité",
+        "track": "Lycée",
+        "level": "Terminale",
+        "summary": "Programme complet aligné sur le programme officiel de la spécialité, exercices calibrés, corrections de Bac blanc.",
+        "duration": "12 séances",
+        "price": "39 €",
+        "accent": "primary"
+      },
+      {
+        "id": "prepa-mp",
+        "slug": "prepa-mp-maths",
+        "title": "Prépa MP — Maths écrit & oral",
+        "track": "Classes prépa",
+        "level": "MP / MP*",
+        "summary": "Rédactions type écrit, entraînements à l'oral, exercices calibrés pour les admissibilités Centrale, Mines et ENS.",
+        "duration": "20 séances",
+        "price": "55 €",
+        "accent": "accent"
+      },
+      {
+        "id": "licence-analyse",
+        "slug": "licence-analyse",
+        "title": "Licence — Analyse L1/L2",
+        "track": "Licence",
+        "level": "L1 / L2 Sciences",
+        "summary": "Suites, séries, intégrales, espaces métriques. Remise à niveau ou approfondissement, calé sur votre programme du moment.",
+        "duration": "10 séances",
+        "price": "39 €",
+        "accent": "muted"
+      }
+    ],
     "pathsEyebrow": "01 — Parcours",
     "pathsTitle": "Quatre parcours, une seule exigence.",
     "pathsIntro": "Lycée, classes préparatoires, BTS, licence : chaque parcours a son programme, ses exercices, et ses profs habitués aux attendus. Choisissez le vôtre, le reste suit.",
     "methodEyebrow": "02 — Méthode",
     "methodTitle": "Comment se passe une séance.",
     "methodIntro": "Trois briques simples, pensées pour qu'on progresse sans se noyer dans le contenu.",
-    "figuresEyebrow": "03 — Chiffres clés",
+    "benefitsEyebrow": "03 — Pourquoi Intégrale",
+    "benefitsTitle": "Tout ce qu'il vous faut, rien de superflu.",
+    "benefitsIntro": "Six raisons pour lesquelles les élèves et les parents choisissent Intégrale plutôt qu'un prof isolé ou une bibliothèque de contenu.",
+    "benefits": [
+      {
+        "icon": "award",
+        "title": "Profils vérifiés",
+        "body": "Candidature écrite, entretien pédagogique, démo de cours en direct. Seuls les meilleurs profils enseignent sur la plateforme."
+      },
+      {
+        "icon": "check",
+        "title": "Programmes alignés",
+        "body": "Chaque programme est mappé sur un vrai examen : Bac, classement prépa, épreuve BTS, ou module universitaire. Pas de contenu générique."
+      },
+      {
+        "icon": "calendar",
+        "title": "Réservation en 60 secondes",
+        "body": "Choisissez un cours, un créneau, payez — invitation calendrier et lien Zoom arrivent par e-mail. Replanifiez depuis votre tableau de bord."
+      },
+      {
+        "icon": "video",
+        "title": "Visio sans friction",
+        "body": "Une salle Zoom privée par séance. Aucune installation, partage d'écran et tableau blanc inclus. Mobile, tablette, PC — même expérience."
+      },
+      {
+        "icon": "card",
+        "title": "Tarifs transparents",
+        "body": "Stripe Checkout, Apple Pay, Google Pay, SEPA. Reçu et facture envoyés automatiquement. Pas de frais cachés, pas d'abonnement."
+      },
+      {
+        "icon": "chart",
+        "title": "Progression réelle",
+        "body": "Un tableau de bord qui identifie les notions où vous bloquez vraiment, séance après séance. Moins d'à-peu-près, plus de progrès."
+      }
+    ],
+    "howEyebrow": "04 — Processus",
+    "howTitle": "De l'inscription à la première séance en moins de cinq minutes.",
+    "howIntro": "Un parcours de réservation prévisible, sans surprise. Vous savez toujours ce qui vient, et ce qu'on attend de vous.",
+    "howSteps": [
+      {
+        "n": "01",
+        "title": "Parlez-nous de vous",
+        "body": "Niveau, matière, objectif — Bac, classement prépa, ou module universitaire. On s'en sert pour vous orienter vers le bon prof.",
+        "detail": "2 minutes"
+      },
+      {
+        "n": "02",
+        "title": "Choisissez un prof et un créneau",
+        "body": "Parcourez les profils vérifiés et réservez un créneau qui vous arrange. Disponibilités réelles, pas d'allers-retours par e-mail.",
+        "detail": "1 minute"
+      },
+      {
+        "n": "03",
+        "title": "Payez, en toute sécurité",
+        "body": "Stripe Checkout, carte ou Apple Pay. Reçu et facture envoyés automatiquement. Votre premier créneau est offert.",
+        "detail": "30 secondes"
+      },
+      {
+        "n": "04",
+        "title": "Retrouvez-vous sur Zoom",
+        "body": "L'invitation calendrier et le lien Zoom arrivent 24 h avant, puis 1 h avant. Connectez-vous depuis n'importe quel appareil.",
+        "detail": "0 installation"
+      }
+    ],
+    "testimonialsEyebrow": "Témoignages",
+    "testimonialsTitle": "Ce qu'en disent les élèves et les parents.",
+    "testimonialsIntro": "Des résultats concrets, après un trimestre de travail. Quelques-uns des messages qu'on reçoit régulièrement.",
+    "testimonials": [
+      {
+        "quote": "En deux mois de cours, j'ai gagné 4 points de moyenne en maths. Les rappels avant chaque séance m'évitent d'oublier.",
+        "author": "Léa B.",
+        "role": "Terminale S — Paris",
+        "rating": 5
+      },
+      {
+        "quote": "L'interface est claire, le prof connaît parfaitement le programme de MPSI. Je recommande pour les prépa.",
+        "author": "Mehdi R.",
+        "role": "MPSI — Lyon",
+        "rating": 5
+      },
+      {
+        "quote": "Paiement et facture automatique, je n'ai rien à gérer. Mes parents reçoivent un récap chaque mois.",
+        "author": "Camille V.",
+        "role": "1ère Générale — Bordeaux",
+        "rating": 5
+      }
+    ],
+    "figuresEyebrow": "05 — Chiffres clés",
     "figuresAria": "Chiffres clés",
-    "ctaEyebrow": "04 — Démarrer",
+    "ctaEyebrow": "06 — Démarrer",
     "ctaTitle": "Réservez un premier cours gratuit",
     "ctaDescription": "Un premier échange de 20 minutes pour cibler vos besoins, puis un créneau offert avec un prof vérifié.",
     "ctaButtonPrimary": "Réserver mon créneau",
     "ctaButtonSecondary": "Voir les tarifs",
+    "faqEyebrow": "FAQ",
+    "faqTitle": "Questions fréquentes.",
+    "faqIntro": "Les questions qu'on nous pose le plus souvent. Si la vôtre n'est pas là, écrivez-nous — on répond généralement sous 24 heures.",
+    "faqContact": "Vous ne trouvez pas votre réponse ? Écrivez-nous à",
+    "faqItems": [
+      {
+        "q": "Comment se passe le premier cours gratuit ?",
+        "a": "C'est un échange de 20 minutes avec un prof : on cartographie votre niveau, votre objectif et vos délais, puis on propose un programme. Si on ne peut pas vous aider, on vous le dit — et on vous oriente vers la bonne ressource."
+      },
+      {
+        "q": "Puis-je annuler ou reporter une séance ?",
+        "a": "Oui, depuis votre tableau de bord, jusqu'à 1 heure avant le début. Au-delà, la séance est due. Tout est tracé, pas de mauvaise surprise à la facturation."
+      },
+      {
+        "q": "Comment sont sélectionnés les profs ?",
+        "a": "Trois filtres : une candidature écrite, un entretien pédagogique de 30 minutes, et une démo de cours en direct. On refuse la majorité des candidatures — le prof moyen a 6 ans ou plus d'expérience."
+      },
+      {
+        "q": "Et si le courant ne passe pas avec mon prof ?",
+        "a": "Dites-le nous. On vous bascule vers un autre prof sans frais, sans question. L'adéquation prof-élève compte plus que toute autre variable."
+      },
+      {
+        "q": "Recevez-vous des factures et des reçus ?",
+        "a": "Oui — Stripe envoie un reçu au moment du paiement, une facture part en fin de mois, et votre tableau de bord garde l'historique complet exportable en PDF."
+      },
+      {
+        "q": "Quelles matières et quels niveaux sont couverts ?",
+        "a": "Mathématiques, physique et chimie, du lycée (Seconde → Terminale) aux classes préparatoires (MPSI / MP / PC / PSI) et à la licence (L1 / L2 Sciences)."
+      }
+    ],
     "seeAllLevels": "Voir les détails par niveau",
     "paths": [
       {
@@ -368,22 +582,6 @@
         { "id": "resources", "label": "Ressources", "href": "/dashboard/resources" },
         { "id": "profile",   "label": "Profil", "href": "/dashboard/profile" }
       ]
-    },
-    "breadcrumbs": {
-      "aria": "Fil d’Ariane",
-      "home": "Accueil",
-      "about": "À propos",
-      "levels": "Niveaux",
-      "pricing": "Tarifs",
-      "contact": "Contact",
-      "tutors": "Tuteurs",
-      "courses": "Cours",
-      "login": "Connexion",
-      "register": "Créer un compte",
-      "forgotPassword": "Mot de passe oublié",
-      "resetPassword": "Nouveau mot de passe",
-      "verifyEmail": "Vérifiez votre boîte",
-      "dashboard": "Tableau de bord"
     },
     "header": {
       "fallbackName": "Mon espace",
