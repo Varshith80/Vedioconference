@@ -10,17 +10,49 @@
   },
   "Nav": {
     "primary": [
-      { "id": "levels", "label": "Levels", "href": "/levels" },
-      { "id": "tutors", "label": "Tutors", "href": "/tutors" },
-      { "id": "pricing", "label": "Pricing", "href": "/pricing" },
-      { "id": "about", "label": "About", "href": "/about" },
-      { "id": "contact", "label": "Contact", "href": "/contact" }
+      {
+        "id": "levels",
+        "label": "Levels",
+        "href": "/levels"
+      },
+      {
+        "id": "tutors",
+        "label": "Tutors",
+        "href": "/tutors"
+      },
+      {
+        "id": "pricing",
+        "label": "Pricing",
+        "href": "/pricing"
+      },
+      {
+        "id": "about",
+        "label": "About",
+        "href": "/about"
+      },
+      {
+        "id": "contact",
+        "label": "Contact",
+        "href": "/contact"
+      }
     ],
     "footer": [
-      { "label": "Levels", "href": "/levels" },
-      { "label": "Pricing", "href": "/pricing" },
-      { "label": "Contact", "href": "/contact" },
-      { "label": "Legal notice", "href": "/legal/notice" }
+      {
+        "label": "Levels",
+        "href": "/levels"
+      },
+      {
+        "label": "Pricing",
+        "href": "/pricing"
+      },
+      {
+        "label": "Contact",
+        "href": "/contact"
+      },
+      {
+        "label": "Legal notice",
+        "href": "/legal/notice"
+      }
     ],
     "languageSwitcher": {
       "aria": "Change language",
@@ -76,7 +108,11 @@
         "bio": "Normalienne (ENS Paris-Saclay), 6 years of experience with prépa students. Specialised in oral-style written answers and admission contests.",
         "rating": 4.9,
         "sessions": 412,
-        "subjects": ["Maths", "MP", "MPI"]
+        "subjects": [
+          "Maths",
+          "MP",
+          "MPI"
+        ]
       },
       {
         "slug": "antoine-rousseau",
@@ -85,7 +121,10 @@
         "bio": "PhD candidate in theoretical physics. Patient, methodical, and unusually clear on thermodynamics and electromagnetism.",
         "rating": 4.8,
         "sessions": 287,
-        "subjects": ["Physics", "Chemistry"]
+        "subjects": [
+          "Physics",
+          "Chemistry"
+        ]
       },
       {
         "slug": "sophie-nguyen",
@@ -94,7 +133,11 @@
         "bio": "Agrégée de maths, 8 years of experience with high-school and prépa students. Strong on Bac speciality and Parcoursup preparation.",
         "rating": 4.9,
         "sessions": 503,
-        "subjects": ["Maths", "Physics", "Bac"]
+        "subjects": [
+          "Maths",
+          "Physics",
+          "Bac"
+        ]
       }
     ],
     "coursesEyebrow": "Popular courses",
@@ -104,7 +147,7 @@
     "courses": [
       {
         "id": "bac-specialite",
-        "slug": "bac-specialite-maths",
+        "slug": "maths-lycee",
         "title": "Baccalauréat — Maths Spécialité",
         "track": "High school",
         "level": "Terminale",
@@ -115,7 +158,7 @@
       },
       {
         "id": "prepa-mp",
-        "slug": "prepa-mp-maths",
+        "slug": "physique-prepa",
         "title": "Prépa MP — Maths écrit & oral",
         "track": "Classes prépa",
         "level": "MP / MP*",
@@ -126,7 +169,7 @@
       },
       {
         "id": "licence-analyse",
-        "slug": "licence-analyse",
+        "slug": "francais-lycee",
         "title": "Licence — Analyse L1/L2",
         "track": "Bachelor's",
         "level": "L1 / L2 Sciences",
@@ -319,9 +362,18 @@
       }
     ],
     "figures": [
-      { "value": "3 400+", "label": "Corrected exercises" },
-      { "value": "100%",   "label": "Live courses with a tutor" },
-      { "value": "4",      "label": "Tracks · High school → Bachelor's" }
+      {
+        "value": "3 400+",
+        "label": "Corrected exercises"
+      },
+      {
+        "value": "100%",
+        "label": "Live courses with a tutor"
+      },
+      {
+        "value": "4",
+        "label": "Tracks · High school → Bachelor's"
+      }
     ]
   },
   "About": {
@@ -436,7 +488,8 @@
     "h1": "Our tutors",
     "intro": "All our tutors are verified on application, interview and teaching demonstration.",
     "emptyTitle": "Profiles arriving at launch",
-    "emptyDescription": "The team is finalising the selection of the first tutors."
+    "emptyDescription": "The team is finalising the selection of the first tutors.",
+    "notFoundTitle": "Tutor not found"
   },
   "Courses": {
     "eyebrow": "Courses",
@@ -445,7 +498,8 @@
     "h1": "All courses",
     "intro": "Browse the full catalogue of subjects and levels.",
     "emptyTitle": "No course published yet",
-    "emptyDescription": "The first courses will be added as the catalogue is filled."
+    "emptyDescription": "The first courses will be added as the catalogue is filled.",
+    "notFoundTitle": "Course not found"
   },
   "NotFound": {
     "eyebrow": "404",
@@ -548,7 +602,22 @@
       "title": "My bookings",
       "subline": "Your upcoming sessions and history.",
       "emptyTitle": "No bookings yet",
-      "emptyDescription": "Your future sessions will appear here as soon as you book one."
+      "emptyDescription": "Your future sessions will appear here as soon as you book one.",
+      "listHeading": "All sessions",
+      "moduleLabel": "Module",
+      "scheduled": "Scheduled for {date}",
+      "duration": "{minutes} min",
+      "status": {
+        "pending_payment": "Pending payment",
+        "scheduled": "Scheduled",
+        "confirmed": "Confirmed",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "no_show": "No-show",
+        "rescheduled": "Rescheduled"
+      },
+      "joinSession": "Join the session",
+      "bookAgain": "Book again"
     },
     "resources": {
       "title": "Resources",
@@ -568,19 +637,51 @@
     "sidebar": {
       "aria": "Personal space navigation",
       "items": [
-        { "id": "dashboard", "label": "Dashboard", "href": "/dashboard" },
-        { "id": "bookings",  "label": "My bookings", "href": "/dashboard/bookings" },
-        { "id": "resources", "label": "Resources", "href": "/dashboard/resources" },
-        { "id": "profile",   "label": "Profile", "href": "/dashboard/profile" }
+        {
+          "id": "dashboard",
+          "label": "Dashboard",
+          "href": "/dashboard"
+        },
+        {
+          "id": "bookings",
+          "label": "My bookings",
+          "href": "/dashboard/bookings"
+        },
+        {
+          "id": "resources",
+          "label": "Resources",
+          "href": "/dashboard/resources"
+        },
+        {
+          "id": "profile",
+          "label": "Profile",
+          "href": "/dashboard/profile"
+        }
       ]
     },
     "topNav": {
       "aria": "Personal space navigation",
       "items": [
-        { "id": "dashboard", "label": "Dashboard", "href": "/dashboard" },
-        { "id": "bookings",  "label": "My bookings", "href": "/dashboard/bookings" },
-        { "id": "resources", "label": "Resources", "href": "/dashboard/resources" },
-        { "id": "profile",   "label": "Profile", "href": "/dashboard/profile" }
+        {
+          "id": "dashboard",
+          "label": "Dashboard",
+          "href": "/dashboard"
+        },
+        {
+          "id": "bookings",
+          "label": "My bookings",
+          "href": "/dashboard/bookings"
+        },
+        {
+          "id": "resources",
+          "label": "Resources",
+          "href": "/dashboard/resources"
+        },
+        {
+          "id": "profile",
+          "label": "Profile",
+          "href": "/dashboard/profile"
+        }
       ]
     },
     "header": {
@@ -594,6 +695,34 @@
       "bookings": "My bookings",
       "resources": "Resources",
       "profile": "Profile"
+    },
+    "module": {
+      "title": "Modules",
+      "bookCta": "Book",
+      "bookAgainCta": "Book again",
+      "joinCta": "Join the session",
+      "viewCta": "View",
+      "status": {
+        "not_started": "Not started",
+        "in_progress": "In progress",
+        "completed": "Completed",
+        "locked": "Locked"
+      },
+      "lockedReason": "Complete the previous module to unlock this one.",
+      "duration": "{minutes} min",
+      "noModules": "This course has no published modules yet.",
+      "enrolledOn": "Enrolled on {date}",
+      "scheduledOn": "Scheduled for {date}",
+      "cancelledReason": "Cancellation reason: {reason}",
+      "backToCourses": "Back to my courses"
+    },
+    "book": {
+      "title": "Book a session — {moduleTitle}",
+      "description": "Pick a time slot below. You'll receive a confirmation email with the join link as soon as the tutor confirms.",
+      "moduleMeta": "Module {position} of {total} · {duration} min",
+      "lockedTitle": "This module is locked",
+      "lockedDescription": "You need to complete the previous module before you can book this one.",
+      "backToCourse": "Back to the course"
     }
   },
   "Admin": {
@@ -670,36 +799,6 @@
       "goToDashboard": "Go to my dashboard",
       "browseMore": "Browse courses",
       "retry": "Retry payment"
-    }
-  },
-  "Dashboard": {
-    "module": {
-      "title": "Modules",
-      "bookCta": "Book",
-      "bookAgainCta": "Book again",
-      "joinCta": "Join the session",
-      "viewCta": "View",
-      "status": {
-        "not_started":  "Not started",
-        "in_progress":  "In progress",
-        "completed":    "Completed",
-        "locked":       "Locked"
-      },
-      "lockedReason": "Complete the previous module to unlock this one.",
-      "duration": "{minutes} min",
-      "noModules": "This course has no published modules yet.",
-      "enrolledOn": "Enrolled on {date}",
-      "scheduledOn": "Scheduled for {date}",
-      "cancelledReason": "Cancellation reason: {reason}",
-      "backToCourses": "Back to my courses"
-    },
-    "book": {
-      "title": "Book a session — {moduleTitle}",
-      "description": "Pick a time slot below. You'll receive a confirmation email with the join link as soon as the tutor confirms.",
-      "moduleMeta": "Module {position} of {total} · {duration} min",
-      "lockedTitle": "This module is locked",
-      "lockedDescription": "You need to complete the previous module before you can book this one.",
-      "backToCourse": "Back to the course"
     }
   },
   "Emails": {

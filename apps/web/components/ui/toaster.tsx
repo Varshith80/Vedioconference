@@ -1,6 +1,6 @@
 'use client';
 
-import { Toaster as SonnerToaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from '@/components/ui/toaster-inner';
 import { useEffect, useState } from 'react';
 
 /**

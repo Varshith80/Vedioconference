@@ -10,17 +10,49 @@
   },
   "Nav": {
     "primary": [
-      { "id": "levels", "label": "Niveaux", "href": "/levels" },
-      { "id": "tutors", "label": "Tuteurs", "href": "/tutors" },
-      { "id": "pricing", "label": "Tarifs", "href": "/pricing" },
-      { "id": "about", "label": "À propos", "href": "/about" },
-      { "id": "contact", "label": "Contact", "href": "/contact" }
+      {
+        "id": "levels",
+        "label": "Niveaux",
+        "href": "/levels"
+      },
+      {
+        "id": "tutors",
+        "label": "Tuteurs",
+        "href": "/tutors"
+      },
+      {
+        "id": "pricing",
+        "label": "Tarifs",
+        "href": "/pricing"
+      },
+      {
+        "id": "about",
+        "label": "À propos",
+        "href": "/about"
+      },
+      {
+        "id": "contact",
+        "label": "Contact",
+        "href": "/contact"
+      }
     ],
     "footer": [
-      { "label": "Niveaux", "href": "/levels" },
-      { "label": "Tarifs", "href": "/pricing" },
-      { "label": "Contact", "href": "/contact" },
-      { "label": "Mentions légales", "href": "/legal/notice" }
+      {
+        "label": "Niveaux",
+        "href": "/levels"
+      },
+      {
+        "label": "Tarifs",
+        "href": "/pricing"
+      },
+      {
+        "label": "Contact",
+        "href": "/contact"
+      },
+      {
+        "label": "Mentions légales",
+        "href": "/legal/notice"
+      }
     ],
     "languageSwitcher": {
       "aria": "Changer de langue",
@@ -76,7 +108,11 @@
         "bio": "Normalienne (ENS Paris-Saclay), 6 ans d'expérience avec des étudiants de prépa. Spécialisée dans les rédactions type oral et la préparation aux concours.",
         "rating": 4.9,
         "sessions": 412,
-        "subjects": ["Maths", "MP", "MPI"]
+        "subjects": [
+          "Maths",
+          "MP",
+          "MPI"
+        ]
       },
       {
         "slug": "antoine-rousseau",
@@ -85,7 +121,10 @@
         "bio": "Doctorant en physique théorique. Pédagogue, méthodique, particulièrement clair sur la thermodynamique et l'électromagnétisme.",
         "rating": 4.8,
         "sessions": 287,
-        "subjects": ["Physique", "Chimie"]
+        "subjects": [
+          "Physique",
+          "Chimie"
+        ]
       },
       {
         "slug": "sophie-nguyen",
@@ -94,7 +133,11 @@
         "bio": "Agrégée de maths, 8 ans d'expérience avec des lycéens et des prépa. Solide sur la Spé et la préparation Parcoursup.",
         "rating": 4.9,
         "sessions": 503,
-        "subjects": ["Maths", "Physique", "Bac"]
+        "subjects": [
+          "Maths",
+          "Physique",
+          "Bac"
+        ]
       }
     ],
     "coursesEyebrow": "Cours populaires",
@@ -104,7 +147,7 @@
     "courses": [
       {
         "id": "bac-specialite",
-        "slug": "bac-specialite-maths",
+        "slug": "maths-lycee",
         "title": "Baccalauréat — Maths Spécialité",
         "track": "Lycée",
         "level": "Terminale",
@@ -115,7 +158,7 @@
       },
       {
         "id": "prepa-mp",
-        "slug": "prepa-mp-maths",
+        "slug": "physique-prepa",
         "title": "Prépa MP — Maths écrit & oral",
         "track": "Classes prépa",
         "level": "MP / MP*",
@@ -126,7 +169,7 @@
       },
       {
         "id": "licence-analyse",
-        "slug": "licence-analyse",
+        "slug": "francais-lycee",
         "title": "Licence — Analyse L1/L2",
         "track": "Licence",
         "level": "L1 / L2 Sciences",
@@ -319,9 +362,18 @@
       }
     ],
     "figures": [
-      { "value": "3 400+", "label": "Exercices corrigés" },
-      { "value": "100%",   "label": "Cours en direct avec un prof" },
-      { "value": "4",      "label": "Niveaux · Lycée → Licence" }
+      {
+        "value": "3 400+",
+        "label": "Exercices corrigés"
+      },
+      {
+        "value": "100%",
+        "label": "Cours en direct avec un prof"
+      },
+      {
+        "value": "4",
+        "label": "Niveaux · Lycée → Licence"
+      }
     ]
   },
   "About": {
@@ -436,7 +488,8 @@
     "h1": "Nos tuteurs",
     "intro": "Tous nos tuteurs sont vérifiés sur dossier, entretien et démonstration de cours.",
     "emptyTitle": "Les profils arrivent au lancement",
-    "emptyDescription": "L’équipe finalise la sélection des premiers tuteurs."
+    "emptyDescription": "L’équipe finalise la sélection des premiers tuteurs.",
+    "notFoundTitle": "Tuteur introuvable"
   },
   "Courses": {
     "eyebrow": "Cours",
@@ -445,7 +498,8 @@
     "h1": "Tous les cours",
     "intro": "Parcourez l’ensemble du catalogue par matière et niveau.",
     "emptyTitle": "Aucun cours publié pour l’instant",
-    "emptyDescription": "Les premiers cours seront ajoutés au fil du remplissage du catalogue."
+    "emptyDescription": "Les premiers cours seront ajoutés au fil du remplissage du catalogue.",
+    "notFoundTitle": "Cours introuvable"
   },
   "NotFound": {
     "eyebrow": "404",
@@ -548,7 +602,22 @@
       "title": "Mes réservations",
       "subline": "Vos séances à venir et votre historique.",
       "emptyTitle": "Aucune réservation pour le moment",
-      "emptyDescription": "Vos futures séances apparaîtront ici dès que vous en aurez réservées une."
+      "emptyDescription": "Vos futures séances apparaîtront ici dès que vous en aurez réservées une.",
+      "listHeading": "Toutes les séances",
+      "moduleLabel": "Module",
+      "scheduled": "Prévu le {date}",
+      "duration": "{minutes} min",
+      "status": {
+        "pending_payment": "Paiement en attente",
+        "scheduled": "Planifié",
+        "confirmed": "Confirmé",
+        "completed": "Terminé",
+        "cancelled": "Annulé",
+        "no_show": "Absence",
+        "rescheduled": "Replanifié"
+      },
+      "joinSession": "Rejoindre la séance",
+      "bookAgain": "Réserver à nouveau"
     },
     "resources": {
       "title": "Ressources",
@@ -568,19 +637,51 @@
     "sidebar": {
       "aria": "Navigation de l’espace personnel",
       "items": [
-        { "id": "dashboard", "label": "Tableau de bord", "href": "/dashboard" },
-        { "id": "bookings",  "label": "Mes réservations", "href": "/dashboard/bookings" },
-        { "id": "resources", "label": "Ressources", "href": "/dashboard/resources" },
-        { "id": "profile",   "label": "Profil", "href": "/dashboard/profile" }
+        {
+          "id": "dashboard",
+          "label": "Tableau de bord",
+          "href": "/dashboard"
+        },
+        {
+          "id": "bookings",
+          "label": "Mes réservations",
+          "href": "/dashboard/bookings"
+        },
+        {
+          "id": "resources",
+          "label": "Ressources",
+          "href": "/dashboard/resources"
+        },
+        {
+          "id": "profile",
+          "label": "Profil",
+          "href": "/dashboard/profile"
+        }
       ]
     },
     "topNav": {
       "aria": "Navigation de l’espace personnel",
       "items": [
-        { "id": "dashboard", "label": "Tableau de bord", "href": "/dashboard" },
-        { "id": "bookings",  "label": "Mes réservations", "href": "/dashboard/bookings" },
-        { "id": "resources", "label": "Ressources", "href": "/dashboard/resources" },
-        { "id": "profile",   "label": "Profil", "href": "/dashboard/profile" }
+        {
+          "id": "dashboard",
+          "label": "Tableau de bord",
+          "href": "/dashboard"
+        },
+        {
+          "id": "bookings",
+          "label": "Mes réservations",
+          "href": "/dashboard/bookings"
+        },
+        {
+          "id": "resources",
+          "label": "Ressources",
+          "href": "/dashboard/resources"
+        },
+        {
+          "id": "profile",
+          "label": "Profil",
+          "href": "/dashboard/profile"
+        }
       ]
     },
     "header": {
@@ -594,6 +695,34 @@
       "bookings": "Mes réservations",
       "resources": "Ressources",
       "profile": "Profil"
+    },
+    "module": {
+      "title": "Modules",
+      "bookCta": "Réserver",
+      "bookAgainCta": "Réserver à nouveau",
+      "joinCta": "Rejoindre la session",
+      "viewCta": "Voir",
+      "status": {
+        "not_started": "Non commencé",
+        "in_progress": "En cours",
+        "completed": "Terminé",
+        "locked": "Verrouillé"
+      },
+      "lockedReason": "Terminez le module précédent pour débloquer celui-ci.",
+      "duration": "{minutes} min",
+      "noModules": "Ce cours n'a pas encore de module publié.",
+      "enrolledOn": "Inscrit le {date}",
+      "scheduledOn": "Prévu le {date}",
+      "cancelledReason": "Motif d'annulation : {reason}",
+      "backToCourses": "Retour à mes cours"
+    },
+    "book": {
+      "title": "Réserver une session — {moduleTitle}",
+      "description": "Choisissez un créneau ci-dessous. Vous recevrez un email de confirmation avec le lien de participation dès que le tuteur aura confirmé.",
+      "moduleMeta": "Module {position} sur {total} · {duration} min",
+      "lockedTitle": "Ce module est verrouillé",
+      "lockedDescription": "Vous devez terminer le module précédent avant de pouvoir réserver celui-ci.",
+      "backToCourse": "Retour au cours"
     }
   },
   "Admin": {
@@ -670,36 +799,6 @@
       "goToDashboard": "Accéder à mon espace",
       "browseMore": "Voir les cours",
       "retry": "Reprendre le paiement"
-    }
-  },
-  "Dashboard": {
-    "module": {
-      "title": "Modules",
-      "bookCta": "Réserver",
-      "bookAgainCta": "Réserver à nouveau",
-      "joinCta": "Rejoindre la session",
-      "viewCta": "Voir",
-      "status": {
-        "not_started":  "Non commencé",
-        "in_progress":  "En cours",
-        "completed":    "Terminé",
-        "locked":       "Verrouillé"
-      },
-      "lockedReason": "Terminez le module précédent pour débloquer celui-ci.",
-      "duration": "{minutes} min",
-      "noModules": "Ce cours n'a pas encore de module publié.",
-      "enrolledOn": "Inscrit le {date}",
-      "scheduledOn": "Prévu le {date}",
-      "cancelledReason": "Motif d'annulation : {reason}",
-      "backToCourses": "Retour à mes cours"
-    },
-    "book": {
-      "title": "Réserver une session — {moduleTitle}",
-      "description": "Choisissez un créneau ci-dessous. Vous recevrez un email de confirmation avec le lien de participation dès que le tuteur aura confirmé.",
-      "moduleMeta": "Module {position} sur {total} · {duration} min",
-      "lockedTitle": "Ce module est verrouillé",
-      "lockedDescription": "Vous devez terminer le module précédent avant de pouvoir réserver celui-ci.",
-      "backToCourse": "Retour au cours"
     }
   },
   "Emails": {
