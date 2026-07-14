@@ -179,3 +179,25 @@ export const getAllStudents = cache(
     }
   },
 );
+
+// Single session lookup. Used by the admin "edit session"
+// page (Sprint 3.6 §4.5). The boundary cast (CLAUDE.md
+// §3.9) is applied here, not in the page, so the RSC gets
+// a fully-typed Session row.
+export const getSessionById = cache(
+  async (id: string): Promise<Record<string, unknown> | null> => {
+    try {
+      const supabase = await createSupabaseServerClientUntyped();
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as Record<string, unknown> | null;
+    } catch (e) {
+      logger.error('admin.getSessionById failed', { id, ...describeError(e) });
+      return null;
+    }
+  },
+);

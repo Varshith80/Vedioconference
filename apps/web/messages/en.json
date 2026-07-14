@@ -1019,6 +1019,29 @@
       "errorsHeading": "Errors",
       "noFile": "Please choose a workbook file before importing.",
       "dryRunNotice": "Dry run — no changes were written to the database."
+    },
+    "forms": {
+      "submit": "Save",
+      "submitting": "Saving…",
+      "cancel": "Cancel",
+      "saveOk": "Saved.",
+      "saveError": "Could not save. Please check the fields and try again."
+    },
+    "sessionEdit": {
+      "title": "Edit session",
+      "subline": "Update the session's display, pricing, and publish flags. price_cents accepts null for 'price TBD'.",
+      "priceTbdHint": "Leave price_cents blank (null) to mark this session as 'price TBD' — Stripe Checkout will then return 422 until a price is set.",
+      "saved": "Session updated.",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "durationMin": "Duration (minutes)",
+        "priceCents": "Price (cents)",
+        "currency": "Currency",
+        "calendlyUri": "Calendly event URI",
+        "isPublished": "Published",
+        "isPreview": "Free preview"
+      }
     }
   },
   "SiteHeader": {

@@ -1019,6 +1019,29 @@
       "errorsHeading": "Erreurs",
       "noFile": "Veuillez choisir un classeur avant d'importer.",
       "dryRunNotice": "Essai à blanc — aucune modification n'a été écrite en base."
+    },
+    "forms": {
+      "submit": "Enregistrer",
+      "submitting": "Enregistrement…",
+      "cancel": "Annuler",
+      "saveOk": "Enregistré.",
+      "saveError": "Impossible d'enregistrer. Vérifiez les champs puis réessayez."
+    },
+    "sessionEdit": {
+      "title": "Modifier la séance",
+      "subline": "Mettez à jour l'affichage, le prix et les drapeaux de publication de la séance. price_cents accepte null pour « prix à définir ».",
+      "priceTbdHint": "Laissez price_cents vide (null) pour marquer la séance comme « prix à définir » — Stripe Checkout renverra alors 422 tant qu'un prix n'est pas saisi.",
+      "saved": "Séance mise à jour.",
+      "fields": {
+        "title": "Titre",
+        "description": "Description",
+        "durationMin": "Durée (minutes)",
+        "priceCents": "Prix (centimes)",
+        "currency": "Devise",
+        "calendlyUri": "URI de l'événement Calendly",
+        "isPublished": "Publiée",
+        "isPreview": "Aperçu gratuit"
+      }
     }
   },
   "SiteHeader": {
