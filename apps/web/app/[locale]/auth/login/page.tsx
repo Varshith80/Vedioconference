@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { LoginForm } from '@/components/forms/login-form';
 
@@ -24,5 +25,19 @@ export default async function LoginPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return <LoginForm />;
+  // The LoginForm uses `useSearchParams` to read `?next=`. In
+  // Next.js 15 + React 19, any client component that reads search
+  // params must be wrapped in a Suspense boundary — otherwise the
+  // tree bails out of partial pre-rendering and React tries to
+  // hydrate with a Fragment as the root, producing the
+  // `Hydration failed: server sent <html> but client expected
+  // <Suspense fallback={<Fragment>}>` mismatch that cascades
+  // into `HierarchyRequestError: <div> cannot be a child of
+  // <#document>` and `NotFoundError: Failed to execute
+  // 'removeChild' on 'Node'` on locale switch and hard refresh.
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
 }

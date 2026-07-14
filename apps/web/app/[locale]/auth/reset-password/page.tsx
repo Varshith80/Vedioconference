@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
@@ -36,7 +37,9 @@ export default async function ResetPasswordPage({
             <h1 id="reset-title" className="sr-only">
               {t('h1')}
             </h1>
-            <ResetPasswordForm />
+            <Suspense fallback={null}>
+              <ResetPasswordForm />
+            </Suspense>
           </div>
         </div>
       </Container>

@@ -6,11 +6,10 @@ import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { EmptyState } from '@/components/shared/empty-state';
-import { BookingCard } from '@/components/dashboard/booking-card';
+import { SessionBookingCard } from '@/components/dashboard/session-booking-card';
 import { BRAND } from '@/lib/constants/brand';
 import { getCurrentUser } from '@/services/auth';
-import { getStudentModuleBookings } from '@/services/module-bookings';
-import type { Locale } from '@/i18n';
+import { getStudentSessionBookings } from '@/services/curriculum/session-bookings';
 
 export async function generateMetadata({
   params,
@@ -18,34 +17,32 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: 'Dashboard.bookings' });
+  const t = await getTranslations({ locale, namespace: 'Dashboard.sessions' });
   return {
     title: `${t('title')} — ${BRAND.name}`,
     description: t('subline'),
-    alternates: { canonical: `/${locale}/dashboard/bookings` },
+    alternates: { canonical: `/${locale}/dashboard/sessions` },
     robots: { index: false, follow: false },
   };
 }
 
 export const dynamic = 'force-dynamic';
 
-export default async function DashboardBookingsPage({
+export default async function DashboardSessionsPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations('Dashboard.bookings');
+  const t = await getTranslations('Dashboard.sessions');
   const tNav = await getTranslations('Nav');
 
   const user = await getCurrentUser();
-  const bookings = user
-    ? await getStudentModuleBookings(user.id)
-    : [];
+  const bookings = user ? await getStudentSessionBookings(user.id) : [];
 
   return (
-    <Section spacing="default" aria-labelledby="bookings-title">
+    <Section spacing="default" aria-labelledby="sessions-title">
       <Container>
         <Breadcrumbs
           items={[
@@ -55,12 +52,10 @@ export default async function DashboardBookingsPage({
           ]}
         />
         <div className="mt-3">
-          <Heading id="bookings-title" level="h1" className="text-3xl sm:text-4xl">
+          <Heading id="sessions-title" level="h1" className="text-3xl sm:text-4xl">
             {t('title')}
           </Heading>
-          <p className="mt-2 text-base text-muted-foreground">
-            {t('subline')}
-          </p>
+          <p className="mt-2 text-base text-muted-foreground">{t('subline')}</p>
         </div>
 
         {bookings.length === 0 ? (
@@ -73,14 +68,14 @@ export default async function DashboardBookingsPage({
           </div>
         ) : (
           <div className="mt-10">
-            <h2 className="sr-only">{t('listHeading')}</h2>
+            <h2 className="sr-only">{t('title')}</h2>
             <ul role="list" className="space-y-4">
               {bookings.map((b) => (
                 <li key={b.id}>
-                  <BookingCard
+                  <SessionBookingCard
                     booking={b}
-                    locale={locale as Locale}
-                    courseId={b.module.course_id}
+                    viewHref={`/${locale}/dashboard/sessions/${b.id}`}
+                    joinHref={b.meeting?.join_url ?? undefined}
                   />
                 </li>
               ))}

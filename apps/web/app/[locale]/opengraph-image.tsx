@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { BRAND } from '@/lib/constants/brand';
-import { MESSAGES, tForLocale } from '@/lib/i18n/server';
+import { safeMessages, resolveLocale, tForLocale } from '@/lib/i18n/server';
 import { defaultLocale, type Locale } from '@/i18n';
 import { brandFromMessages } from '@/lib/i18n/brand';
 
@@ -16,14 +16,25 @@ export const contentType = 'image/png';
  * The edge runtime cannot use next-intl's React providers, so we
  * import the raw messages and pick the active locale from the
  * `params.locale` route parameter (with English as the fallback).
+ *
+ * Locale resolution goes through `safeMessages` (not `MESSAGES[...]`)
+ * because the framework can call this function with any string in
+ * `params.locale` — including an unknown value — and the previous
+ * direct `MESSAGES[locale]` access returned `undefined` for unknown
+ * locales, which crashed `brandFromMessages` and produced the
+ * `Cannot read properties of undefined (reading 'Brand')` error in
+ * the terminal. Routing the lookup through `safeMessages` is the
+ * single, dedicated chokepoint for "always return a valid messages
+ * object for any locale string", and the helper also returns the
+ * normalised `Locale` so the metadata `id` is always a known value.
  */
 export async function generateImageMetadata({
   params,
 }: {
   params: { locale: string };
 }) {
-  const locale: Locale = (params.locale as Locale) ?? defaultLocale;
-  const brand = brandFromMessages(MESSAGES[locale]);
+  const { locale, messages } = safeMessages(params.locale);
+  const brand = brandFromMessages(messages);
   return [
     {
       id: locale,
@@ -34,8 +45,15 @@ export async function generateImageMetadata({
 }
 
 export default async function OpengraphImage({ id }: { id: string }) {
-  const locale: Locale = (id as Locale) ?? defaultLocale;
-  const brand = brandFromMessages(MESSAGES[locale]);
+  // In Next 15 the `id` prop is the plain string returned by
+  // `generateImageMetadata`; in Next 16 it became a Promise. We
+  // accept both shapes defensively so the route works across
+  // upgrades without a code change.
+  const rawId: string =
+    typeof id === 'string' ? id : await Promise.resolve(id).catch(() => defaultLocale);
+  const locale: Locale = resolveLocale(rawId);
+  const { messages } = safeMessages(locale);
+  const brand = brandFromMessages(messages);
   const t = tForLocale(locale);
   const headline = t('Homepage.headline');
   const socialProof = t('Homepage.socialProof');
@@ -98,7 +116,9 @@ export default async function OpengraphImage({ id }: { id: string }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
             <span
               style={{
-                display: 'inline-block',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 width: 12,
                 height: 12,
                 borderRadius: 6,

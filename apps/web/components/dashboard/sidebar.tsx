@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, CalendarRange, LayoutDashboard, User2 } from 'lucide-react';
+import { BookOpen, CalendarRange, LayoutDashboard, School, User2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { BrandMark } from '@/components/layout/brand-mark';
 import { cn } from '@/lib/utils/cn';
@@ -19,6 +19,8 @@ interface NavItem {
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
+  programs: School,
+  sessions: CalendarRange,
   bookings: CalendarRange,
   resources: BookOpen,
   profile: User2,

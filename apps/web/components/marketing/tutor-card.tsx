@@ -18,7 +18,7 @@ interface TutorCardProps {
 export function TutorCard({ tutor, className }: TutorCardProps) {
   return (
     <Link
-      href={`/tutors/${tutor.slug}`}
+      href={`/tutors/${tutor.id}`}
       className={
         'group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ' +
         'rounded-xl ' +

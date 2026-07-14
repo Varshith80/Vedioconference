@@ -17,7 +17,7 @@ import Link from 'next/link';
 interface CourseDetailProps {
   course: Course;
   /** Tutors who teach this course. Empty array is fine. */
-  tutors: Array<{ id: string; slug: string; full_name: string; avatar_url: string | null; rating: number }>;
+  tutors: Array<{ id: string; full_name: string; avatar_url: string | null; rating: number }>;
 }
 
 export function CourseDetail({ course, tutors }: CourseDetailProps) {
@@ -120,7 +120,7 @@ export function CourseDetail({ course, tutors }: CourseDetailProps) {
               {tutors.map((t) => (
                 <li key={t.id}>
                   <Link
-                    href={`/tutors/${t.slug}`}
+                    href={`/tutors/${t.id}`}
                     className="block rounded-xl border bg-card p-5 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-6"
                   >
                     <div className="flex items-center gap-3">

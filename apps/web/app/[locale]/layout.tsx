@@ -103,6 +103,9 @@ export default async function LocaleLayout({
       className={`${sans.variable} ${serif.variable} ${mono.variable} ${heading.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      </head>
       <body className={sans.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}

@@ -16,19 +16,18 @@ export async function generateMetadata(
   { params }: { params: Promise<{ slug: string; locale: string }> },
 ): Promise<Metadata> {
   const { slug, locale } = await params;
-  try {
-    const tutor = await getTutorBySlug(slug);
-    const t = await getTranslations({ locale, namespace: 'Tutors' });
-    return {
-      title: tutor.full_name,
-      description: tutor.bio || tutor.headline || t('description'),
-      alternates: { canonical: `/${locale}/tutors/${slug}` },
-      openGraph: { title: tutor.full_name, description: tutor.bio || tutor.headline || undefined, type: 'profile' },
-    };
-  } catch {
+  const tutor = await getTutorBySlug(slug);
+  if (!tutor) {
     const t = await getTranslations({ locale, namespace: 'Tutors' });
     return { title: t('notFoundTitle') };
   }
+  const t = await getTranslations({ locale, namespace: 'Tutors' });
+  return {
+    title: tutor.full_name,
+    description: tutor.bio || tutor.headline || t('description'),
+    alternates: { canonical: `/${locale}/tutors/${slug}` },
+    openGraph: { title: tutor.full_name, description: tutor.bio || tutor.headline || undefined, type: 'profile' },
+  };
 }
 
 export default async function TutorDetailPage(
@@ -36,12 +35,8 @@ export default async function TutorDetailPage(
 ) {
   const { slug, locale } = await params;
   setRequestLocale(locale);
-  let tutor;
-  try {
-    tutor = await getTutorBySlug(slug);
-  } catch {
-    notFound();
-  }
+  const tutor = await getTutorBySlug(slug);
+  if (!tutor) notFound();
   const courses = await listCoursesForTutor(tutor.id);
   return <TutorDetail tutor={tutor} courses={courses} />;
 }
