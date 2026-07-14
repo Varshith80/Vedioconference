@@ -1,28 +1,28 @@
 import { type NextRequest } from 'next/server';
-import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
-import { jsonResponse } from '@/lib/utils/api';
-import { Unauthorized } from '@/lib/utils/errors';
+import { errorResponse } from '@/lib/utils/api';
+import { ApiError, Unauthorized } from '@/lib/utils/errors';
 
 /**
- * GET /api/module-bookings — list the current user's module
- * bookings, with the module and meeting link eagerly joined.
- * Sprint B2 replaces the per-booking flow: each row here is one
- * scheduled module of a course enrollment.
+ * POST /api/module-bookings — DEPRECATED since Sprint 3.5.
+ * The `module_bookings` table is replaced by `session_bookings`.
+ *
+ * Replacement: `POST /api/session-bookings` with
+ * `{ session_id, session_grant_id, scheduled_start, scheduled_end }`.
+ * Kept for one sprint as a 410 stub (removed in Sprint 3.6).
  */
-export async function GET(_req: NextRequest) {
+export async function POST(_req: NextRequest) {
+  const { createSupabaseServerClientUntyped } = await import('@/lib/supabase/server');
   const supabase = await createSupabaseServerClientUntyped();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw Unauthorized('You must be signed in to view your bookings.');
-
-  const { data, error } = await supabase
-    .from('module_bookings')
-    .select(
-      '*, module:modules(*), meeting:meeting_links!meeting_links_module_booking_id_fkey(*)',
-    )
-    .eq('student_id', user.id)
-    .order('scheduled_start', { ascending: false });
-  if (error) throw error;
-  return jsonResponse({ ok: true as const, data: (data ?? []) as unknown as ReadonlyArray<Record<string, unknown>> });
+  if (!user) throw Unauthorized('You must be signed in.');
+  return errorResponse(
+    new ApiError(
+      410,
+      'endpoint_deprecated',
+      'The /api/module-bookings endpoint has been replaced by /api/session-bookings in Sprint 3.5.',
+      { replacement: 'POST /api/session-bookings' },
+    ),
+  );
 }
