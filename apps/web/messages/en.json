@@ -1000,6 +1000,25 @@
       "yes": "Yes",
       "no": "No",
       "na": "—"
+    },
+    "import": {
+      "title": "Import curriculum",
+      "subline": "Upload an Excel workbook (EN or FR) to bulk-insert programs, grades, courses, chapters, and sessions. The importer is data-driven and idempotent — re-running on the same file is a no-op.",
+      "upload": "Upload workbook",
+      "fileLabel": "Workbook file (.xlsx)",
+      "languageLabel": "Workbook language",
+      "languageEn": "English",
+      "languageFr": "French",
+      "dryRunLabel": "Dry run (preview only, no DB writes)",
+      "run": "Import",
+      "running": "Importing…",
+      "success": "Import complete.",
+      "failure": "Import failed.",
+      "partial": "Import finished with warnings.",
+      "summary": "{programs} programs, {grades} grades, {courses} courses, {chapters} chapters, {sessions} sessions ({skipped} skipped).",
+      "errorsHeading": "Errors",
+      "noFile": "Please choose a workbook file before importing.",
+      "dryRunNotice": "Dry run — no changes were written to the database."
     }
   },
   "SiteHeader": {

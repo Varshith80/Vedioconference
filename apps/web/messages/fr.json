@@ -1000,6 +1000,25 @@
       "yes": "Oui",
       "no": "Non",
       "na": "—"
+    },
+    "import": {
+      "title": "Importer le cursus",
+      "subline": "Téléversez un classeur Excel (EN ou FR) pour insérer en masse les programmes, niveaux, cours, chapitres et séances. L'importeur est piloté par les données et idempotent — relancer sur le même fichier n'a aucun effet.",
+      "upload": "Téléverser le classeur",
+      "fileLabel": "Fichier classeur (.xlsx)",
+      "languageLabel": "Langue du classeur",
+      "languageEn": "Anglais",
+      "languageFr": "Français",
+      "dryRunLabel": "Essai à blanc (aperçu, aucune écriture en base)",
+      "run": "Importer",
+      "running": "Importation…",
+      "success": "Importation terminée.",
+      "failure": "L'importation a échoué.",
+      "partial": "Importation terminée avec avertissements.",
+      "summary": "{programs} programmes, {grades} niveaux, {courses} cours, {chapters} chapitres, {sessions} séances ({skipped} ignorées).",
+      "errorsHeading": "Erreurs",
+      "noFile": "Veuillez choisir un classeur avant d'importer.",
+      "dryRunNotice": "Essai à blanc — aucune modification n'a été écrite en base."
     }
   },
   "SiteHeader": {
