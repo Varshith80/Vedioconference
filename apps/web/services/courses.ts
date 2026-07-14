@@ -1,32 +1,43 @@
 ﻿import 'server-only';
 import { cache } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { NotFound } from '@/lib/utils/errors';
+import { NotFound, describeError } from '@/lib/utils/errors';
+import { logger } from '@/lib/utils/logger';
 import type { Course, Tutor } from '@/types/domain';
 
 export const getPublishedCourses = cache(async (): Promise<Course[]> => {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('is_published', true)
-    .order('title');
-  if (error) throw error;
-  // The select chain can't be fully inferred without a generated
-  // Database type (run `pnpm db:types` to replace this cast).
-  return (data ?? []) as unknown as Course[];
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('is_published', true)
+      .order('title');
+    if (error) throw error;
+    // The select chain can't be fully inferred without a generated
+    // Database type (run `pnpm db:types` to replace this cast).
+    return (data ?? []) as unknown as Course[];
+  } catch (e) {
+    logger.error('getPublishedCourses failed', describeError(e));
+    return [];
+  }
 });
 
-export const getCourseBySlug = cache(async (slug: string): Promise<Course> => {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_published', true)
-    .single();
-  if (error || !data) throw NotFound(`Cours introuvable : ${slug}`);
-  return data as unknown as Course;
+export const getCourseBySlug = cache(async (slug: string): Promise<Course | null> => {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_published', true)
+      .single();
+    if (error || !data) throw NotFound(`Cours introuvable : ${slug}`);
+    return data as unknown as Course;
+  } catch (e) {
+    logger.error('getCourseBySlug failed', { slug, ...describeError(e) });
+    return null;
+  }
 });
 
 export const getAllPublishedCourseSlugs = cache(async (): Promise<string[]> => {

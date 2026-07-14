@@ -1,7 +1,8 @@
 import 'server-only';
 import { cache } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { NotFound } from '@/lib/utils/errors';
+import { NotFound, describeError } from '@/lib/utils/errors';
+import { logger } from '@/lib/utils/logger';
 import type { ModuleBooking, ModuleBookingWithDetails } from '@/types/domain';
 
 /**
@@ -11,16 +12,21 @@ import type { ModuleBooking, ModuleBookingWithDetails } from '@/types/domain';
  */
 export const getStudentModuleBookings = cache(
   async (studentId: string): Promise<ModuleBookingWithDetails[]> => {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from('module_bookings')
-      .select(
-        '*, module:modules(*), meeting:meeting_links!meeting_links_module_booking_id_fkey(*)',
-      )
-      .eq('student_id', studentId)
-      .order('scheduled_start', { ascending: false });
-    if (error) throw error;
-    return (data ?? []) as unknown as ModuleBookingWithDetails[];
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from('module_bookings')
+        .select(
+          '*, module:modules(*), meeting:meeting_links!meeting_links_module_booking_id_fkey(*)',
+        )
+        .eq('student_id', studentId)
+        .order('scheduled_start', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as ModuleBookingWithDetails[];
+    } catch (e) {
+      logger.error('getStudentModuleBookings failed', { studentId, ...describeError(e) });
+      return [];
+    }
   },
 );
 
@@ -30,14 +36,19 @@ export const getStudentModuleBookings = cache(
  * tutor / admin, so we just propagate the row.
  */
 export const getModuleBooking = cache(
-  async (id: string): Promise<ModuleBooking> => {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from('module_bookings')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error || !data) throw NotFound('Module booking not found.');
-    return data;
+  async (id: string): Promise<ModuleBooking | null> => {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from('module_bookings')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error || !data) throw NotFound('Module booking not found.');
+      return data;
+    } catch (e) {
+      logger.error('getModuleBooking failed', { id, ...describeError(e) });
+      return null;
+    }
   },
 );

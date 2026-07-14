@@ -1,7 +1,8 @@
 import 'server-only';
 import { cache } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { NotFound } from '@/lib/utils/errors';
+import { NotFound, describeError } from '@/lib/utils/errors';
+import { logger } from '@/lib/utils/logger';
 import type { Enrollment, EnrollmentWithProgress } from '@/types/domain';
 
 /**
@@ -11,29 +12,39 @@ import type { Enrollment, EnrollmentWithProgress } from '@/types/domain';
  */
 export const getStudentEnrollments = cache(
   async (studentId: string): Promise<EnrollmentWithProgress[]> => {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from('enrollments')
-      .select(
-        '*, course:courses(*), progress:module_progress(*)',
-      )
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return (data ?? []) as unknown as EnrollmentWithProgress[];
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from('enrollments')
+        .select(
+          '*, course:courses(*), progress:module_progress(*)',
+        )
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as EnrollmentWithProgress[];
+    } catch (e) {
+      logger.error('getStudentEnrollments failed', { studentId, ...describeError(e) });
+      return [];
+    }
   },
 );
 
 /** Fetch a single enrollment by id. RLS scopes the read. */
-export const getEnrollment = cache(async (id: string): Promise<Enrollment> => {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from('enrollments')
-    .select('*')
-    .eq('id', id)
-    .single();
-  if (error || !data) throw NotFound('Enrollment not found.');
-  return data;
+export const getEnrollment = cache(async (id: string): Promise<Enrollment | null> => {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('enrollments')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error || !data) throw NotFound('Enrollment not found.');
+    return data;
+  } catch (e) {
+    logger.error('getEnrollment failed', { id, ...describeError(e) });
+    return null;
+  }
 });
 
 /** List the published modules of a course. Used by
@@ -43,16 +54,21 @@ export const getEnrollmentCourseModules = cache(
     module: { id: string; title: string; position: number; duration_min: number; is_published: boolean; is_preview: boolean };
     progress: { status: 'not_started' | 'in_progress' | 'completed'; started_at: string | null; completed_at: string | null } | null;
   }>> => {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from('module_progress')
-      .select('status, started_at, completed_at, module:modules(id, title, position, duration_min, is_published, is_preview)')
-      .eq('enrollment_id', enrollmentId)
-      .order('module(position)', { ascending: true });
-    if (error) throw error;
-    return (data ?? []) as unknown as ReadonlyArray<{
-      module: { id: string; title: string; position: number; duration_min: number; is_published: boolean; is_preview: boolean };
-      progress: { status: 'not_started' | 'in_progress' | 'completed'; started_at: string | null; completed_at: string | null } | null;
-    }>;
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from('module_progress')
+        .select('status, started_at, completed_at, module:modules(id, title, position, duration_min, is_published, is_preview)')
+        .eq('enrollment_id', enrollmentId)
+        .order('module(position)', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as ReadonlyArray<{
+        module: { id: string; title: string; position: number; duration_min: number; is_published: boolean; is_preview: boolean };
+        progress: { status: 'not_started' | 'in_progress' | 'completed'; started_at: string | null; completed_at: string | null } | null;
+      }>;
+    } catch (e) {
+      logger.error('getEnrollmentCourseModules failed', { enrollmentId, ...describeError(e) });
+      return [];
+    }
   },
 );

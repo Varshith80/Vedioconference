@@ -1,5 +1,7 @@
 import 'server-only';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { describeError } from '@/lib/utils/errors';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * `services/bookings/module-unlock.ts` — defensive service-side
@@ -44,70 +46,84 @@ export async function isModuleUnlocked(args: {
   enrollmentId: string;
   moduleId:     string;
 }): Promise<ModuleUnlockResult> {
-  const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-  // 1. Read the enrollment.
-  const { data: enrollment, error: enrollmentError } = await supabase
-    .from('enrollments')
-    .select('id, course_id, status')
-    .eq('id', args.enrollmentId)
-    .maybeSingle();
-  if (enrollmentError) throw enrollmentError;
-  const enrollmentRow = enrollment as unknown as { id: string; course_id: string; status: string } | null;
-  if (!enrollmentRow) {
-    return { unlocked: false, reason: 'not_enrolled' };
-  }
-  if (enrollmentRow.status !== 'active' && enrollmentRow.status !== 'pending_payment') {
-    return { unlocked: false, reason: 'enrollment_inactive' };
-  }
+    // 1. Read the enrollment.
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('enrollments')
+      .select('id, course_id, status')
+      .eq('id', args.enrollmentId)
+      .maybeSingle();
+    if (enrollmentError) throw enrollmentError;
+    const enrollmentRow = enrollment as unknown as { id: string; course_id: string; status: string } | null;
+    if (!enrollmentRow) {
+      return { unlocked: false, reason: 'not_enrolled' };
+    }
+    if (enrollmentRow.status !== 'active' && enrollmentRow.status !== 'pending_payment') {
+      return { unlocked: false, reason: 'enrollment_inactive' };
+    }
 
-  // 2. Read the target module.
-  const { data: module, error: moduleError } = await supabase
-    .from('modules')
-    .select('id, course_id, position, is_preview, is_published')
-    .eq('id', args.moduleId)
-    .maybeSingle();
-  if (moduleError) throw moduleError;
-  const moduleRow = module as unknown as { id: string; course_id: string; position: number; is_preview: boolean; is_published: boolean } | null;
-  if (!moduleRow || !moduleRow.is_published) {
-    return { unlocked: false, reason: 'not_enrolled' };
-  }
-  if (moduleRow.is_preview) {
-    return { unlocked: true, reason: 'is_preview' };
-  }
+    // 2. Read the target module.
+    const { data: module, error: moduleError } = await supabase
+      .from('modules')
+      .select('id, course_id, position, is_preview, is_published')
+      .eq('id', args.moduleId)
+      .maybeSingle();
+    if (moduleError) throw moduleError;
+    const moduleRow = module as unknown as { id: string; course_id: string; position: number; is_preview: boolean; is_published: boolean } | null;
+    if (!moduleRow || !moduleRow.is_published) {
+      return { unlocked: false, reason: 'not_enrolled' };
+    }
+    if (moduleRow.is_preview) {
+      return { unlocked: true, reason: 'is_preview' };
+    }
 
-  // 3. Read the blocking list. A module is "blocking" if it is
-  //    published, of the same course, at a lower position, and
-  //    does not have a `module_progress.status = 'completed'`
-  //    row for this enrollment.
-  const { data: predecessors, error: predecessorsError } = await supabase
-    .from('modules')
-    .select('id')
-    .eq('course_id', enrollmentRow.course_id)
-    .eq('is_published', true)
-    .lt('position', moduleRow.position);
-  if (predecessorsError) throw predecessorsError;
-  const predIds = ((predecessors ?? []) as unknown as Array<{ id: string }>).map((m) => m.id);
+    // 3. Read the blocking list. A module is "blocking" if it is
+    //    published, of the same course, at a lower position, and
+    //    does not have a `module_progress.status = 'completed'`
+    //    row for this enrollment.
+    const { data: predecessors, error: predecessorsError } = await supabase
+      .from('modules')
+      .select('id')
+      .eq('course_id', enrollmentRow.course_id)
+      .eq('is_published', true)
+      .lt('position', moduleRow.position);
+    if (predecessorsError) throw predecessorsError;
+    const predIds = ((predecessors ?? []) as unknown as Array<{ id: string }>).map((m) => m.id);
 
-  if (predIds.length === 0) {
+    if (predIds.length === 0) {
+      return { unlocked: true, reason: 'ok' };
+    }
+
+    const { data: progress, error: progressError } = await supabase
+      .from('module_progress')
+      .select('module_id, status')
+      .eq('enrollment_id', args.enrollmentId)
+      .in('module_id', predIds)
+      .eq('status', 'completed');
+    if (progressError) throw progressError;
+    const completedSet = new Set(
+      ((progress ?? []) as unknown as Array<{ module_id: string; status: string }>).map((p) => p.module_id),
+    );
+    const blockingModuleIds = predIds.filter((id) => !completedSet.has(id));
+
+    if (blockingModuleIds.length > 0) {
+      return { unlocked: false, reason: 'preceding_incomplete', blockingModuleIds };
+    }
+
     return { unlocked: true, reason: 'ok' };
+  } catch (e) {
+    // The DB trigger is the source of truth for "locked". If the
+    // service-side check itself can't reach the DB we conservatively
+    // report "locked" — the page disables the booking button until
+    // the DB is reachable again. The user sees a friendly empty
+    // state instead of a 500.
+    logger.error('isModuleUnlocked failed', {
+      enrollmentId: args.enrollmentId,
+      moduleId: args.moduleId,
+      ...describeError(e),
+    });
+    return { unlocked: false, reason: 'not_enrolled' };
   }
-
-  const { data: progress, error: progressError } = await supabase
-    .from('module_progress')
-    .select('module_id, status')
-    .eq('enrollment_id', args.enrollmentId)
-    .in('module_id', predIds)
-    .eq('status', 'completed');
-  if (progressError) throw progressError;
-  const completedSet = new Set(
-    ((progress ?? []) as unknown as Array<{ module_id: string; status: string }>).map((p) => p.module_id),
-  );
-  const blockingModuleIds = predIds.filter((id) => !completedSet.has(id));
-
-  if (blockingModuleIds.length > 0) {
-    return { unlocked: false, reason: 'preceding_incomplete', blockingModuleIds };
-  }
-
-  return { unlocked: true, reason: 'ok' };
 }

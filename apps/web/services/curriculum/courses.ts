@@ -70,6 +70,29 @@ export const getCoursesByProgram = cache(
 );
 
 /**
+ * Fetch a single course by id. Returns `null` on miss.
+ * Used by the public session detail page to resolve the
+ * course slug for the breadcrumb back-link.
+ */
+export const getCourseById = cache(
+  async (id: string): Promise<Course | null> => {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as Course | null;
+    } catch (e) {
+      logger.error('getCourseById failed', { id, ...describeError(e) });
+      return null;
+    }
+  },
+);
+
+/**
  * Fetch a single course by its slug with its program, grade,
  * and chapters (each with its sessions) eagerly joined.
  * Used by the marketing course detail page.

@@ -573,6 +573,37 @@
       "backHome": "Retour à l’accueil"
     }
   },
+  "Programs": {
+    "title": "Programmes scolaires",
+    "subtitle": "Choisissez le programme qui correspond à votre année. Chaque programme regroupe les cours que vous pouvez acheter.",
+    "allGrades": "Tous les niveaux",
+    "viewCourses": "Voir les cours",
+    "viewChapters": "Voir les chapitres",
+    "viewSessions": "Voir les sessions"
+  },
+  "Chapters": {
+    "title": "Chapitres",
+    "sessionCount": "{count, plural, =0 {Aucune session} =1 {1 session} other {# sessions}}",
+    "totalDuration": "{minutes} min au total",
+    "noSessions": "Ce chapitre n'a pas encore de sessions."
+  },
+  "Sessions": {
+    "title": "Sessions",
+    "duration": "{minutes} min",
+    "price": "Prix",
+    "priceTbd": "Prix à venir",
+    "buy": "Acheter cette session",
+    "buyPending": "Ouverture du paiement…",
+    "buyError": "Impossible de démarrer le paiement. Veuillez réessayer.",
+    "book": "Réserver un créneau",
+    "alreadyOwned": "Vous possédez cette session",
+    "booked": "Réservée",
+    "completed": "Terminée",
+    "cancelled": "Annulée",
+    "refunded": "Remboursée",
+    "pendingPayment": "Paiement en attente",
+    "notFoundTitle": "Session introuvable"
+  },
   "Dashboard": {
     "loading": "Chargement de votre espace…",
     "layout": {
@@ -619,6 +650,20 @@
       "joinSession": "Rejoindre la séance",
       "bookAgain": "Réserver à nouveau"
     },
+    "programs": {
+      "title": "Mes programmes",
+      "subline": "Vos sessions achetées, regroupées par programme.",
+      "emptyTitle": "Aucun programme actif",
+      "emptyDescription": "Vos sessions achetées apparaîtront ici dès que vous en aurez acquis une.",
+      "viewSessions": "Voir les sessions"
+    },
+    "sessions": {
+      "title": "Mes sessions",
+      "subline": "Toutes les sessions que vous avez achetées ou réservées.",
+      "emptyTitle": "Aucune session pour le moment",
+      "emptyDescription": "Les sessions que vous achetez ou réservez apparaîtront ici.",
+      "viewDetails": "Voir les détails"
+    },
     "resources": {
       "title": "Ressources",
       "subline": "Les supports partagés par vos profs apparaîtront ici.",
@@ -641,6 +686,16 @@
           "id": "dashboard",
           "label": "Tableau de bord",
           "href": "/dashboard"
+        },
+        {
+          "id": "programs",
+          "label": "Mes programmes",
+          "href": "/dashboard/programs"
+        },
+        {
+          "id": "sessions",
+          "label": "Mes sessions",
+          "href": "/dashboard/sessions"
         },
         {
           "id": "bookings",
@@ -666,6 +721,16 @@
           "id": "dashboard",
           "label": "Tableau de bord",
           "href": "/dashboard"
+        },
+        {
+          "id": "programs",
+          "label": "Mes programmes",
+          "href": "/dashboard/programs"
+        },
+        {
+          "id": "sessions",
+          "label": "Mes sessions",
+          "href": "/dashboard/sessions"
         },
         {
           "id": "bookings",
@@ -785,6 +850,16 @@
       "errorGeneric": "Le paiement n'a pas pu être démarré. Veuillez réessayer.",
       "errorNetwork": "Erreur réseau. Vérifiez votre connexion et réessayez.",
       "errorCheckoutUnavailable": "Le paiement est en cours de préparation. Réessayez dans un instant."
+    },
+    "sessionGrant": {
+      "title": "Finaliser votre achat",
+      "description": "Vous êtes à une étape d'accéder à cette session. Le paiement sécurisé est géré par Stripe — votre carte ne touche jamais nos serveurs.",
+      "payButton": "Payer avec Stripe",
+      "secureNote": "Les paiements sont sécurisés par Stripe. Les cartes sont tokenisées ; nous ne les stockons jamais.",
+      "backToSession": "Retour à la session",
+      "alreadyPaidDescription": "Cette session vous appartient déjà. Vous pouvez réserver un créneau depuis votre espace.",
+      "goToDashboard": "Accéder à mes sessions",
+      "sessionPriceMissing": "Le prix de cette session n'est pas encore disponible. Revenez bientôt."
     },
     "success": {
       "title": "Paiement reçu",

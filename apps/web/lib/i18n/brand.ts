@@ -55,11 +55,26 @@ export function getBrandCopy(t: (key: 'tagline' | 'shortDescription' | 'ogCaptio
 
 /**
  * Edge-runtime form — used inside `app/opengraph-image.tsx`.
- * The OG image runs on the edge and cannot use next-intl's React
- * providers, so it imports the raw messages object directly.
+ * This function is **total**: it accepts `unknown` (not `RawMessages`)
+ * because at the call site the messages object can legitimately be
+ * `undefined`. `MESSAGES[locale]` returns `undefined` whenever the
+ * `locale` argument is not a known key of the `DICTS` map, and we
+ * also defensively re-validate the shape of the object in case a
+ * future translation file is missing the `Brand` namespace. We do
+ * not want every caller to have to remember the `?? {}` dance, and
+ * we do not want a `Cannot read properties of undefined` error to
+ * crash metadata generation and produce a white page. Instead, we
+ * accept any input and return a fully-populated `BrandCopy` —
+ * missing translations degrade to the empty string, which the OG
+ * image renders as a blank line.
  */
-export function brandFromMessages(messages: RawMessages): BrandCopy {
-  const b = messages.Brand ?? {};
+export function brandFromMessages(messages: unknown): BrandCopy {
+  const b =
+    messages != null &&
+    typeof messages === 'object' &&
+    'Brand' in (messages as Record<string, unknown>)
+      ? ((messages as RawMessages).Brand ?? {})
+      : {};
   return {
     ...STRUCTURAL,
     // The structural BRAND intentionally omits `tagline`,
@@ -67,8 +82,9 @@ export function brandFromMessages(messages: RawMessages): BrandCopy {
     // brand identity. The translations are the only source of truth;
     // if a translation is missing, we fall back to the empty string
     // rather than synthesising a value.
-    tagline: b.tagline ?? '',
-    shortDescription: b.shortDescription ?? '',
-    ogCaption: b.ogCaption ?? '',
+    tagline: typeof b.tagline === 'string' ? b.tagline : '',
+    shortDescription:
+      typeof b.shortDescription === 'string' ? b.shortDescription : '',
+    ogCaption: typeof b.ogCaption === 'string' ? b.ogCaption : '',
   };
 }

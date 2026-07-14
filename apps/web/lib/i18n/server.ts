@@ -21,7 +21,7 @@
  *   return t('ApiErrors.rateLimited');
  */
 import { type NextRequest } from 'next/server';
-import { defaultLocale, locales, type Locale } from '@/i18n';
+import { defaultLocale, isLocale, locales, type Locale } from '@/i18n';
 import en from '@/messages/en.json';
 import fr from '@/messages/fr.json';
 
@@ -89,3 +89,40 @@ export function tForLocale(locale: Locale): (key: string) => string {
  * OG image, which renders `Brand.ogCaption` directly.
  */
 export const MESSAGES: Record<Locale, Messages> = DICTS;
+
+/**
+ * Resolve the raw messages object for an arbitrary `locale` string
+ * **without ever returning `undefined`**. This is the single
+ * chokepoint that the OG image route uses to load its translations;
+ * routing all callers through it means the `Cannot read properties
+ * of undefined (reading 'Brand')` error that used to surface from
+ * `generateImageMetadata` (and cascade into a hydration mismatch and
+ * a white page) cannot happen, regardless of what the Next.js
+ * framework hands us for `params.locale`.
+ *
+ * Behaviour:
+ *  - If `locale` is a known key of `DICTS`, return the matching
+ *    messages object.
+ *  - Otherwise, return the default locale's messages (the same
+ *    fallback `getRequestConfig` uses in `i18n.ts`).
+ *
+ * Callers that need the original locale string (e.g. to set
+ * `Content-Language` or to pass to a flat-key translator) should
+ * pair this with `resolveLocale`.
+ */
+export function safeMessages(locale: string | null | undefined): {
+  locale: Locale;
+  messages: Messages;
+} {
+  const safe = isLocale(locale) ? locale : defaultLocale;
+  return { locale: safe, messages: DICTS[safe] };
+}
+
+/**
+ * Normalise an arbitrary string to a known `Locale`. The default
+ * locale is the fallback for anything unrecognised, matching
+ * `getRequestConfig` and `safeMessages`.
+ */
+export function resolveLocale(locale: string | null | undefined): Locale {
+  return isLocale(locale) ? locale : defaultLocale;
+}

@@ -74,6 +74,31 @@ export const getSessionBooking = cache(
 );
 
 /**
+ * Fetch a single session booking by its id, with its
+ * session, chapter, and meeting link eagerly joined. Used
+ * by `/[locale]/dashboard/sessions/[id]`.
+ */
+export const getSessionBookingWithDetails = cache(
+  async (id: string): Promise<SessionBookingWithDetails | null> => {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from('session_bookings')
+        .select(
+          '*, session:sessions(*, chapter:chapters(*)), meeting:meeting_links!session_booking_id(*)',
+        )
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as SessionBookingWithDetails | null;
+    } catch (e) {
+      logger.error('getSessionBookingWithDetails failed', { id, ...describeError(e) });
+      return null;
+    }
+  },
+);
+
+/**
  * Insert a new `scheduled` session booking. The caller must
  * have already validated that:
  *   1. The session_grant is `active` (or `pending_payment`,
