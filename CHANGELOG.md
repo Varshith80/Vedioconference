@@ -4,6 +4,280 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-phase2-sprint-3.6] — 2026-07-15
+
+### Added — Admin Dashboard, Excel Curriculum Import, and v1 Retirement (Sprint 3.6)
+
+The platform has a working admin dashboard backed by the v2
+session hierarchy, a one-shot Excel importer for the
+curriculum workbooks, and the v1 module-based hierarchy is
+retired. Three design invariants from §5.0 of the plan are
+codified in tests:
+
+1. **Data-driven importer** — no hardcoded curriculum
+   tokens anywhere in `apps/web/lib/excel/*` (enforced by
+   `parse-curriculum-no-hardcoded-names.test.ts`, 15
+   assertions).
+2. **`price_cents = NULL` for any session with no price
+   cell** — no placeholder prices (Sprint 3.5 decision;
+   enforced by `parse-curriculum.test.ts`, 14 assertions).
+3. **Fully idempotent** — re-running the importer never
+   creates duplicate `programs` / `grades` / `courses` /
+   `chapters` / `sessions` rows (enforced by
+   `import-idempotency.test.ts`, 6 assertions).
+
+#### Admin dashboard (S36-ADMIN)
+- `apps/web/hooks/use-require-user.ts` — adds
+  `requireAdmin` / `requireSuperAdmin`; the 5 inline copies
+  collapse to the shared helper.
+- `apps/web/app/api/admin/overview/route.ts` (MODIFIED) —
+  re-anchored on v2 tables (`session_grants`,
+  `session_bookings`, `payments`, `profiles`, `courses`,
+  `chapters`, `sessions`); the v1
+  `module_bookings` / `enrollments` / `module_progress`
+  selections are removed.
+- `apps/web/services/admin/{overview,programs,grades,courses-admin,chapters-admin,sessions-admin,payments-admin,students-admin}.ts`
+  (8 NEW) — read + small-write CRUD for the catalog; the
+  ledger + roster are read-only (writes go through the
+  Stripe + n8n webhooks).
+- `apps/web/app/[locale]/admin/{layout,page}.tsx` (MODIFIED)
+  — the placeholder becomes the `OverviewCounters` page.
+- `apps/web/app/[locale]/admin/{programs,grades,courses,chapters,sessions,payments,students}/...`
+  — read-only list + detail pages for every catalog
+  entity + the ledger + the roster. Create / edit forms
+  for `courses`, `chapters`, `sessions`:
+  `apps/web/components/forms/{course,chapter,session}-form.tsx`
+  (3 NEW) using `react-hook-form` + `zodResolver`. The
+  session form exposes `price_cents` as a number input with
+  a "no price yet" checkbox that maps to `NULL` server-side.
+- `apps/web/components/admin/{admin-client-layout,admin-sidebar,admin-top-nav,admin-header,overview-counters,program-row-card,course-row-card,chapter-row-card,session-row-card,payment-row-card,student-row-card,import-excel-form}.tsx`
+  (12 NEW).
+- `apps/web/lib/validations/admin-{courses,chapters,sessions,import-excel}.ts`
+  (4 NEW) — Zod schemas with the `TLike` factory pattern
+  from `apps/web/lib/validations/auth.ts`.
+- `apps/web/messages/{en,fr}.json` (MODIFIED) — `Admin.*`
+  expands from 3 keys to ~80 keys. New namespaces:
+  `Admin.sidebar.*`, `Admin.topNav.*`, `Admin.header.*`,
+  `Admin.overview.*`, `Admin.programs.*`, `Admin.grades.*`,
+  `Admin.courses.*`, `Admin.chapters.*`, `Admin.sessions.*`,
+  `Admin.payments.*`, `Admin.students.*`, `Admin.forms.*`,
+  `Admin.import.*`.
+
+#### Admin API (S36-API)
+- `POST /api/courses` (NEW) — admin-only course create.
+- `POST /api/chapters` (NEW) — admin-only chapter create.
+- `PATCH /api/sessions/[id]` (NEW) — admin-only session
+  update.
+
+#### Excel import (S36-EXCEL)
+- `apps/web/lib/excel/parse-curriculum.ts` (NEW) — pure
+  function: workbook buffer → `ParsedCurriculum` tree.
+  Language-aware (`{ language: 'en' | 'fr' }`). The
+  hierarchy is **discovered from the workbook**, not from a
+  lookup table.
+- `apps/web/lib/excel/column-aliases.ts` (NEW) — the
+  en/fr column-name → canonical field map.
+- `apps/web/lib/excel/import.ts` (NEW) — the importer.
+  Every write is an `INSERT … ON CONFLICT (<natural key>)
+  DO UPDATE` upsert keyed on the natural unique constraint
+  of the target table.
+- `apps/web/app/api/admin/import-excel/route.ts` (NEW) —
+  admin-only POST. `runtime='nodejs'`,
+  `dynamic='force-dynamic'`. Accepts a `file` (xlsx), a
+  `language` ('en' | 'fr'), and a `dryRun` flag. Returns
+  a `ImportReport` with `counts` + `errors`.
+- `apps/web/app/api/sessions/bulk/route.ts` (NEW) —
+  admin-only POST that does a single `INSERT … ON CONFLICT
+  (chapter_id, position) DO UPDATE` for all the chapter's
+  sessions in one round-trip.
+- `docs/imports/excel-shape.md` (NEW) — the committed
+  output of `tmp_inspect_excel.cjs` against both
+  workbooks; the single source of truth for the
+  sheet/column shape.
+
+#### v1 retirement migration (S36-SQL)
+- `supabase/migrations/20260715000000_drop_v1_back_compat_tables.sql` (NEW) — the single forward-only
+  migration that:
+  - Drops 5 v1 tables: `module_bookings`,
+    `module_progress`, `enrollments`, `modules`,
+    `_bookings_legacy` (cascade).
+  - Drops 7 v1 triggers BEFORE the table drop:
+    `trg_module_bookings_updated_at`,
+    `trg_module_bookings_completion`,
+    `trg_module_bookings_audit`,
+    `trg_module_progress_updated_at`,
+    `trg_module_progress_audit`,
+    `trg_enrollments_completion`,
+    `trg_enrollments_refund`.
+  - Drops 2 v1 functions:
+    `fn_module_bookings_completion()`,
+    `fn_enrollments_completion()`.
+  - Recreates `fn_enrollments_refund()` as v2-only
+    (`session_grant_id` branch only); re-installs
+    `trg_enrollments_refund` on `payments`.
+  - Drops 9 v1 RLS policies + all `_bookings_legacy_*`
+    policies (dynamic drop via `pg_policies` lookup).
+  - Drops 13 v1 indexes.
+  - Drops 6 v1 FK columns:
+    `meeting_links.booking_id`,
+    `meeting_links.module_booking_id`,
+    `payments.booking_id`,
+    `payments.enrollment_id`,
+    `payments.module_booking_id`,
+    `resource_grants.enrollment_id`.
+  - Re-anchors `resource_grants` PK from
+    `(resource_id, enrollment_id)` to
+    `(resource_id, session_grant_id)`: dynamic PK drop
+    via `pg_constraint` lookup, backfill via v1
+    `enrollment` → `session_grants` join, delete
+    orphans, re-create PK, replace RLS policy.
+  - Drops the `module_progress_status` type.
+
+#### v1 retirement code (S36-RETIRE)
+- **Deleted (16 files)**: the 4 `410`-stamped routes
+  (`app/api/enrollments/route.ts`,
+  `app/api/enrollments/[id]/modules/route.ts`,
+  `app/api/module-bookings/route.ts`,
+  `app/api/module-bookings/[id]/cancel/route.ts`); the
+  2 v1 back-compat routes
+  (`app/api/enrollments/[id]/refund/route.ts`,
+  `app/api/enrollments/checkout/route.ts`); the v1
+  checkout page (`app/[locale]/checkout/enrollment/[id]/page.tsx`)
+  + its client component
+  (`components/checkout/checkout-client.tsx`); the v1
+  dashboard card (`components/dashboard/booking-card.tsx`);
+  the 3 v1 services (`services/enrollments.ts`,
+  `services/module-bookings.ts`,
+  `services/bookings/module-unlock.ts`); the 2 v1 email
+  templates (renamed → v2); 2 v1 unit tests.
+- **Renamed**:
+  `lib/email/templates/module-booking-confirmed.tsx` →
+  `session-booking-confirmed.tsx`;
+  `module-cancelled.tsx` → `session-cancelled.tsx`. The
+  `EmailTemplateName` union + dispatcher are updated.
+- **Live runtime migrations** (the 12 audit hits from
+  the plan):
+  - `app/api/me/me/route.ts` —
+    `{ enrollments: [...] }` →
+    `{ sessionGrants: [...] }`.
+  - `app/api/webhooks/n8n/route.ts` — v1 back-compat
+    removed; `meeting_created` and `reminder_sent` only
+    accept `session_booking_id`; the v1
+    `enrollment_checkout_created` and
+    `enrollment_refund_succeeded` cases are removed.
+  - `app/api/webhooks/stripe/route.ts` — v1 back-compat
+    removed; `checkout.session.completed` only reads
+    `session_grant_id` (or `client_reference_id`).
+  - `app/api/bookings/{route,[id]/cancel,checkout}/route.ts`
+    — the 3 410 shims point to v2 endpoints
+    (`/api/session-bookings`,
+    `/api/session-bookings/[id]/cancel`,
+    `/api/session-grants/[id]/stripe-session`).
+  - `app/[locale]/dashboard/courses/[id]/page.tsx` —
+    307 redirect to
+    `/[locale]/dashboard/sessions`.
+  - `app/[locale]/dashboard/courses/[id]/modules/[moduleId]/book/page.tsx`
+    — 307 redirect to
+    `/[locale]/dashboard/sessions`.
+  - `lib/email/templates/reminder-{1h,24h}.tsx` —
+    `moduleTitle` → `sessionTitle` (n8n field
+    is now `session_booking_id`).
+  - `lib/email/templates/index.ts` — `EmailTemplateName`
+    union + dispatcher updated.
+  - `types/domain.ts` — v1 aliases
+    (`Module`, `Enrollment`, `ModuleProgress`,
+    `ModuleBooking`, `CourseWithModules`,
+    `ModuleBookingWithDetails`,
+    `EnrollmentWithProgress`, `LegacyBooking`)
+    are deleted.
+  - `types/database.generated.ts` — v1 row shapes
+    (`ModuleRow`, `EnrollmentRow`,
+    `ModuleBookingRow`, `BookingsLegacyRow`,
+    `ModuleProgressRow`) are deleted.
+  - `supabase/seed/consolidated_demo_seed.sql` — the
+    9 v1 `public.modules` INSERTs are removed.
+  - `supabase/tests/rls_smoke_{assertions,setup,teardown}.sql`
+    — the v1 RLS suite is rewritten to single-line
+    no-op markers (the v1 tables are gone; the v2
+    suite is the single source of truth). The files
+    are kept (not deleted) so
+    `scripts/rls-smoke.sh` continues to invoke them
+    (one line in the runner); the runner is otherwise
+    unchanged.
+
+#### RLS v2 wire-up (S36-RLS)
+- `scripts/rls-smoke.sh` (MODIFIED) — one line is added
+  to invoke the v2 suite
+  (`rls_smoke_assertions_v2.sql`).
+- The v2 suite covers 10 policy blocks
+  (programs/grades/chapters/sessions select,
+  session_grants + session_bookings isolation,
+  no_direct_write, payments + meeting_links isolation,
+  admin visibility).
+
+#### Tests (S36-TEST)
+- `parse-curriculum.test.ts` (NEW, 14 assertions) —
+  golden-file: loads EN + FR workbooks, asserts that
+  the entity counts are equal; asserts
+  `price_cents: null` for any session with no price
+  cell.
+- `parse-curriculum-no-hardcoded-names.test.ts` (NEW, 15
+  assertions) — grep-based: scans
+  `apps/web/lib/excel/*` and rejects any occurrence of
+  the forbidden curriculum tokens.
+- `column-aliases.test.ts` (NEW) — asserts the en/fr
+  column-name alias table is the single source of
+  column mappings.
+- `import-idempotency.test.ts` (NEW, 6 assertions) —
+  runs the importer against the same
+  `ParsedCurriculum` twice; asserts row counts
+  unchanged on the second run.
+- `require-admin.test.ts` (NEW, 12 assertions) —
+  `requireAdmin` returns the triple for admin /
+  super_admin, throws `Forbidden` for student /
+  tutor / unauth.
+- `admin-overview-service.test.ts` (NEW, 5 assertions).
+- `admin-courses-create-route.test.ts` (NEW, 5 assertions).
+- `admin-chapters-create-route.test.ts` (NEW, 4 assertions).
+- `admin-sessions-patch-route.test.ts` (NEW, 6 assertions).
+- `admin-sessions-bulk-route.test.ts` (NEW, 8 assertions).
+- `admin-import-excel-route.test.ts` (NEW, 6 assertions).
+
+### Changed
+- `apps/web/app/api/admin/overview/route.ts` — re-anchored
+  on v2 tables.
+- `apps/web/app/api/session-bookings/route.ts` — docblock
+  updated.
+- `apps/web/services/zoom/meetings.ts` — minor.
+- `apps/web/hooks/use-require-user.ts` — adds
+  `requireAdmin` / `requireSuperAdmin`.
+- `scripts/rls-smoke.sh` — wire v2 suite (1 line).
+- `apps/web/messages/{en,fr}.json` — `Admin.*` expansion
+  + 4 additive namespaces.
+
+### Removed
+- 16 v1 source files (see S36-RETIRE above).
+- 5 v1 tables + 7 v1 triggers + 2 v1 functions + 9 v1 RLS
+  policies + 13 v1 indexes + 6 v1 FK columns + 1 v1 type
+  (`module_progress_status`) + the `_bookings_legacy` view
+  (see S36-SQL above).
+
+### Quality gates
+- `pnpm type-check` → exit 0.
+- `pnpm lint` → exit 0 (1 pre-existing `console.log`
+  warning in `lib/utils/logger.ts`, by design).
+- `pnpm test` → **153/153 passing** across 24 test files
+  (71 new in Sprint 3.6).
+- `pnpm build` → exit 0, route count grows by
+  `+6 new − 5 deleted = +1` net (4 410 + 1 v1 refund
+  route deleted; admin POST/PATCH + import-excel +
+  sessions/bulk added). Total: ~70 static pages.
+- `scripts/rls-smoke.sh` → not run in this environment
+  (requires live Supabase project; user to run on
+  staging).
+- `tests/integration/auth-smoke.ts` → not run in this
+  environment (requires live Supabase env).
+
 ## [1.5.0-phase2-sprint-3.5] — 2026-07-14
 
 ### Added — Curriculum Architecture Restructure (Sprint 3.5)

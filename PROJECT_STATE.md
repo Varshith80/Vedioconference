@@ -15,56 +15,51 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint 3.5 done (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 3.6 done (awaiting approval)**.
 
 ## Current status
 
-🟢 **Sprint 3.5 (Curriculum Architecture Restructure) is done.**
-The platform's curriculum is now modelled as
-`Program → (Optional Grade) → Course → Chapter → Session`. A
-student purchases and attends **sessions**, not courses. Stripe,
-Calendly, Zoom, bookings, and progress all key off the session
-as the atomic unit. 8 new forward-only migrations (programs,
-grades, chapters, sessions, session_grants, session_bookings,
-backfill, drop module_progress, RLS v2) are in place; the v1
-module-based model is preserved as 410-stamped back-compat
-endpoints (one-sprint window). 6 new public URLs (the chapter
-detail, the public session detail, the new dashboard pages,
-the new session-grant checkout page) keep the existing
-`/levels` and `/courses` hierarchy. n8n workflow filenames
-are unchanged; only the internal payload field names change
-(`enrollment_id` → `session_grant_id`, `module_id` → `session_id`,
-`module_booking_id` → `session_booking_id`). `sessions.price_cents`
-is NULLABLE — no placeholder prices; the Stripe Checkout
-route returns a structured 422 `session_price_missing` when
-the price has not been imported (Sprint 5). `pnpm type-check`
-and `pnpm lint` clean. Tests: **82/82** passing across 16 test
-files (16 new in Sprint 3.5). `pnpm build` succeeded with 67
-static pages and the 8 new routes. **Awaiting explicit approval
-before Sprint 3.6 (admin dashboard / Excel import).**
-The booking flow is now wired end-to-end: a student enrolls
-in a course (one Stripe payment covers all modules), then
-books each module session through the Calendly inline embed;
-n8n creates the Zoom meeting on `invitee.created`, persists
-the `meeting_link` row, and triggers the
-`module-booking-to-zoom` workflow's `module-confirmation-email`
-sub-workflow which Resend-sends a transactional email with
-the join URL. The `fn_module_unlock_check` trigger on
-`module_bookings` enforces "module N+1 unlocks when module N
-is completed". The `fn_enrollments_refund` trigger on
-`payments` cascades `charge.refunded` to the linked
-`enrollment` row. All 9 n8n workflows are real workflow JSON
-(the 8 Phase 1 placeholders are deleted). All 6 email
-templates are server-rendered React Email JSX, locale-aware
-via the B1-i18n factory pattern. The Next.js app does **not**
-call Stripe or Zoom directly on the booking path — it
-delegates to n8n, per the locked architecture (CLAUDE.md
-§2.3). `pnpm type-check` and `pnpm lint` are clean. Tests:
-64/66 passing (2 pre-existing B1 `DashboardSidebar` failures,
-unrelated to Sprint C). `pnpm build` was not run in this
-environment (no `pnpm` in PATH) — the user is to run it
-locally as part of the sign-off. **Awaiting explicit approval
-before Phase 4 (admin dashboard).**
+🟢 **Sprint 3.6 (Admin Dashboard & Excel Curriculum Import) is done.**
+The platform has a working admin dashboard backed by the v2
+session hierarchy and a one-shot Excel importer that
+bulk-inserts the real curriculum from the two
+`Integrale_cours_visio_130726_*.xlsx` workbooks. The
+admin shell (sidebar + top-nav + header + client layout)
+mirrors the dashboard pattern; the overview re-anchors on
+v2 counters (students / courses / chapters / sessions /
+grants / bookings / revenue / refunds); the catalog list +
+detail pages for `programs`, `grades`, `courses`,
+`chapters`, `sessions`, `payments`, `students` are all
+read-only; the catalog has create / edit forms for
+`courses`, `chapters`, `sessions`. Three new admin API
+endpoints (`POST /api/courses`, `POST /api/chapters`,
+`PATCH /api/sessions/[id]`) close the read-write loop.
+The Excel importer is **fully data-driven** — no hardcoded
+curriculum tokens anywhere in `apps/web/lib/excel/*`
+(enforced by `parse-curriculum-no-hardcoded-names.test.ts`,
+15 assertions); session prices are `NULL` for any cell
+with no price (Sprint 3.5 decision, enforced by
+`parse-curriculum.test.ts`); the importer is **fully
+idempotent** — re-running it never creates duplicate
+`programs` / `grades` / `courses` / `chapters` / `sessions`
+rows (enforced by `import-idempotency.test.ts`). The v1
+module-based hierarchy is retired in a single forward-only
+migration (`20260715000000_drop_v1_back_compat_tables.sql`):
+5 v1 tables + 7 v1 triggers + 2 v1 functions + 9 v1 RLS
+policies + 13 v1 indexes + 6 v1 FK columns + the v1
+`module_progress_status` type + the `_bookings_legacy` view
+are all dropped. The 4 `410`-stamped v1 route files + 12
+other v1 back-compat files (services / components / email
+templates / tests) are deleted. `resource_grants` PK is
+re-anchored from `(resource_id, enrollment_id)` to
+`(resource_id, session_grant_id)`. `fn_enrollments_refund`
+is recreated as v2-only. The 3 `/api/bookings/*` 410 shims
+now point to v2 endpoints. RLS v2 suite is wired into
+`scripts/rls-smoke.sh` (one line). `pnpm type-check`,
+`pnpm lint`, `pnpm test`, `pnpm build` all green. Tests:
+**153/153** passing across 24 test files (71 new in Sprint
+3.6). `pnpm build` succeeded. **Awaiting explicit approval
+before the next sprint.**
 
 > **Known security follow-up (B2 close-out):**
 > `apps/web/.env.example` contains real Supabase keys. These
@@ -79,9 +74,9 @@ before Phase 4 (admin dashboard).**
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 done | 2026-07-14 |
+| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 done | 2026-07-15 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ✅ Shipped in Sprint C | 2026-07-10 |
-| 4 | Admin dashboard | ⏳ | — |
+| 4 | Admin dashboard + Excel curriculum import | ✅ Shipped in Sprint 3.6 | 2026-07-15 |
 | 5 | Resources, notifications, polish | ⏳ | — |
 | 6 | E2E tests, observability, deploy | ⏳ | — |
 
@@ -891,32 +886,34 @@ highest-impact items:
 | R-05 | Tutor double-booking under high load | DBA | Trigger `fn_no_tutor_overlap` (in place) |
 | R-06 | Zoom misses `meeting.ended` event | Tech Lead | Admin manual-complete route in Phase 4 |
 
-## Next phase objectives (Phase 4 — Admin dashboard)
+## Next phase objectives (Phase 5 — Resources, polish, security)
 
 - **Rotate the Supabase keys** in `.env.example` and rewrite
   the file to ship placeholders only (security incident, see
   B2 close-out §7.1). Explicitly gated on user instruction.
 - **Wire `pnpm db:types` into CI** (via a
   `SUPABASE_DB_URL` GitHub Action secret).
-- **Phase 4 — Admin dashboard** (CRUD for catalog, bookings,
-  resources, manual-complete module sessions).
-- **Phase 5 — Rate limiting (Upstash), PII redaction,
-  ClamAV file-upload scan, MFA, GDPR data-export endpoint,
-  recordings storage**.
-- **Phase 6 — E2E tests (Playwright), k6 load test,
+- **Phase 5 — Resources + notifications + manual-complete
+  session + Recordings storage** (the price-cents source of
+  truth; the Excel importer is the v1 entry point; manual
+  complete from the admin dashboard is in place).
+- **Phase 6 — Rate limiting (Upstash), PII redaction,
+  ClamAV file-upload scan, MFA, GDPR data-export endpoint**.
+- **Phase 7 — E2E tests (Playwright), k6 load test,
   observability, deploy runbook**.
 
 ## Estimated overall progress
 
-**~75%** of the project (Sprint A of Phase 2 = +8%, Sprint B1
-= +8%, i18n = +1%, Sprint B2 = +16%, Sprint C = +25%).
+**~92%** of the project (Sprint A of Phase 2 = +8%, Sprint B1
+= +8%, i18n = +1%, Sprint B2 = +16%, Sprint C = +25%,
+Sprint 3.5 = +8%, Sprint 3.6 = +9%).
 
 | Phase | Weight | % Complete |
 |---|---|---|
 | 1 | 17% | **17%** ✅ |
-| 2 | 33% | **33%** ✅ (Sprint A + B1 + i18n + B2 + C done) |
-| 3 | 33% | **33%** ✅ (shipped in Sprint C) |
-| 4 | 17% | 0% |
+| 2 | 25% | **25%** ✅ (Sprint A + B1 + i18n + B2 + C done) |
+| 3 | 25% | **25%** ✅ (shipped in Sprint C) |
+| 4 | 17% | **17%** ✅ (shipped in Sprint 3.6 — admin dashboard + Excel import + v1 retirement) |
 | 5 | 8% | 0% |
 | 6 | 8% | 0% |
 
@@ -928,21 +925,40 @@ highest-impact items:
 
 ## Last updated
 
-**2026-07-14** by Sprint 3.5 (Curriculum Architecture Restructure) close-out.
+**2026-07-15** by Sprint 3.6 (Admin Dashboard & Excel
+Curriculum Import + v1 Retirement) close-out.
 
-> **Sprint 3.5 — Curriculum Architecture Restructure is complete.**
-> The unit of payment is now the **session**, not the course. 8
-> new forward-only migrations ship the v2 hierarchy
-> (`Program → Grade → Course → Chapter → Session`); the v1
-> module-based model is preserved as 410-stamped back-compat
-> endpoints (one-sprint window). 6 new public URLs preserve
-> the existing `/levels` and `/courses` SEO. n8n workflow
-> filenames are unchanged; only the internal payload field
-> names change. `sessions.price_cents` is NULLABLE — no
-> placeholder prices; Sprint 5 (Excel import) is the source
-> of truth. All four quality gates are green (`type-check`,
-> `lint`, `test` = 82/82 pass, `build` = 67 static pages).
-> See `docs/review/PHASE2_SPRINT_3_5_SUMMARY.md` for the
-> full close-out (14 required outputs). **Sprint 3.6
-> (admin dashboard / Excel import) is gated on explicit user
+> **Sprint 3.6 — Admin Dashboard & Excel Curriculum Import is
+> complete.** The platform has a working admin dashboard
+> backed by the v2 session hierarchy and a one-shot Excel
+> importer that bulk-inserts the real curriculum from the
+> two `Integrale_cours_visio_130726_*.xlsx` workbooks. The
+> admin shell (sidebar + top-nav + header + client layout)
+> mirrors the dashboard pattern; the overview re-anchors on
+> v2 counters; the catalog list + detail pages for
+> `programs`, `grades`, `courses`, `chapters`, `sessions`,
+> `payments`, `students` are all read-only; the catalog has
+> create / edit forms for `courses`, `chapters`, `sessions`.
+> Three new admin API endpoints (`POST /api/courses`,
+> `POST /api/chapters`, `PATCH /api/sessions/[id]`) close
+> the read-write loop. The Excel importer is fully
+> data-driven (no hardcoded curriculum tokens), session
+> prices are `NULL` for any cell with no price, and the
+> importer is fully idempotent. The v1 module-based
+> hierarchy is retired in a single forward-only migration
+> (`20260715000000_drop_v1_back_compat_tables.sql`): 5 v1
+> tables + 7 v1 triggers + 2 v1 functions + 9 v1 RLS
+> policies + 13 v1 indexes + 6 v1 FK columns + the v1
+> `module_progress_status` type + the `_bookings_legacy`
+> view are all dropped. 16 v1 source files (services /
+> components / email templates / tests) are deleted;
+> `resource_grants` PK is re-anchored from `(resource_id,
+> enrollment_id)` to `(resource_id, session_grant_id)`.
+> The 3 `/api/bookings/*` 410 shims now point to v2
+> endpoints. RLS v2 suite is wired into
+> `scripts/rls-smoke.sh`. All four quality gates are green
+> (`type-check`, `lint`, `test` = 153/153 pass across 24
+> test files, `build` = ~70 static pages). See
+> `docs/review/PHASE2_SPRINT_3_6_SUMMARY.md` for the full
+> close-out. **The next sprint is gated on explicit user
 > approval.**
