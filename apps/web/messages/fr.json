@@ -793,7 +793,123 @@
   "Admin": {
     "title": "Vue d’ensemble",
     "h1": "Vue d’ensemble",
-    "subline": "Indicateurs clés de la plateforme."
+    "subline": "Indicateurs clés de la plateforme.",
+    "loading": "Chargement de l’espace admin…",
+    "sidebar": {
+      "aria": "Navigation admin",
+      "items": [
+        {
+          "id": "overview",
+          "label": "Vue d’ensemble",
+          "href": "/admin"
+        },
+        {
+          "id": "programs",
+          "label": "Programmes",
+          "href": "/admin/programs"
+        },
+        {
+          "id": "grades",
+          "label": "Niveaux",
+          "href": "/admin/grades"
+        },
+        {
+          "id": "courses",
+          "label": "Cours",
+          "href": "/admin/courses"
+        },
+        {
+          "id": "chapters",
+          "label": "Chapitres",
+          "href": "/admin/chapters"
+        },
+        {
+          "id": "sessions",
+          "label": "Séances",
+          "href": "/admin/sessions"
+        },
+        {
+          "id": "payments",
+          "label": "Paiements",
+          "href": "/admin/payments"
+        },
+        {
+          "id": "students",
+          "label": "Étudiants",
+          "href": "/admin/students"
+        },
+        {
+          "id": "import",
+          "label": "Importer un cursus",
+          "href": "/admin/import"
+        }
+      ]
+    },
+    "topNav": {
+      "aria": "Navigation admin",
+      "items": [
+        {
+          "id": "overview",
+          "label": "Vue d’ensemble",
+          "href": "/admin"
+        },
+        {
+          "id": "programs",
+          "label": "Programmes",
+          "href": "/admin/programs"
+        },
+        {
+          "id": "courses",
+          "label": "Cours",
+          "href": "/admin/courses"
+        },
+        {
+          "id": "chapters",
+          "label": "Chapitres",
+          "href": "/admin/chapters"
+        },
+        {
+          "id": "sessions",
+          "label": "Séances",
+          "href": "/admin/sessions"
+        },
+        {
+          "id": "payments",
+          "label": "Paiements",
+          "href": "/admin/payments"
+        },
+        {
+          "id": "students",
+          "label": "Étudiants",
+          "href": "/admin/students"
+        },
+        {
+          "id": "import",
+          "label": "Importer",
+          "href": "/admin/import"
+        }
+      ]
+    },
+    "header": {
+      "fallbackName": "Admin",
+      "subtitle": "Console admin",
+      "signOut": "Se déconnecter",
+      "signOutAria": "Se déconnecter"
+    },
+    "overview": {
+      "title": "Vue d’ensemble",
+      "subline": "Métriques de la plateforme, dernier import le {lastImport}.",
+      "counters": {
+        "students": "Étudiants",
+        "courses": "Cours",
+        "chapters": "Chapitres",
+        "sessions": "Séances",
+        "sessionGrants": "Achat de séances",
+        "sessionBookings": "Réservations",
+        "revenueCents": "Revenus (centimes)",
+        "refundsCents": "Remboursements (centimes)"
+      }
+    }
   },
   "SiteHeader": {
     "mySpace": "Mon espace",

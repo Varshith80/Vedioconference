@@ -793,7 +793,123 @@
   "Admin": {
     "title": "Overview",
     "h1": "Overview",
-    "subline": "Key platform indicators."
+    "subline": "Key platform indicators.",
+    "loading": "Loading admin space…",
+    "sidebar": {
+      "aria": "Admin navigation",
+      "items": [
+        {
+          "id": "overview",
+          "label": "Overview",
+          "href": "/admin"
+        },
+        {
+          "id": "programs",
+          "label": "Programs",
+          "href": "/admin/programs"
+        },
+        {
+          "id": "grades",
+          "label": "Grades",
+          "href": "/admin/grades"
+        },
+        {
+          "id": "courses",
+          "label": "Courses",
+          "href": "/admin/courses"
+        },
+        {
+          "id": "chapters",
+          "label": "Chapters",
+          "href": "/admin/chapters"
+        },
+        {
+          "id": "sessions",
+          "label": "Sessions",
+          "href": "/admin/sessions"
+        },
+        {
+          "id": "payments",
+          "label": "Payments",
+          "href": "/admin/payments"
+        },
+        {
+          "id": "students",
+          "label": "Students",
+          "href": "/admin/students"
+        },
+        {
+          "id": "import",
+          "label": "Import curriculum",
+          "href": "/admin/import"
+        }
+      ]
+    },
+    "topNav": {
+      "aria": "Admin navigation",
+      "items": [
+        {
+          "id": "overview",
+          "label": "Overview",
+          "href": "/admin"
+        },
+        {
+          "id": "programs",
+          "label": "Programs",
+          "href": "/admin/programs"
+        },
+        {
+          "id": "courses",
+          "label": "Courses",
+          "href": "/admin/courses"
+        },
+        {
+          "id": "chapters",
+          "label": "Chapters",
+          "href": "/admin/chapters"
+        },
+        {
+          "id": "sessions",
+          "label": "Sessions",
+          "href": "/admin/sessions"
+        },
+        {
+          "id": "payments",
+          "label": "Payments",
+          "href": "/admin/payments"
+        },
+        {
+          "id": "students",
+          "label": "Students",
+          "href": "/admin/students"
+        },
+        {
+          "id": "import",
+          "label": "Import",
+          "href": "/admin/import"
+        }
+      ]
+    },
+    "header": {
+      "fallbackName": "Admin",
+      "subtitle": "Admin console",
+      "signOut": "Sign out",
+      "signOutAria": "Sign out"
+    },
+    "overview": {
+      "title": "Overview",
+      "subline": "Live platform metrics, last import at {lastImport}.",
+      "counters": {
+        "students": "Students",
+        "courses": "Courses",
+        "chapters": "Chapters",
+        "sessions": "Sessions",
+        "sessionGrants": "Session grants",
+        "sessionBookings": "Session bookings",
+        "revenueCents": "Revenue (cents)",
+        "refundsCents": "Refunds (cents)"
+      }
+    }
   },
   "SiteHeader": {
     "mySpace": "My space",
