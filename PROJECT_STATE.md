@@ -15,11 +15,33 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint C done (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 3.5 done (awaiting approval)**.
 
 ## Current status
 
-🟢 **Sprint C (Phase 3 end-to-end booking) is done.**
+🟢 **Sprint 3.5 (Curriculum Architecture Restructure) is done.**
+The platform's curriculum is now modelled as
+`Program → (Optional Grade) → Course → Chapter → Session`. A
+student purchases and attends **sessions**, not courses. Stripe,
+Calendly, Zoom, bookings, and progress all key off the session
+as the atomic unit. 8 new forward-only migrations (programs,
+grades, chapters, sessions, session_grants, session_bookings,
+backfill, drop module_progress, RLS v2) are in place; the v1
+module-based model is preserved as 410-stamped back-compat
+endpoints (one-sprint window). 6 new public URLs (the chapter
+detail, the public session detail, the new dashboard pages,
+the new session-grant checkout page) keep the existing
+`/levels` and `/courses` hierarchy. n8n workflow filenames
+are unchanged; only the internal payload field names change
+(`enrollment_id` → `session_grant_id`, `module_id` → `session_id`,
+`module_booking_id` → `session_booking_id`). `sessions.price_cents`
+is NULLABLE — no placeholder prices; the Stripe Checkout
+route returns a structured 422 `session_price_missing` when
+the price has not been imported (Sprint 5). `pnpm type-check`
+and `pnpm lint` clean. Tests: **82/82** passing across 16 test
+files (16 new in Sprint 3.5). `pnpm build` succeeded with 67
+static pages and the 8 new routes. **Awaiting explicit approval
+before Sprint 3.6 (admin dashboard / Excel import).**
 The booking flow is now wired end-to-end: a student enrolls
 in a course (one Stripe payment covers all modules), then
 books each module session through the Calendly inline embed;
@@ -57,7 +79,7 @@ before Phase 4 (admin dashboard).**
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C done | 2026-07-10 |
+| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 done | 2026-07-14 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ✅ Shipped in Sprint C | 2026-07-10 |
 | 4 | Admin dashboard | ⏳ | — |
 | 5 | Resources, notifications, polish | ⏳ | — |
@@ -906,4 +928,21 @@ highest-impact items:
 
 ## Last updated
 
-**2026-07-09** by the Sprint B2 close-out.
+**2026-07-14** by Sprint 3.5 (Curriculum Architecture Restructure) close-out.
+
+> **Sprint 3.5 — Curriculum Architecture Restructure is complete.**
+> The unit of payment is now the **session**, not the course. 8
+> new forward-only migrations ship the v2 hierarchy
+> (`Program → Grade → Course → Chapter → Session`); the v1
+> module-based model is preserved as 410-stamped back-compat
+> endpoints (one-sprint window). 6 new public URLs preserve
+> the existing `/levels` and `/courses` SEO. n8n workflow
+> filenames are unchanged; only the internal payload field
+> names change. `sessions.price_cents` is NULLABLE — no
+> placeholder prices; Sprint 5 (Excel import) is the source
+> of truth. All four quality gates are green (`type-check`,
+> `lint`, `test` = 82/82 pass, `build` = 67 static pages).
+> See `docs/review/PHASE2_SPRINT_3_5_SUMMARY.md` for the
+> full close-out (14 required outputs). **Sprint 3.6
+> (admin dashboard / Excel import) is gated on explicit user
+> approval.**

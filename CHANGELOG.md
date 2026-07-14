@@ -4,6 +4,94 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-phase2-sprint-3.5] — 2026-07-14
+
+### Added — Curriculum Architecture Restructure (Sprint 3.5)
+
+The platform's curriculum is now modelled as
+`Program → (Optional Grade) → Course → Chapter → Session`. A
+student purchases and attends **sessions**, not courses.
+
+#### Database (S35-SQL)
+- `supabase/migrations/20260714000000_programs_grades.sql` — 5 programs (High School, Prep School, BTS ABM, BTS Optics, BTS BioALC) + 2 grades (Grade 11, Grade 12) attached to `high_school`.
+- `supabase/migrations/20260714000001_chapters_sessions.sql` — `courses` gains `program_id` / `grade_id` FKs; new `chapters` and `sessions` tables; `sessions.price_cents` is **NULLABLE** (no placeholder prices per user instruction; Sprint 5 Excel import is the source of truth).
+- `supabase/migrations/20260714000002_session_grants.sql` — the new unit of payment; reuses `enrollment_status` enum (Q6 answer); partial unique index prevents duplicate active grants.
+- `supabase/migrations/20260714000003_session_bookings_meeting_links_payments.sql` — `session_bookings` (replaces `module_bookings`); `meeting_links.session_booking_id`; `payments.session_grant_id`.
+- `supabase/migrations/20260714000004_backfill_curriculum_hierarchy.sql` — additive backfill of v1 demo data into v2 hierarchy.
+- `supabase/migrations/20260714000005_drop_module_progress_module_unlock.sql` — drops `module_progress` + `fn_module_unlock_check`; adds `fn_session_grants_completion`.
+- `supabase/migrations/20260714000006_seed_demo_chapters_sessions.sql` — expands the 3 demo courses to 3 chapters × 3 sessions.
+- `supabase/migrations/20260714000007_rls_policies_curriculum_v2.sql` — 10 new RLS policies for the v2 tables.
+- `supabase/tests/rls_smoke_assertions_v2.sql` — 10 new policy blocks (programs/grades/chapters/sessions select, session_grants + session_bookings isolation, no_direct_write, payments + meeting_links isolation, admin visibility). Total RLS coverage: 23 policy blocks.
+
+#### Services (S35-SERVICES)
+- `apps/web/services/curriculum/programs.ts` (NEW) — `getPublishedPrograms`, `getProgramBySlug`, `getProgramWithGrades`, `getGradeBySlug`.
+- `apps/web/services/curriculum/courses.ts` (NEW) — `getCourseWithChapters`, `getCoursesByProgram`, `getCourseById`.
+- `apps/web/services/curriculum/chapters.ts` (NEW) — `getChapterWithSessions`.
+- `apps/web/services/curriculum/sessions.ts` (NEW) — `getSession`, `getSessionWithChapter`, `getPublishedSessionsByCourse`.
+- `apps/web/services/curriculum/session-grants.ts` (NEW) — `getStudentSessionGrants`, `getSessionGrant`, `createPendingSessionGrant`, `markSessionGrantPaid`.
+- `apps/web/services/curriculum/session-bookings.ts` (NEW) — `getStudentSessionBookings`, `getSessionBooking`, `getSessionBookingWithDetails`, `createSessionBooking`, `cancelSessionBooking`.
+
+#### API (S35-API)
+- `POST /api/session-grants` (NEW) — body `{ session_id }`; returns 201 `{ session_grant_id, checkout_url }`; 422 `session_price_missing` when `sessions.price_cents IS NULL`; 409 `session_grant_exists`; 503 `checkout_unavailable`.
+- `GET /api/session-grants/[id]/stripe-session` (NEW) — resume support.
+- `POST /api/session-bookings` (NEW) — body `{ session_grant_id, scheduled_start, scheduled_end, calendly_invitee_uri? }`.
+- `POST /api/session-bookings/[id]/cancel` (NEW).
+- `POST /api/session-grants/[id]/refund` (NEW) — admin-only.
+- `POST /api/sessions` (NEW) — admin-only (Sprint 5 Excel import).
+- `POST /api/enrollments` (410 Gone).
+- `POST /api/enrollments/[id]/modules` (410 Gone).
+- `POST /api/module-bookings` (410 Gone).
+- `POST /api/module-bookings/[id]/cancel` (410 Gone).
+
+#### UI (S35-UI)
+- `/[locale]/courses/[slug]/page.tsx` (MODIFIED) — renders chapters + sessions accordion below the course detail.
+- `/[locale]/courses/[slug]/chapters/[chapterSlug]/page.tsx` (NEW) — chapter detail with "Buy this session" link per session.
+- `/[locale]/sessions/[id]/page.tsx` (NEW) — public session detail with `BuySessionButton`.
+- `/[locale]/levels/[levelSlug]/page.tsx` (MODIFIED) — reads from `programs` + `grades`.
+- `/[locale]/levels/[levelSlug]/grades/[gradeSlug]/page.tsx` (NEW) — courses in a grade (high_school only today).
+- `/[locale]/dashboard/programs/page.tsx` (NEW) — "My programs" = programs the student has any active grant in.
+- `/[locale]/dashboard/sessions/page.tsx` (NEW) — all bookings + grants.
+- `/[locale]/dashboard/sessions/[id]/page.tsx` (NEW) — session detail with Zoom join link.
+- `/[locale]/dashboard/bookings/page.tsx` (MODIFIED) — reads from `session_bookings`.
+- `/[locale]/checkout/session-grant/[id]/page.tsx` (NEW) — server page that calls n8n and redirects to Stripe.
+- `/[locale]/dashboard/layout.tsx` + `components/dashboard/{sidebar,top-nav}.tsx` (MODIFIED) — add Programs and Sessions entries.
+- `components/marketing/buy-session-button.tsx`, `chapter-list.tsx`, `program-card.tsx`, `session-card.tsx` (4 NEW) — presentational + the client-side Buy button.
+- `components/dashboard/session-grant-card.tsx`, `session-booking-card.tsx` (2 NEW) — used on the new dashboard pages.
+- `components/checkout/session-grant-checkout-card.tsx` (NEW) — mirrors `enrollment-checkout-card.tsx`.
+- `loading.tsx` cleanup (re-applies the Sprint 1 hydration fix): `app/[locale]/loading.tsx` and `app/loading.tsx` are deleted; `app/[locale]/(marketing)/loading.tsx` is the only one.
+
+#### Integration (S35-INTEG)
+- `POST /api/webhooks/stripe/route.ts` (MODIFIED) — `checkout.session.completed` reads `session_grant_id` first (v2), falls back to `enrollment_id` (v1 back-compat) and `booking_id` (legacy); the `module_progress` upsert block is removed.
+- `POST /api/webhooks/n8n/route.ts` (MODIFIED) — new handlers for `session_grant_checkout_created`, `session_grant_refund_succeeded`, `session_booking_confirmed`, `session_booking_cancelled`. `meeting_created` and `reminder_sent` now prefer `session_booking_id`.
+- `POST /api/enrollments/[id]/refund/route.ts` (MODIFIED) — reads `session_grant_id` (new) or `enrollment_id` (v1 back-compat).
+- n8n workflow renames (filenames unchanged per user-approved adjustment #2; only internal payload field names change):
+  - `enrollment_id` → `session_grant_id`
+  - `module_id` → `session_id`
+  - `module_booking_id` → `session_booking_id`
+  - 7 files affected: `enrollment-created.json`, `module-booking-to-zoom.json`, `module-completed.json`, `module-cancellation.json`, `module-reminder-scheduler.json`, `module-reschedule.json`, `tutor-notification.json`.
+- `n8n/docs/WORKFLOWS.md` (MODIFIED) — header disclaimer updated; new "Sprint 3.5 change" block documents the field-rename table and reuses `enrollment_status` for `session_grants.status`.
+
+#### i18n + tests + RLS (S35-I18N)
+- `apps/web/messages/{en,fr}.json` (MODIFIED) — 4 additive namespaces: `Sessions.*`, `Chapters.*`, `Dashboard.programs.*`, `Dashboard.sessions.*`. One key rename: `Checkout.cancel.browseCourses` → `browseMore`.
+- `apps/web/tests/unit/session-grants-route.test.ts` (NEW, 7 tests).
+- `apps/web/tests/unit/session-bookings-route.test.ts` (NEW, 6 tests).
+- `apps/web/tests/unit/chapter-session-listing.test.ts` (NEW, 3 tests).
+- `supabase/tests/rls_smoke_assertions_v2.sql` (NEW, 10 policy blocks).
+
+### Removed
+- `apps/web/services/bookings/module-unlock.ts` — the unlock rule is dropped in `20260714000005`.
+- `apps/web/tests/unit/module-unlock.test.ts` — covered the deleted service.
+- `apps/web/app/[locale]/loading.tsx` and `apps/web/app/loading.tsx` — moved into the `(marketing)` route group.
+- The v1 `module_bookings` view from `…0003…` is preserved for one sprint, dropped in the follow-up cleanup migration.
+
+### Quality gates
+- `pnpm type-check` → exit 0.
+- `pnpm lint` → exit 0 (1 pre-existing `console.log` warning in `lib/utils/logger.ts`, by design).
+- `pnpm test` → **82/82 passing** across 16 test files (16 new in Sprint 3.5).
+- `pnpm build` → exit 0, **67 static pages** generated, 8 new routes compiled.
+- `scripts/rls-smoke.sh` → not run in this environment (requires live Supabase project; user to run on staging).
+- `tests/integration/auth-smoke.ts` → not run in this environment (requires live Supabase env).
+
 ## [1.5.0-phase2-sprint-c] — 2026-07-10
 
 ### Added — Phase 3 end-to-end booking (Sprint C)
