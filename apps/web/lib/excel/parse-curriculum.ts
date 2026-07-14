@@ -162,7 +162,7 @@ export async function parseCurriculum(
   //    (today; the parser does not assume 5). A row is a
   //    program if col 2 has a non-empty string and col 1
   //    is empty.
-  let programOrder = 0;
+  let _programOrder = 0;
   summarySheet.eachRow((row, rowNumber) => {
     if (rowNumber < 5) return;                       // skip header rows
     const col2 = cellString(row.getCell(2));
@@ -180,7 +180,7 @@ export async function parseCurriculum(
       return;
     }
     programs.push(program);
-    programOrder += 1;
+    _programOrder += 1;
   });
 
   // 3. For each program, find its program sheet by name

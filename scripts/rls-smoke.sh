@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # =====================================================================
-# rls-smoke.sh — run the Sprint B2 RLS smoke test against a
-# Supabase Postgres database.
+# rls-smoke.sh — run the RLS smoke tests against a Supabase
+# Postgres database. Sprint 3.6 now runs both the v1 suite
+# (13 policy blocks, Sprint B2) and the v2 suite (10 policy
+# blocks, Sprint 3.5) for a total of 23 policy blocks.
 #
 # Usage:
 #   scripts/rls-smoke.sh <environment>
@@ -36,6 +38,7 @@ run_sql() {
 
 run_sql supabase/tests/rls_smoke_setup.sql
 run_sql supabase/tests/rls_smoke_assertions.sql
+run_sql supabase/tests/rls_smoke_assertions_v2.sql
 run_sql supabase/tests/rls_smoke_teardown.sql
 
 echo
