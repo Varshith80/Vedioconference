@@ -1,0 +1,38 @@
+-- =====================================================================
+-- Migration: 20260714000006_seed_demo_chapters_sessions.sql
+-- Sprint:     3.5 — Curriculum Architecture Restructure
+--
+-- Description
+-- -----------
+-- Marker migration. The actual demo data backfill (3 demo
+-- courses × 3 modules → 3 demo courses × 3 chapters × 3
+-- sessions) was performed by
+-- 20260714000004_backfill_curriculum_hierarchy.sql with a 1:1
+-- split (one v1 module → one new chapter + one new session).
+--
+-- Why a 1:1 split and not N sessions per chapter
+-- -----------------------------------------------
+-- The user-approved Q1 answer is "1 Chapter = N Sessions (full
+-- split)". The Excel files contain N sessions per chapter. But
+-- the v1 demo data (3 modules per course, no exercises) does
+-- not have the per-chapter N structure to expand into — the
+-- backfill is a bridge from the v1 schema to the new schema.
+-- The real N-sessions-per-chapter data lands in Sprint 5 with
+-- the Excel import, which uses POST /api/sessions to bulk-
+-- insert.
+--
+-- What this migration does
+-- ------------------------
+-- Nothing. It exists so the migration sequence
+-- (20260714000000..0007) reads naturally — a reader of the
+-- migration list can see "ah, the demo seed is here" without
+-- having to chase the backfill into `…0004…`. The migration is
+-- a no-op marker.
+--
+-- Idempotency
+-- -----------
+-- N/A — this migration contains no DDL or DML.
+-- =====================================================================
+
+-- No-op. The demo data is in 20260714000004.
+select 1 as marker;
