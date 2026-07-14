@@ -4,28 +4,30 @@ import { getTranslations } from 'next-intl/server';
 import { shell, jsxToPlainText, type RenderedEmail, type EmailLocale } from './_base';
 
 /**
- * `module-cancelled.tsx` — sent when a booking is cancelled by
- * the student or by the admin. Contains the cancellation reason.
+ * `session-cancelled.tsx` — sent when a session booking is
+ * cancelled by the student or by the admin. Contains the
+ * cancellation reason. Renamed from `module-cancelled.tsx`
+ * in Sprint 3.6 §6.1 to match the v2 hierarchy.
  */
-export interface ModuleCancelledProps {
+export interface SessionCancelledProps {
   studentName: string;
-  moduleTitle: string;
+  sessionTitle: string;
   courseTitle: string;
   cancelledReason: string;
   dashboardUrl: string;
 }
 
-export async function renderModuleCancelledEmail(
+export async function renderSessionCancelledEmail(
   locale: EmailLocale,
-  props: ModuleCancelledProps,
+  props: SessionCancelledProps,
 ): Promise<RenderedEmail> {
-  const t = await getTranslations({ locale, namespace: 'Emails.moduleCancelled' });
-  const subject = t('subject', { moduleTitle: props.moduleTitle });
+  const t = await getTranslations({ locale, namespace: 'Emails.sessionCancelled' });
+  const subject = t('subject', { sessionTitle: props.sessionTitle });
   const html = shell(
     <>
       <h1 style={{ margin: 0, marginBottom: 12, fontSize: 20, fontWeight: 600 }}>{t('title')}</h1>
       <p>{t('greeting', { name: props.studentName })}</p>
-      <p>{t('body', { moduleTitle: props.moduleTitle, courseTitle: props.courseTitle })}</p>
+      <p>{t('body', { sessionTitle: props.sessionTitle, courseTitle: props.courseTitle })}</p>
       <p style={{ margin: '16px 0', fontSize: 13, color: '#2B2E33' }}>
         <strong>{t('reasonLabel')}:</strong> {props.cancelledReason}
       </p>
@@ -52,7 +54,7 @@ export async function renderModuleCancelledEmail(
     <>
       {`${t('title')}\n\n`}
       {`${t('greeting', { name: props.studentName })}\n\n`}
-      {`${t('body', { moduleTitle: props.moduleTitle, courseTitle: props.courseTitle })}\n\n`}
+      {`${t('body', { sessionTitle: props.sessionTitle, courseTitle: props.courseTitle })}\n\n`}
       {`${t('reasonLabel')}: ${props.cancelledReason}\n\n`}
       {`${t('dashboardCta')}: ${props.dashboardUrl}\n`}
     </>,

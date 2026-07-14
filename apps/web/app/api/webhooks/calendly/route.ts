@@ -57,9 +57,11 @@ export async function POST(req: NextRequest) {
     if (insertError) throw insertError;
 
     // Sprint C: forward `invitee.created` to the n8n
-    // `module-booking-to-zoom` workflow. The workflow creates
-    // the Zoom meeting, persists the meeting_link row, and
-    // flips the module_booking status to `confirmed`.
+    // session-booking workflow (renamed from
+    // `module-booking-to-zoom` in Sprint 3.6 §6.4). The
+    // workflow creates the Zoom meeting, persists the
+    // meeting_link row, and flips the session_booking
+    // status to `confirmed`.
     if (body.event === 'invitee.created') {
       const env = serverEnv();
       const webhookUrl = env.N8N_ENROLLMENT_WEBHOOK_URL;

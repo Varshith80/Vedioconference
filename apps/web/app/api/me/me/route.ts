@@ -2,16 +2,20 @@ import { type NextRequest } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { jsonResponse, errorResponse } from '@/lib/utils/api';
 import { Unauthorized } from '@/lib/utils/errors';
-import { getStudentEnrollments } from '@/services/enrollments';
+import { getStudentSessionGrants } from '@/services/curriculum/session-grants';
 
-/**
- * GET /api/me/me — returns the current user profile + the
- * student's enrollments (with course + progress eagerly joined).
- *
- * Used by the checkout page and the dashboard's "my courses"
- * list. RLS scopes the reads — the user can only see their own
- * data.
- */
+// =====================================================================
+// GET /api/me/me — returns the current user profile + the
+// student's active session grants (the v2 unit of payment,
+// was the v1 "enrollments" surface pre-Sprint 3.5).
+//
+// The v1 shape `{ enrollments: [...] }` is replaced by
+// `{ sessionGrants: [...] }` in Sprint 3.6. There are no
+// external consumers in the live runtime (`/api/me/me` was
+// only called by the v1 dashboard; the migration is
+// covered by sprint 3.5 §15 and Sprint 3.6 §6).
+// =====================================================================
+
 export async function GET(_req: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -29,19 +33,19 @@ export async function GET(_req: NextRequest) {
         data: {
           user: { id: user.id, email: user.email ?? null },
           profile: null,
-          enrollments: [],
+          sessionGrants: [],
         },
       });
     }
     const profileRow = profile as unknown as { id: string; email: string; full_name: string | null; role: string; locale: string | null };
-    const enrollments = await getStudentEnrollments(user.id);
+    const sessionGrants = await getStudentSessionGrants(user.id);
 
     return jsonResponse({
       ok: true as const,
       data: {
         user: { id: user.id, email: user.email ?? null },
         profile: profileRow,
-        enrollments,
+        sessionGrants,
       },
     });
   } catch (e) {

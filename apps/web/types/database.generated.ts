@@ -29,22 +29,25 @@
  *     migration is one of: (a) re-run `pnpm db:types` and
  *     `git diff`, or (b) bump the version in the header.
  *
- * Sprint 3.5 changes from the Sprint B2 / Sprint C shape:
- *   - 6 new tables: `programs`, `grades`, `chapters`, `sessions`,
- *     `session_grants`, `session_bookings` (migrations 14
- *     §1-§3).
- *   - `module_progress` is DROPPED. The `ModuleProgressRow`
- *     interface is retained for backwards compatibility with the
- *     `@deprecated` JSDoc references but the table is gone.
- *   - `payments` gains nullable `session_grant_id`.
- *   - `meeting_links` gains nullable `session_booking_id`.
- *   - `courses` gains nullable `program_id`, `grade_id`. The
- *     existing `level_group`, `price_cents`, `is_subscription`
- *     columns are KEPT in the DB for backwards compatibility.
- *   - 1 new trigger function: `fn_session_grants_completion`
- *     (no-op in Sprint 3.5; extension point for Sprint 5+).
- *   - 0 new enums: `enrollment_status` is REUSED for
- *     `session_grants.status` (the user-approved Q6 answer).
+ * Sprint 3.6 changes from the Sprint 3.5 shape:
+ *   - 5 v1 tables DROPPED: `modules`, `enrollments`,
+ *     `module_progress`, `module_bookings`, `_bookings_legacy`
+ *     (migration `20260715000000_drop_v1_back_compat_tables.sql`).
+ *   - The v1 row interfaces (`ModuleRow`, `EnrollmentRow`,
+ *     `ModuleBookingRow`, `BookingsLegacyRow`,
+ *     `ModuleProgressRow`) are removed from this file.
+ *   - `payments` loses the v1 FK columns (`booking_id`,
+ *     `enrollment_id`, `module_booking_id`); only the v2
+ *     `session_grant_id` remains.
+ *   - `meeting_links` loses the v1 FK columns (`booking_id`,
+ *     `module_booking_id`); only the v2 `session_booking_id`
+ *     remains.
+ *   - `resource_grants` loses the v1 `enrollment_id` column;
+ *     only the v2 `session_grant_id` remains.
+ *   - 2 v1 functions removed: `fn_module_bookings_completion`,
+ *     `fn_enrollments_completion`. `fn_enrollments_refund` is
+ *     re-created as v2-only (session_grant cascade only).
+ *   - 0 new tables / 0 new enums.
  *
  * Conventions:
  *   - UUID columns → `string`.
@@ -63,24 +66,10 @@
  *     inferrer doesn't fall through to `SelectQueryError<…>`,
  *     which is `never`.
  *
- * Sprint B2 changes from the Phase 1 stand-in:
- *   - 5 new tables: `modules`, `enrollments`, `module_progress`,
- *     `module_bookings`, `_bookings_legacy` (renamed from
- *     `bookings`).
- *   - `payments` gains nullable `enrollment_id` and
- *     `module_booking_id`; `booking_id` is re-pointed at
- *     `_bookings_legacy`.
- *   - `meeting_links` gains nullable `module_booking_id`;
- *     `booking_id` is re-pointed at `_bookings_legacy`.
- *   - `resource_grants` swaps `booking_id` for `enrollment_id`.
- *   - 3 new enums: `enrollment_status`,
- *     `module_progress_status`; `booking_status` gains
- *     `'scheduled'`.
- *   - 2 new views (none; views stay empty).
- *   - 1 new function: `fn_module_bookings_completion`,
- *     `fn_enrollments_completion` (declared in Functions for
- *     completeness, even though they are not RPCs the app
- *     calls).
+ * Sprint 3.6 note: the Sprint B2 "5 new tables" section in the
+ * previous version of this file is gone with the v1 back-compat
+ * migration. The Sprint 3.5 §Sprint 3.6 changelog at the top
+ * of this file is the single source of truth for the table set.
  */
 export type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
 
@@ -227,51 +216,16 @@ export interface CourseTutorRow {
 }
 
 /**
- * `public._bookings_legacy` — DEPRECATED. The pre-Sprint-B2
- * `bookings` table, renamed for safety. RLS is off. New code
- * MUST NOT read this table. Will be dropped in a future
- * cleanup migration. (Migration 09 §0)
- *
- * The shape is preserved for diagnostic reads only.
- */
-export interface BookingsLegacyRow {
-  id: string;
-  student_id: string;
-  tutor_id: string;
-  course_id: string;
-  status: BookingStatus;
-  scheduled_start: string;
-  scheduled_end: string;
-  timezone: string;
-  calendly_event_uri: string | null;
-  calendly_invitee_uri: string | null;
-  stripe_session_id: string | null;
-  stripe_payment_intent_id: string | null;
-  amount_cents: number;
-  currency: string;
-  cancelled_at: string | null;
-  cancelled_reason: string | null;
-  rescheduled_from: string | null;
-  notes: string | null;
-  metadata: Json;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * `public.payments` — one row per payment attempt. Tied to a
- * session_grant (preferred — Sprint 3.5+), an enrollment
- * (pre-Sprint-3.5), a module_booking (legacy), or a
- * `_bookings_legacy` (the legacy table). Exactly one of the
- * four FKs is set in normal use. (Migration 04 + migration
- * 09 §6 + migration 14 §4)
+ * `public.payments` — one row per payment attempt. The unit of
+ * payment is the v2 `session_grant`; the `session_grant_id` FK
+ * is non-null in normal use. (Migration 04 + migration 14 §4.
+ * The v1 `enrollment_id` / `module_booking_id` / `booking_id`
+ * columns were dropped in Sprint 3.6 with the v1 back-compat
+ * migration `20260715000000_drop_v1_back_compat_tables.sql`.)
  */
 export interface PaymentRow {
   id: string;
-  enrollment_id: string | null;
-  module_booking_id: string | null;
   session_grant_id: string | null;
-  booking_id: string | null;
   provider: PaymentProvider;
   status: PaymentStatus;
   amount_cents: number;
@@ -289,15 +243,14 @@ export interface PaymentRow {
 
 /**
  * `public.meeting_links` — one Zoom meeting per confirmed
- * session_booking (preferred — Sprint 3.5+), per confirmed
- * module_booking (legacy), or per legacy booking.
- * (Migration 04 + migration 09 §7 + migration 14 §3)
+ * session_booking. The v1 `module_booking_id` and `booking_id`
+ * columns were dropped in Sprint 3.6 with the v1 back-compat
+ * migration `20260715000000_drop_v1_back_compat_tables.sql`.
+ * (Migration 04 + migration 14 §3)
  */
 export interface MeetingLinkRow {
   id: string;
-  module_booking_id: string | null;
   session_booking_id: string | null;
-  booking_id: string | null;
   provider: string;
   meeting_id: string;
   join_url: string;
@@ -330,13 +283,16 @@ export interface ResourceRow {
 }
 
 /**
- * `public.resource_grants` — per-enrollment access to a resource
- * (replaces the per-booking join). PK on (resource_id,
- * enrollment_id). (Migration 05 + migration 09 §8)
+ * `public.resource_grants` — per-session_grant access to a
+ * resource (replaces the pre-Sprint-3.6 per-enrollment join).
+ * PK on (resource_id, session_grant_id). (Migration 05 +
+ * migration `20260715000000_drop_v1_back_compat_tables.sql`
+ * which re-anchored the PK from `enrollment_id` to
+ * `session_grant_id`.)
  */
 export interface ResourceGrantRow {
   resource_id: string;
-  enrollment_id: string;
+  session_grant_id: string;
   granted_at: string;
 }
 
@@ -476,83 +432,8 @@ export interface InvoiceRow {
 }
 
 /**
- * `public.modules` — pre-created pedagogical atoms of a course.
- * Each has its own Calendly event type. (Migration 09 §2)
- */
-export interface ModuleRow {
-  id: string;
-  course_id: string;
-  position: number;
-  slug: string;
-  title: string;
-  description: string | null;
-  duration_min: number;
-  is_published: boolean;
-  is_preview: boolean;
-  calendly_event_uri: string | null;
-  metadata: Json;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * `public.enrollments` — paid access to a course. The unit of
- * payment. One row per (student, course) for the active
- * enrollment. (Migration 09 §3)
- */
-export interface EnrollmentRow {
-  id: string;
-  student_id: string;
-  course_id: string;
-  status: EnrollmentStatus;
-  stripe_session_id: string | null;
-  stripe_payment_intent_id: string | null;
-  amount_cents: number;
-  currency: string;
-  paid_at: string | null;
-  refunded_at: string | null;
-  refunded_amount_cents: number;
-  completed_at: string | null;
-  cancelled_at: string | null;
-  cancelled_reason: string | null;
-  metadata: Json;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * `public.module_bookings` — DEPRECATED (Sprint 3.5). One row
- * per live session under the v1 hierarchy. The table is
- * KEPT in the DB but no new rows are inserted. New code uses
- * `session_bookings` (the v2 hierarchy). (Migration 09 §5)
- *
- * The shape is preserved for diagnostic reads only.
- */
-export interface ModuleBookingRow {
-  id: string;
-  enrollment_id: string;
-  module_id: string;
-  tutor_id: string;
-  student_id: string;
-  status: BookingStatus;
-  scheduled_start: string;
-  scheduled_end: string;
-  timezone: string;
-  calendly_event_uri: string | null;
-  calendly_invitee_uri: string | null;
-  notes: string | null;
-  cancelled_at: string | null;
-  cancelled_reason: string | null;
-  rescheduled_from: string | null;
-  metadata: Json;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * `public.programs` — top of the curriculum hierarchy. The 5
- * known programs: High School, Prep School, BTS ABM, BTS
- * Optics, BTS BioALC. (Migration 14 §1)
+ * `public.programs` — top of the curriculum hierarchy.
+ * (Migration 14 §1)
  */
 export interface ProgramRow {
   id: string;
@@ -705,7 +586,6 @@ export type Database = {
       tutors: Table<TutorRow>;
       courses: Table<CourseRow>;
       course_tutors: Table<CourseTutorRow>;
-      _bookings_legacy: Table<BookingsLegacyRow>;
       payments: Table<PaymentRow>;
       meeting_links: Table<MeetingLinkRow>;
       resources: Table<ResourceRow>;
@@ -718,17 +598,12 @@ export type Database = {
       n8n_executions: Table<N8nExecutionRow>;
       n8n_dead_letters: Table<N8nDeadLetterRow>;
       invoices: Table<InvoiceRow>;
-      // Sprint 3.5 — the v1 hierarchy (modules, enrollments,
-      // module_progress, module_bookings) is KEPT in the DB for
-      // backwards compatibility but no new rows are inserted.
-      modules: Table<ModuleRow>;
-      enrollments: Table<EnrollmentRow>;
-      // `module_progress` is DROPPED in Sprint 3.5 (migration 14
-      // §5). The table is gone from the DB. The interface below
-      // is retained for diagnostic reads only and the `Database`
-      // envelope no longer references it.
-      module_bookings: Table<ModuleBookingRow>;
-      // Sprint 3.5 — the new hierarchy.
+      // Sprint 3.6 — the v1 hierarchy is DROPPED with migration
+      // `20260715000000_drop_v1_back_compat_tables.sql`. The
+      // `modules`, `enrollments`, `module_bookings`,
+      // `module_progress`, and `_bookings_legacy` tables are
+      // gone from the DB. The v2 hierarchy below is the only
+      // curriculum surface.
       programs: Table<ProgramRow>;
       grades: Table<GradeRow>;
       chapters: Table<ChapterRow>;
@@ -748,14 +623,16 @@ export type Database = {
       fn_block_role_self_escalation: FunctionDef<Record<string, never>, unknown>;
       fn_lock_tutor_profile_id: FunctionDef<Record<string, never>, unknown>;
       fn_block_late_cancel: FunctionDef<Record<string, never>, unknown>;
-      fn_module_bookings_completion: FunctionDef<Record<string, never>, unknown>;
-      fn_enrollments_completion: FunctionDef<Record<string, never>, unknown>;
-      // Sprint 3.5 — the new no-op completion hook for
+      // Sprint 3.5 — the no-op completion hook for
       // session_grants. Triggered on session_bookings updates;
       // the body is intentionally minimal in Sprint 3.5 and
       // can be extended in a later sprint without a schema
       // change.
       fn_session_grants_completion: FunctionDef<Record<string, never>, unknown>;
+      // Sprint 3.6 — the v2-only refund cascade function. Replaces
+      // the Sprint C `fn_enrollments_refund` (the v1 branch is
+      // dropped; the v2 session_grant branch is preserved).
+      fn_enrollments_refund: FunctionDef<Record<string, never>, unknown>;
     };
     Enums: {
       user_role: UserRole;
@@ -766,10 +643,8 @@ export type Database = {
       coupon_kind: CouponKind;
       invoice_status: InvoiceStatus;
       enrollment_status: EnrollmentStatus;
-      // Sprint 3.5 — `module_progress_status` is dropped (the
-      // `module_progress` table is gone). The `enrollment_status`
-      // enum is REUSED for `session_grants.status` — see
-      // migration 14 §2.
+      // Sprint 3.6 — `module_progress_status` is gone (the
+      // `module_progress` table is dropped).
     };
     CompositeTypes: Record<string, Record<string, never>>;
   };

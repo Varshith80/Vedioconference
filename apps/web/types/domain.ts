@@ -13,19 +13,25 @@
  *   4. Components consume only the domain types. They never
  *      import `Database` directly.
  *
-/**
- * Sprint 3.5 changes:
- *   - New v2 entities: `Program`, `Grade`, `Chapter`, `Session`,
- *     `SessionGrant`, `SessionBooking`.
- *   - The v1 `Module` / `Enrollment` / `ModuleProgress` /
- *     `ModuleBooking` types are KEPT and marked `@deprecated`.
- *     They are referenced by the 410-stamped v1 route handlers
- *     and the deprecated `services/{enrollments,module-bookings}.ts`
- *     files. They are removed in Sprint 3.6.
- *   - `Payment`, `MeetingLink`, `ResourceGrant` get the new
- *     nullable `session_grant_id` / `session_booking_id` columns.
+ * Sprint 3.6 changes:
+ *   - Sprint 3.5 added: `Program`, `Grade`, `Chapter`, `Session`,
+ *     `SessionGrant`, `SessionBooking` (and the four
+ *     `*WithDetails` convenience interfaces).
+ *   - Sprint 3.6 retires: the v1 `Module` / `Enrollment` /
+ *     `ModuleProgress` / `ModuleBooking` / `CourseWithModules` /
+ *     `ModuleBookingWithDetails` / `EnrollmentWithProgress`
+ *     aliases. The 410-stamped route handlers, the v1 services,
+ *     and the v1 dashboard `BookingCard` component are all
+ *     deleted in this sprint. The `module_bookings` SQL table
+ *     and the `_bookings_legacy` SQL table are also dropped
+ *     (`20260715000000_drop_v1_back_compat_tables.sql`).
+ *   - `Payment`, `MeetingLink`, `ResourceGrant` keep the new
+ *     nullable `session_grant_id` / `session_booking_id`
+ *     columns (the v1 `enrollment_id` / `module_booking_id`
+ *     columns are dropped with the v1 tables).
  *   - The `enrollment_status` enum is reused for
- *     `session_grants.status` (the user-approved Q6 answer).
+ *     `session_grants.status` (the user-approved Q6 answer from
+ *     Sprint 3.5).
  */
 import type { Database, Json } from './database.generated';
 
@@ -38,12 +44,6 @@ export type SubscriptionStatus = Database['public']['Enums']['subscription_statu
 export type CouponKind = Database['public']['Enums']['coupon_kind'];
 export type InvoiceStatus = Database['public']['Enums']['invoice_status'];
 export type EnrollmentStatus = Database['public']['Enums']['enrollment_status'];
-// Sprint 3.5: `module_progress_status` enum is dropped (the
-// `module_progress` table is gone). The string-literal type
-// is kept as a local type alias for the @deprecated
-// `ModuleProgress` interface's `status` field. It is not
-// exported.
-type ModuleProgressStatus = 'not_started' | 'in_progress' | 'completed';
 
 // -- Row types (derived from the typed Database) ---------------------------
 
@@ -53,32 +53,25 @@ export type Course = Database['public']['Tables']['courses']['Row'];
 export type CourseTutor = Database['public']['Tables']['course_tutors']['Row'];
 
 /**
- * DEPRECATED. The pre-Sprint-B2 `bookings` table, renamed to
- * `_bookings_legacy` in migration 09 §0. New code MUST NOT read
- * this table. Kept here only so legacy import sites type-check
- * until they are deleted in a later sprint.
- */
-export type LegacyBooking = Database['public']['Tables']['_bookings_legacy']['Row'];
-
-/**
- * `payments` — exactly one of `enrollment_id`, `module_booking_id`,
- * or `booking_id` (legacy) is set in normal use. The application
- * always writes `enrollment_id`.
+ * `payments` — one row per Stripe charge. The unit of payment
+ * is the v2 `session_grant` (the `session_grant_id` FK is
+ * non-null in normal use).
  */
 export type Payment = Database['public']['Tables']['payments']['Row'];
 
 /**
- * `meeting_links` — one Zoom meeting per `module_booking_id` (new
- * path) or per `booking_id` (legacy). The new code path only
- * writes `module_booking_id`.
+ * `meeting_links` — one Zoom meeting per `session_booking_id`.
+ * The v1 `booking_id` / `module_booking_id` columns were
+ * dropped with the v1 back-compat migration
+ * (`20260715000000_drop_v1_back_compat_tables.sql`).
  */
 export type MeetingLink = Database['public']['Tables']['meeting_links']['Row'];
 
 export type Resource = Database['public']['Tables']['resources']['Row'];
 
 /**
- * `resource_grants` — per-enrollment access to a resource.
- * (Replaces the pre-Sprint-B2 per-booking join.)
+ * `resource_grants` — per-session_grant access to a resource.
+ * Replaces the pre-Sprint-B2 per-booking join.
  */
 export type ResourceGrant = Database['public']['Tables']['resource_grants']['Row'];
 
@@ -91,93 +84,11 @@ export type N8nExecution = Database['public']['Tables']['n8n_executions']['Row']
 export type N8nDeadLetter = Database['public']['Tables']['n8n_dead_letters']['Row'];
 export type Invoice = Database['public']['Tables']['invoices']['Row'];
 
-// -- Sprint B2 new entities (DEPRECATED since Sprint 3.5) -------------------
-
-/**
- * @deprecated Since Sprint 3.5. The new hierarchy uses
- * `Chapter` and `Session`; the v1 `Module` is now an alias for
- * a `Chapter` (one v1 module = one v2 chapter + one v2 session,
- * 1:1 in the backfill; Sprint 5 splits chapters into N sessions).
- * New code MUST use `Chapter` and `Session`. The interface is
- * retained so the 410-stamped v1 route handlers still compile.
- * Will be removed in Sprint 3.6.
- */
-export type Module = Database['public']['Tables']['modules']['Row'];
-
-/**
- * @deprecated Since Sprint 3.5. The unit of payment is now
- * `SessionGrant`, not `Enrollment`. New code MUST use
- * `SessionGrant`. The interface is retained so the 410-stamped
- * v1 route handlers still compile. Will be removed in
- * Sprint 3.6.
- */
-export type Enrollment = Database['public']['Tables']['enrollments']['Row'];
-
-/**
- * @deprecated Since Sprint 3.5. The `module_progress` table is
- * dropped (migration 14 §5). The new equivalent is
- * `session_bookings.status = 'completed'`. The interface is
- * retained only for the JSDoc references. Will be removed in
- * Sprint 3.6.
- */
-export type ModuleProgress = {
-  id: string;
-  enrollment_id: string;
-  module_id: string;
-  status: ModuleProgressStatus;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * @deprecated Since Sprint 3.5. The unit of a Zoom meeting is
- * now `SessionBooking`, not `ModuleBooking`. New code MUST use
- * `SessionBooking`. The interface is retained so the 410-stamped
- * v1 route handlers still compile. Will be removed in
- * Sprint 3.6.
- */
-export type ModuleBooking = Database['public']['Tables']['module_bookings']['Row'];
-
 // -- Helpers ---------------------------------------------------------------
 
 /** Re-export Database for the rare caller that needs it. The
  *  cast at the service boundary is the only place it is used. */
 export type { Database, Json };
-
-// -- Convenience aliases for services and components ----------------------
-
-/**
- * @deprecated Since Sprint 3.5. Use `CourseWithChapters` instead.
- * The interface is retained so the deprecated
- * `services/courses.ts` (v1) and the `course-detail.tsx`
- * component still compile. Will be removed in Sprint 3.6.
- */
-export interface CourseWithModules extends Course {
-  modules: ReadonlyArray<Module>;
-}
-
-/**
- * @deprecated Since Sprint 3.5. Use `SessionBookingWithDetails`
- * instead. The interface is retained so the deprecated
- * `services/module-bookings.ts` (v1) still compiles. Will be
- * removed in Sprint 3.6.
- */
-export interface ModuleBookingWithDetails extends ModuleBooking {
-  module: Module;
-  meeting: MeetingLink | null;
-}
-
-/**
- * @deprecated Since Sprint 3.5. The `Enrollment` type is
- * deprecated; the v2 equivalent is `SessionGrantWithDetails`.
- * Will be removed in Sprint 3.6.
- */
-export interface EnrollmentWithProgress extends Enrollment {
-  course: Course;
-  progress: ReadonlyArray<ModuleProgress>;
-}
 
 // -- Sprint 3.5 new entities (v2 hierarchy) -------------------------------
 

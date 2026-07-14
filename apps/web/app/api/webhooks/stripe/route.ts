@@ -15,11 +15,14 @@ import { markSessionGrantPaid } from '@/services/curriculum/session-grants';
  * records the event in `webhook_events` for idempotency, and applies
  * the relevant state change.
  *
- * Sprint 3.5: the unit of payment is now `session_grant` (not
- * `enrollment`). The Stripe Checkout Session metadata key is
- * `session_grant_id`. For one sprint we still accept the v1
- * `enrollment_id` key for the legacy rows; the v1 path is
- * dropped in Sprint 3.6.
+ * Sprint 3.6: the v1 back-compat is REMOVED. The Stripe Checkout
+ * Session metadata key is now `session_grant_id` only. The v1
+ * `enrollments` and `_bookings_legacy` tables are dropped in
+ * `20260715000000_drop_v1_back_compat_tables.sql`. The v1
+ * `enrollment_id` / `booking_id` metadata keys are no longer
+ * accepted — the route returns 200 with a warning log if a
+ * payload arrives with only the v1 keys (the corresponding v1
+ * rows no longer exist).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -61,78 +64,50 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        // Sprint 3.5: prefer the new `session_grant_id` key. Fall
-        // back to the v1 `enrollment_id` for the legacy rows that
-        // are still in flight (this transition window ends in
-        // Sprint 3.6). The `client_reference_id` is the third
-        // fallback (older C-phase code paths).
+        // Sprint 3.6: the v2 `session_grant_id` key is the
+        // only accepted metadata key. The v1 `enrollment_id`
+        // and `booking_id` keys are no longer routed (the
+        // corresponding v1 tables are dropped in
+        // `20260715000000_drop_v1_back_compat_tables.sql`).
         const sessionGrantId = (session.metadata?.session_grant_id ??
           session.client_reference_id) as string | undefined;
-        const legacyEnrollmentId = session.metadata?.enrollment_id as
-          | string
-          | undefined;
-        const legacyBookingId = session.metadata?.booking_id as
-          | string
-          | undefined;
 
         const paymentIntentId =
           typeof session.payment_intent === 'string'
             ? session.payment_intent
             : session.payment_intent?.id ?? null;
 
-        if (sessionGrantId) {
-          // 1. Update the v2 `payments` row keyed by
-          //    `session_grant_id`.
-          await admin
-            .from('payments')
-            .update({
-              status: 'succeeded',
-              paid_at: new Date().toISOString(),
-              stripe_payment_intent_id: paymentIntentId,
-              amount_cents: session.amount_total ?? 0,
-            } as never)
-            .eq('session_grant_id', sessionGrantId);
-          // 2. Flip the session_grant to `active`. The
-          //    `markSessionGrantPaid` service does this and
-          //    also stamps `paid_at` and the Stripe ids.
-          await markSessionGrantPaid(
-            sessionGrantId,
-            session.id,
-            paymentIntentId ?? undefined,
-          );
-        } else if (legacyEnrollmentId) {
-          // 1. Update the v1 `payments` row keyed by
-          //    `enrollment_id`.
-          await admin
-            .from('payments')
-            .update({
-              status: 'succeeded',
-              paid_at: new Date().toISOString(),
-              stripe_payment_intent_id: paymentIntentId,
-              amount_cents: session.amount_total ?? 0,
-            } as never)
-            .eq('enrollment_id', legacyEnrollmentId);
-          // 2. Flip the v1 `enrollments` row to `active`.
-          await admin
-            .from('enrollments')
-            .update({
-              status: 'active',
-              paid_at: new Date().toISOString(),
-              stripe_session_id: session.id,
-              stripe_payment_intent_id: paymentIntentId,
-            } as never)
-            .eq('id', legacyEnrollmentId);
-        } else if (legacyBookingId) {
-          await admin
-            .from('payments')
-            .update({
-              status: 'succeeded',
-              paid_at: new Date().toISOString(),
-              stripe_payment_intent_id: paymentIntentId,
-              amount_cents: session.amount_total ?? 0,
-            } as never)
-            .eq('booking_id', legacyBookingId);
+        if (!sessionGrantId) {
+          // No v2 key — log a warning and 200 so Stripe does
+          // not retry indefinitely. The v1 path is gone; the
+          // payload is from a pre-Sprint-3.5 Stripe session
+          // whose target table no longer exists.
+          logger.warn('stripe.checkout.session.completed arrived without session_grant_id (v1 key?)', {
+            event_id: event.id,
+            has_enrollment_id: typeof session.metadata?.enrollment_id === 'string',
+            has_booking_id: typeof session.metadata?.booking_id === 'string',
+          });
+          break;
         }
+        // 1. Update the v2 `payments` row keyed by
+        //    `session_grant_id`.
+        await admin
+          .from('payments')
+          .update({
+            status: 'succeeded',
+            paid_at: new Date().toISOString(),
+            stripe_payment_intent_id: paymentIntentId,
+            amount_cents: session.amount_total ?? 0,
+          } as never)
+          .eq('session_grant_id', sessionGrantId);
+        // 2. Flip the session_grant to `active`. The
+        //    `markSessionGrantPaid` service does this and
+        //    also stamps `paid_at` and the Stripe ids.
+        await markSessionGrantPaid(
+          sessionGrantId,
+          session.id,
+          paymentIntentId ?? undefined,
+        );
         break;
       }
       case 'payment_intent.payment_failed': {

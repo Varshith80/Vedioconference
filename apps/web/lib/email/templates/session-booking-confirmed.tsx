@@ -4,13 +4,15 @@ import { getTranslations } from 'next-intl/server';
 import { shell, jsxToPlainText, type RenderedEmail, type EmailLocale } from './_base';
 
 /**
- * `module-booking-confirmed.tsx` — sent after the n8n
- * `module-booking-to-zoom` workflow has created the Zoom meeting
- * and persisted the meeting_link row. Contains the join URL.
+ * `session-booking-confirmed.tsx` — sent after the n8n
+ * `session-booking-to-zoom` workflow has created the Zoom
+ * meeting and persisted the meeting_link row. Contains the
+ * join URL. Renamed from `module-booking-confirmed.tsx` in
+ * Sprint 3.6 §6.1 to match the v2 hierarchy.
  */
-export interface ModuleBookingConfirmedProps {
+export interface SessionBookingConfirmedProps {
   studentName: string;
-  moduleTitle: string;
+  sessionTitle: string;
   courseTitle: string;
   scheduledStartIso: string;
   durationMin: number;
@@ -18,18 +20,18 @@ export interface ModuleBookingConfirmedProps {
   dashboardUrl: string;
 }
 
-export async function renderModuleBookingConfirmedEmail(
+export async function renderSessionBookingConfirmedEmail(
   locale: EmailLocale,
-  props: ModuleBookingConfirmedProps,
+  props: SessionBookingConfirmedProps,
 ): Promise<RenderedEmail> {
-  const t = await getTranslations({ locale, namespace: 'Emails.moduleBookingConfirmed' });
-  const subject = t('subject', { moduleTitle: props.moduleTitle });
+  const t = await getTranslations({ locale, namespace: 'Emails.sessionBookingConfirmed' });
+  const subject = t('subject', { sessionTitle: props.sessionTitle });
   const scheduledHuman = new Date(props.scheduledStartIso).toUTCString();
   const html = shell(
     <>
       <h1 style={{ margin: 0, marginBottom: 12, fontSize: 20, fontWeight: 600 }}>{t('title')}</h1>
       <p>{t('greeting', { name: props.studentName })}</p>
-      <p>{t('body', { moduleTitle: props.moduleTitle, courseTitle: props.courseTitle })}</p>
+      <p>{t('body', { sessionTitle: props.sessionTitle, courseTitle: props.courseTitle })}</p>
       <table role="presentation" cellPadding={0} cellSpacing={0} style={{ margin: '16px 0', width: '100%' }}>
         <tbody>
           <tr>
@@ -71,7 +73,7 @@ export async function renderModuleBookingConfirmedEmail(
     <>
       {`${t('title')}\n\n`}
       {`${t('greeting', { name: props.studentName })}\n\n`}
-      {`${t('body', { moduleTitle: props.moduleTitle, courseTitle: props.courseTitle })}\n\n`}
+      {`${t('body', { sessionTitle: props.sessionTitle, courseTitle: props.courseTitle })}\n\n`}
       {`${t('when')}: ${scheduledHuman}\n`}
       {`${t('duration', { minutes: props.durationMin })}\n\n`}
       {`${t('joinCta')}: ${props.joinUrl}\n\n`}

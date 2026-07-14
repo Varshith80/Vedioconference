@@ -10,28 +10,30 @@ import { serverEnv } from '@/lib/env';
  * Validates a shared secret, records the event in `webhook_events`
  * for idempotency, then updates the relevant Supabase row.
  *
- * Sprint B2 expected payloads (one endpoint, multiple `type`s):
- *   { type: "meeting_created",   module_booking_id, meeting_id, ... }
- *   { type: "meeting_created",   booking_id,        ... }   (legacy)
- *   { type: "payment_succeeded", payment_id,        ... }
- *   { type: "payment_failed",    payment_id,        ... }
- *   { type: "reminder_sent",     module_booking_id, channel, type }
- *   { type: "reminder_sent",     booking_id,        channel, type }   (legacy)
- *   { type: "workflow_failed",   workflow, error, original_event }
- *
- * Sprint 3.5 added payloads (v2 path; n8n workflow filenames
- * unchanged, only field names renamed — see `n8n/docs/WORKFLOWS.md`):
- *   { type: "meeting_created",          session_booking_id, meeting_id, ... }
- *   { type: "reminder_sent",            session_booking_id, channel, type }
- *   { type: "session_grant_checkout_created", session_grant_id, stripe_session_id }
- *   { type: "session_booking_confirmed",      session_booking_id }
- *   { type: "session_booking_cancelled",      session_booking_id }
- *   { type: "session_grant_refund_succeeded",  session_grant_id }
- *
- * The handler is forward-and-backward compatible: a v2 payload
- * with `session_booking_id` is preferred; a v1 payload with
- * `module_booking_id` continues to work for the deprecation
- * window (Sprint 3.6).
+ * Sprint 3.6 changes:
+ *   - The v1 back-compat for `module_booking_id` (v1
+ *     `module_bookings` table) and `booking_id` (legacy
+ *     `_bookings_legacy` table) is REMOVED. The v1 tables are
+ *     dropped in `20260715000000_drop_v1_back_compat_tables.sql`.
+ *     The v1 `enrollments` table is also gone. The v2
+ *     equivalents are: `session_booking_id` (for
+ *     `session_bookings`) and `session_grant_id` (for
+ *     `session_grants`).
+ *   - The `enrollment_checkout_created` and
+ *     `enrollment_refund_succeeded` cases are REMOVED (the
+ *     v1 `enrollments` table is gone). The v2 equivalents are
+ *     `session_grant_checkout_created` and
+ *     `session_grant_refund_succeeded`.
+ *   - Supported payloads (v2 only):
+ *       { type: "meeting_created",                  session_booking_id, meeting_id, ... }
+ *       { type: "payment_succeeded",                payment_id, ... }
+ *       { type: "payment_failed",                   payment_id }
+ *       { type: "reminder_sent",                    session_booking_id, channel, type }
+ *       { type: "session_grant_checkout_created",   session_grant_id, stripe_session_id }
+ *       { type: "session_booking_confirmed",        session_booking_id }
+ *       { type: "session_booking_cancelled",        session_booking_id }
+ *       { type: "session_grant_refund_succeeded",   session_grant_id }
+ *       { type: "workflow_failed",                  workflow, error, original_event }
  */
 export async function POST(req: NextRequest) {
   try {
@@ -61,8 +63,6 @@ export async function POST(req: NextRequest) {
     switch (body.type) {
       case 'meeting_created': {
         const {
-          module_booking_id,
-          booking_id,
           session_booking_id,
           meeting_id,
           join_url,
@@ -70,66 +70,24 @@ export async function POST(req: NextRequest) {
           host_url,
           start_url,
         } = body;
-        // Sprint 3.5: the v2 `session_booking_id` key is
-        // preferred. Fall back to the v1 `module_booking_id`,
-        // then the legacy `booking_id`.
-        const id = session_booking_id ?? module_booking_id ?? booking_id;
-        if (!id) {
-          throw BadRequest('meeting_created requires session_booking_id, module_booking_id or booking_id.');
+        if (!session_booking_id) {
+          throw BadRequest('meeting_created requires session_booking_id.');
         }
-        const onConflict = session_booking_id
-          ? 'session_booking_id'
-          : module_booking_id
-            ? 'module_booking_id'
-            : 'booking_id';
         const { error } = await admin.from('meeting_links').upsert({
-          ...(session_booking_id
-            ? { session_booking_id }
-            : module_booking_id
-              ? { module_booking_id }
-              : { booking_id }),
+          session_booking_id,
           provider: 'zoom',
           meeting_id,
           join_url,
           passcode,
           host_url,
           start_url,
-        } as never, { onConflict });
+        } as never, { onConflict: 'session_booking_id' });
         if (error) throw error;
 
-        if (session_booking_id) {
-          await admin
-            .from('session_bookings')
-            .update({ status: 'confirmed' } as never)
-            .eq('id', session_booking_id);
-        } else if (module_booking_id) {
-          await admin
-            .from('module_bookings')
-            .update({ status: 'confirmed' } as never)
-            .eq('id', module_booking_id);
-        } else {
-          // Legacy path: write to _bookings_legacy if a row
-          // still exists. Best-effort; missing row is OK.
-          await admin
-            .from('_bookings_legacy')
-            .update({ status: 'confirmed' } as never)
-            .eq('id', booking_id);
-        }
-        break;
-      }
-      case 'enrollment_checkout_created': {
-        // Sprint C: n8n created the Stripe Checkout Session.
-        // Persist the session id on the enrollment row so the
-        // `checkout.session.completed` webhook can resolve the
-        // enrollment back to the session.
-        const { enrollment_id, stripe_session_id } = body;
-        if (!enrollment_id || !stripe_session_id) {
-          throw BadRequest('enrollment_checkout_created requires enrollment_id and stripe_session_id.');
-        }
         await admin
-          .from('enrollments')
-          .update({ stripe_session_id } as never)
-          .eq('id', enrollment_id);
+          .from('session_bookings')
+          .update({ status: 'confirmed' } as never)
+          .eq('id', session_booking_id);
         break;
       }
       case 'session_grant_checkout_created': {
@@ -151,31 +109,6 @@ export async function POST(req: NextRequest) {
             updated_at: new Date().toISOString(),
           } as never)
           .eq('id', session_grant_id);
-        break;
-      }
-      case 'enrollment_refund_succeeded': {
-        // Sprint C: n8n performed the Stripe refund. The
-        // payments row + the linked enrollments row have been
-        // updated by the `charge.refunded` webhook + the
-        // `fn_enrollments_refund` trigger. This branch exists
-        // for observability (a `notifications` row) and is
-        // safe to receive out-of-order.
-        const { enrollment_id } = body;
-        if (!enrollment_id) break;
-        const { data: enrollment } = await admin
-          .from('enrollments')
-          .select('student_id')
-          .eq('id', enrollment_id)
-          .single();
-        const enrollmentRow = enrollment as unknown as { student_id: string } | null;
-        if (enrollmentRow) {
-          await admin.from('notifications').insert({
-            user_id: enrollmentRow.student_id,
-            type:    'enrollment_refund_succeeded',
-            channel: 'email',
-            payload: body,
-          } as never);
-        }
         break;
       }
       case 'session_grant_refund_succeeded': {
@@ -270,35 +203,19 @@ export async function POST(req: NextRequest) {
       }
       case 'reminder_sent': {
         const {
-          module_booking_id,
-          booking_id,
           session_booking_id,
           channel = 'email',
           type = 'reminder_24h',
         } = body;
-        let userId: string | null = null;
-        if (session_booking_id) {
-          const { data: sb } = await admin
-            .from('session_bookings')
-            .select('student_id')
-            .eq('id', session_booking_id)
-            .single();
-          userId = (sb as { student_id?: string } | null)?.student_id ?? null;
-        } else if (module_booking_id) {
-          const { data: mb } = await admin
-            .from('module_bookings')
-            .select('student_id')
-            .eq('id', module_booking_id)
-            .single();
-          userId = (mb as { student_id?: string } | null)?.student_id ?? null;
-        } else {
-          const { data: b } = await admin
-            .from('_bookings_legacy')
-            .select('student_id')
-            .eq('id', booking_id)
-            .single();
-          userId = (b as { student_id?: string } | null)?.student_id ?? null;
+        if (!session_booking_id) {
+          throw BadRequest('reminder_sent requires session_booking_id.');
         }
+        const { data: sb } = await admin
+          .from('session_bookings')
+          .select('student_id')
+          .eq('id', session_booking_id)
+          .single();
+        const userId = (sb as { student_id?: string } | null)?.student_id ?? null;
         if (userId) {
           await admin.from('notifications').insert({
             user_id: userId,

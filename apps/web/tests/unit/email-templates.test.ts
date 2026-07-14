@@ -7,11 +7,11 @@ vi.mock('next-intl/server', () => ({
   getTranslations: vi.fn(async ({ namespace }: { namespace: string }) => {
     const fixture: Record<string, string> = {
       'Emails.enrollmentConfirmed.subject':       'Welcome to {courseTitle}',
-      'Emails.moduleBookingConfirmed.subject':   'Session confirmed — {moduleTitle}',
-      'Emails.reminder24h.subject':              'Reminder — {moduleTitle} tomorrow',
-      'Emails.reminder1h.subject':               'Starting soon — {moduleTitle}',
-      'Emails.moduleCancelled.subject':          'Session cancelled — {moduleTitle}',
-      'Emails.adminDeadLetter.subject':          '[n8n] {workflow} failed',
+      'Emails.sessionBookingConfirmed.subject':   'Session confirmed — {sessionTitle}',
+      'Emails.reminder24h.subject':               'Reminder — {sessionTitle} tomorrow',
+      'Emails.reminder1h.subject':                'Starting soon — {sessionTitle}',
+      'Emails.sessionCancelled.subject':          'Session cancelled — {sessionTitle}',
+      'Emails.adminDeadLetter.subject':           '[n8n] {workflow} failed',
     };
     return (key: string, vars?: Record<string, unknown>) => {
       const full = `${namespace}.${key}`;
@@ -20,20 +20,20 @@ vi.mock('next-intl/server', () => ({
       // tests assert *structure* (e.g. "contains the join URL")
       // rather than a snapshot of the translation copy.
       const template = fixture[full] ?? full;
-      if (vars && 'courseTitle' in vars) return template.replace('{courseTitle}', String(vars.courseTitle));
-      if (vars && 'moduleTitle' in vars) return template.replace('{moduleTitle}', String(vars.moduleTitle));
-      if (vars && 'workflow'   in vars) return template.replace('{workflow}',   String(vars.workflow));
-      if (vars && 'name'       in vars) return template.replace('{name}',       String(vars.name));
+      if (vars && 'courseTitle'  in vars) return template.replace('{courseTitle}',  String(vars.courseTitle));
+      if (vars && 'sessionTitle' in vars) return template.replace('{sessionTitle}', String(vars.sessionTitle));
+      if (vars && 'workflow'     in vars) return template.replace('{workflow}',    String(vars.workflow));
+      if (vars && 'name'         in vars) return template.replace('{name}',        String(vars.name));
       return template;
     };
   }),
 }));
 
 import { renderEnrollmentConfirmedEmail } from '@/lib/email/templates/enrollment-confirmed';
-import { renderModuleBookingConfirmedEmail } from '@/lib/email/templates/module-booking-confirmed';
+import { renderSessionBookingConfirmedEmail } from '@/lib/email/templates/session-booking-confirmed';
 import { renderReminder24hEmail } from '@/lib/email/templates/reminder-24h';
 import { renderReminder1hEmail } from '@/lib/email/templates/reminder-1h';
-import { renderModuleCancelledEmail } from '@/lib/email/templates/module-cancelled';
+import { renderSessionCancelledEmail } from '@/lib/email/templates/session-cancelled';
 import { renderAdminDeadLetterEmail } from '@/lib/email/templates/admin-dead-letter';
 
 describe('email templates', () => {
@@ -44,9 +44,9 @@ describe('email templates', () => {
       courseSlug:   'mathematiques-terminale',
       dashboardUrl: 'https://example.com/en/dashboard',
     },
-    moduleBookingConfirmed: {
+    sessionBookingConfirmed: {
       studentName:      'Alice',
-      moduleTitle:      'Algèbre linéaire',
+      sessionTitle:     'Algèbre linéaire',
       courseTitle:      'Mathématiques — Terminale',
       scheduledStartIso: '2026-08-01T14:00:00.000Z',
       durationMin:      60,
@@ -55,25 +55,25 @@ describe('email templates', () => {
     },
     reminder24h: {
       studentName:      'Alice',
-      moduleTitle:      'Algèbre linéaire',
+      sessionTitle:     'Algèbre linéaire',
       scheduledStartIso: '2026-08-01T14:00:00.000Z',
       joinUrl:          'https://zoom.example/j/123',
     },
     reminder1h: {
       studentName:      'Alice',
-      moduleTitle:      'Algèbre linéaire',
+      sessionTitle:     'Algèbre linéaire',
       scheduledStartIso: '2026-08-01T14:00:00.000Z',
       joinUrl:          'https://zoom.example/j/123',
     },
-    moduleCancelled: {
+    sessionCancelled: {
       studentName:      'Alice',
-      moduleTitle:      'Algèbre linéaire',
+      sessionTitle:     'Algèbre linéaire',
       courseTitle:      'Mathématiques — Terminale',
       cancelledReason:  'Tutor unavailable',
       dashboardUrl:     'https://example.com/en/dashboard',
     },
     adminDeadLetter: {
-      workflow:      'module-booking-to-zoom',
+      workflow:      'session-booking-to-zoom',
       errorMessage:  'Zoom 500',
       originalEvent: { foo: 'bar' },
     },
@@ -87,8 +87,8 @@ describe('email templates', () => {
     expect(r.text.length).toBeGreaterThan(0);
   });
 
-  it('module_booking_confirmed renders the join URL', async () => {
-    const r = await renderModuleBookingConfirmedEmail('en', baseProps.moduleBookingConfirmed);
+  it('session_booking_confirmed renders the join URL', async () => {
+    const r = await renderSessionBookingConfirmedEmail('en', baseProps.sessionBookingConfirmed);
     expect(r.html).toContain('zoom.example/j/123');
     expect(r.html).toContain('example.com/en/dashboard');
     expect(r.text).toContain('zoom.example/j/123');
@@ -104,15 +104,15 @@ describe('email templates', () => {
     expect(r.html).toContain('zoom.example/j/123');
   });
 
-  it('module_cancelled renders the cancellation reason', async () => {
-    const r = await renderModuleCancelledEmail('fr', baseProps.moduleCancelled);
+  it('session_cancelled renders the cancellation reason', async () => {
+    const r = await renderSessionCancelledEmail('fr', baseProps.sessionCancelled);
     expect(r.html).toContain('Tutor unavailable');
     expect(r.text).toContain('Tutor unavailable');
   });
 
   it('admin_dead_letter renders the workflow name + the original event', async () => {
     const r = await renderAdminDeadLetterEmail('en', baseProps.adminDeadLetter);
-    expect(r.html).toContain('module-booking-to-zoom');
+    expect(r.html).toContain('session-booking-to-zoom');
     expect(r.html).toContain('Zoom 500');
     expect(r.html).toMatch(/foo/);
   });
@@ -120,10 +120,10 @@ describe('email templates', () => {
   it('every template produces a non-empty plain-text fallback', async () => {
     const results = await Promise.all([
       renderEnrollmentConfirmedEmail('en',    baseProps.enrollmentConfirmed),
-      renderModuleBookingConfirmedEmail('en', baseProps.moduleBookingConfirmed),
+      renderSessionBookingConfirmedEmail('en', baseProps.sessionBookingConfirmed),
       renderReminder24hEmail('en',            baseProps.reminder24h),
       renderReminder1hEmail('en',             baseProps.reminder1h),
-      renderModuleCancelledEmail('en',        baseProps.moduleCancelled),
+      renderSessionCancelledEmail('en',       baseProps.sessionCancelled),
       renderAdminDeadLetterEmail('en',        baseProps.adminDeadLetter),
     ]);
     for (const r of results) {

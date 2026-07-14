@@ -25,9 +25,10 @@ import { logger } from '@/lib/utils/logger';
  *
  * n8n remains the only system that creates Zoom meetings
  * (CLAUDE.md §2.3). This route is read/write against the
- * `session_bookings` table; the `module-booking-to-zoom`
- * workflow (filename unchanged, internal field names
- * renamed per §6.4) fires on the new `session_booking_id`.
+ * `session_bookings` table; the n8n workflow
+ * (Sprint 3.6 §6.4 renamed the workflow field from
+ * `module_booking_id` to `session_booking_id`) fires on
+ * the new id.
  */
 const bodySchema = z.object({
   session_id: z.string().uuid(),

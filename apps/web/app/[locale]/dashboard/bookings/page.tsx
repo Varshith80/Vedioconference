@@ -6,11 +6,20 @@ import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { EmptyState } from '@/components/shared/empty-state';
-import { BookingCard } from '@/components/dashboard/booking-card';
+import { SessionBookingCard } from '@/components/dashboard/session-booking-card';
 import { BRAND } from '@/lib/constants/brand';
 import { getCurrentUser } from '@/services/auth';
-import { getStudentModuleBookings } from '@/services/module-bookings';
-import type { Locale } from '@/i18n';
+import { getStudentSessionBookings } from '@/services/curriculum/session-bookings';
+
+// =====================================================================
+// /dashboard/bookings — Sprint 3.6 §6.1 migration. The v1 page
+// called getStudentModuleBookings() and rendered <BookingCard/>
+// (a v1 module-based card). The page now uses the v2
+// session-grant/session-booking model. The URL is preserved
+// (the sidebar links to /dashboard/bookings) so this is a
+// pure read-side migration; the v1 service and the v1 card
+// are deleted in the same Sprint 3.6 commit.
+// =====================================================================
 
 export async function generateMetadata({
   params,
@@ -41,7 +50,7 @@ export default async function DashboardBookingsPage({
 
   const user = await getCurrentUser();
   const bookings = user
-    ? await getStudentModuleBookings(user.id)
+    ? await getStudentSessionBookings(user.id)
     : [];
 
   return (
@@ -77,10 +86,10 @@ export default async function DashboardBookingsPage({
             <ul role="list" className="space-y-4">
               {bookings.map((b) => (
                 <li key={b.id}>
-                  <BookingCard
+                  <SessionBookingCard
                     booking={b}
-                    locale={locale as Locale}
-                    courseId={b.module.course_id}
+                    viewHref={`/${locale}/dashboard/sessions/${b.id}`}
+                    joinHref={b.meeting?.join_url ?? undefined}
                   />
                 </li>
               ))}

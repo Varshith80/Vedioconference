@@ -11,12 +11,13 @@ import { zoomFetch } from '@/lib/zoom/client';
  * `lib/zoom/client.ts` is the raw token + fetch helper. This
  * module is the *typed* surface: every method takes a strongly-
  * shaped input and returns a strongly-shaped output. The
- * `n8n/workflows/module-booking-to-zoom.json` workflow calls
+ * `n8n/workflows/session-booking-to-zoom.json` workflow calls
  * these via an n8n HTTP node when the Sprint C path needs to
  * create / delete / update a meeting. The Next.js app does NOT
  * call Zoom directly on the booking path — n8n does — but
  * having a typed service in `services/zoom/` keeps the API
- * shape documented and unit-testable.
+ * shape documented and unit-testable. (Renamed from
+ * `module-booking-to-zoom` in Sprint 3.6 §6.4.)
  */
 
 export interface CreateMeetingInput {

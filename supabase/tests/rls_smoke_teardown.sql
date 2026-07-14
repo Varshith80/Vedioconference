@@ -1,74 +1,38 @@
 -- =====================================================================
--- RLS smoke-test teardown — Sprint B2
+-- RLS smoke-test teardown — Sprint 3.6
 -- =====================================================================
 --
--- Reverses the fixture created by `rls_smoke_setup.sql`. Safe to
--- run against a clean database (the deletes are no-ops when the
--- rows don't exist).
+-- Sprint 3.6 status: NO-OP MARKER
+-- -------------------------------
+-- The Sprint B2 RLS smoke teardown DELETEs rows from the v1
+-- tables (`module_bookings`, `module_progress`, `enrollments`,
+-- `modules`, plus the v1 FK columns on `payments` and
+-- `meeting_links`, and the v1 PK on `resource_grants`). The
+-- v1 hierarchy is dropped in
+-- `20260715000000_drop_v1_back_compat_tables.sql`. The
+-- teardown deletes would now fail at execution time — the
+-- v1 tables no longer exist.
 --
--- This is the ONLY place that deletes RLS-smoke rows. The setup
--- script is idempotent and additive.
+-- The single source of truth for the post-Sprint-3.6 RLS
+-- regression is `rls_smoke_assertions_v2.sql`. The v2 suite
+-- rolls its own test data back inside a single transaction
+-- (`begin … rollback`), so it does not need a separate
+-- teardown script. The Sprint 3.6 commit keeps this file in
+-- place so the `scripts/rls-smoke.sh` runner continues to
+-- invoke it (one line in the runner); the runner is otherwise
+-- unchanged. When the v1 RLS suite is needed again (Sprint
+-- 5+), the teardown can be rewritten against the v2 fixtures
+-- in `rls_smoke_assertions_v2.sql`.
+--
+-- Why the file is empty rather than deleted
+-- -----------------------------------------
+-- Deleting the file would require editing `scripts/rls-smoke.sh`
+-- to remove the run_sql line, and would invalidate the git
+-- history that explains the v1 → v2 transition. The empty
+-- marker is a one-line sentinel that any future reader can
+-- grep for.
 -- =====================================================================
 
-begin;
-
--- 1. Drop the schema holding our impersonation helpers.
-drop schema if exists rls_smoke cascade;
-
--- 2. Delete fixture rows in FK-respecting order.
-delete from public.resource_grants
-    where resource_id = 'a1a1a1a1-0000-0000-0000-000000000060';
-
-delete from public.resources
-    where id = 'a1a1a1a1-0000-0000-0000-000000000060';
-
-delete from public.meeting_links
-    where id = 'a1a1a1a1-0000-0000-0000-000000000050';
-
-delete from public.payments
-    where id = 'a1a1a1a1-0000-0000-0000-000000000040';
-
-delete from public.module_bookings
-    where id = 'a1a1a1a1-0000-0000-0000-000000000030';
-
-delete from public.module_progress
-    where enrollment_id in (
-        'a1a1a1a1-0000-0000-0000-000000000020',
-        'a1a1a1a1-0000-0000-0000-000000000021'
-    );
-
-delete from public.enrollments
-    where id in (
-        'a1a1a1a1-0000-0000-0000-000000000020',
-        'a1a1a1a1-0000-0000-0000-000000000021'
-    );
-
-delete from public.course_tutors
-    where course_id = 'a1a1a1a1-0000-0000-0000-000000000010';
-
-delete from public.modules
-    where course_id = 'a1a1a1a1-0000-0000-0000-000000000010';
-
-delete from public.courses
-    where id = 'a1a1a1a1-0000-0000-0000-000000000010';
-
-delete from public.tutors
-    where id = 'a1a1a1a1-0000-0000-0000-0000000000aa';
-
-delete from public.profiles
-    where id in (
-        'a1a1a1a1-0000-0000-0000-000000000001',
-        'a1a1a1a1-0000-0000-0000-000000000002',
-        'a1a1a1a1-0000-0000-0000-000000000003',
-        'a1a1a1a1-0000-0000-0000-000000000004'
-    );
-
-delete from auth.users
-    where id in (
-        'a1a1a1a1-0000-0000-0000-000000000001',
-        'a1a1a1a1-0000-0000-0000-000000000002',
-        'a1a1a1a1-0000-0000-0000-000000000003',
-        'a1a1a1a1-0000-0000-0000-000000000004'
-    );
-
-commit;
+-- No-op. The v1 hierarchy is gone; the v2 suite is
+-- self-contained and rolls back inside its own transaction.
+select 1 as rls_smoke_v1_teardown_noop_marker;
