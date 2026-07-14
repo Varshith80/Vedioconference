@@ -2,7 +2,8 @@ import { type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { jsonResponse, errorResponse } from '@/lib/utils/api';
-import { ApiError, BadRequest, NotFound, Unauthorized } from '@/lib/utils/errors';
+import { ApiError, BadRequest, NotFound } from '@/lib/utils/errors';
+import { requireAdminRoute } from '@/lib/auth/require-admin-route';
 import { logger } from '@/lib/utils/logger';
 import { serverEnv } from '@/lib/env';
 
@@ -32,28 +33,10 @@ export async function POST(
 ) {
   try {
     const { id: sessionGrantId } = await params;
+    // requireAdminRoute() is the shared admin guard (Sprint 3.6
+    // §4.1). It throws Unauthorized()/Forbidden() for failures.
+    const { user } = await requireAdminRoute();
     const supabase = createSupabaseAdminClient();
-
-    // Auth: must be signed in (admin). The DB policy `is_admin()`
-    // is the authoritative gate; this route uses the service-role
-    // client to bypass RLS for the update, so we ALSO check the
-    // caller's role here.
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      throw Unauthorized('You must be signed in to refund a session grant.');
-    }
-    const { data: callerProfile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    const callerRole = (callerProfile as unknown as { role: string } | null)?.role;
-    if (callerRole !== 'admin' && callerRole !== 'super_admin') {
-      throw new ApiError(403, 'forbidden', 'Only admins can refund a session grant.');
-    }
 
     const raw = await req.json().catch(() => ({}));
     const parsed = bodySchema.safeParse(raw ?? {});

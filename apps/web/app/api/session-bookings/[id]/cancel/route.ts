@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
 import { jsonResponse, errorResponse } from '@/lib/utils/api';
 import { ApiError, BadRequest, Unauthorized, NotFound } from '@/lib/utils/errors';
+import { requireAdminRoute } from '@/lib/auth/require-admin-route';
 import { cancelSessionBooking } from '@/services/curriculum/session-bookings';
 
 /**
@@ -59,9 +60,9 @@ export async function POST(
     };
 
     // Ownership: student, tutor (via tutors.profile_id), or
-    // admin. For Sprint 3.5 we trust RLS for the admin
-    // branch (the `session_bookings_student_update_cancel`
-    // policy) and add an explicit tutor check here.
+    // admin (via the shared requireAdminRoute() helper). For
+    // Sprint 3.5 we trust RLS for the admin branch (the
+    // `session_bookings_student_update_cancel` policy).
     let authorized = bRow.student_id === user.id;
     if (!authorized) {
       const { data: tutor } = await supabase
@@ -73,10 +74,15 @@ export async function POST(
       authorized = tRow?.profile_id === user.id;
     }
     if (!authorized) {
-      // Admin check (uses the is_admin() helper; this is the
-      // only path that bypasses the student/tutor ownership).
-      const { data: isAdmin } = await supabase.rpc('is_admin');
-      if (isAdmin === true) authorized = true;
+      // Admin check: the shared requireAdminRoute() throws
+      // Forbidden() for non-admins. We catch that and treat
+      // it as "not authorized" so the unified 403 below fires.
+      try {
+        await requireAdminRoute();
+        authorized = true;
+      } catch {
+        authorized = false;
+      }
     }
     if (!authorized) {
       throw new ApiError(403, 'forbidden', 'You do not have permission to cancel this booking.');

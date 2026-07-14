@@ -1,8 +1,8 @@
 import { type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
 import { jsonResponse, errorResponse } from '@/lib/utils/api';
-import { ApiError, BadRequest, Unauthorized, NotFound } from '@/lib/utils/errors';
+import { ApiError, BadRequest, NotFound } from '@/lib/utils/errors';
+import { requireAdminRoute } from '@/lib/auth/require-admin-route';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -35,18 +35,10 @@ const bodySchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClientUntyped();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw Unauthorized('You must be signed in to create a session.');
-
-    // Admin-only. The `is_admin()` helper lives in the DB and
-    // is exposed via RPC.
-    const { data: isAdmin } = await supabase.rpc('is_admin');
-    if (isAdmin !== true) {
-      throw new ApiError(403, 'forbidden', 'Only admins can create sessions.');
-    }
+    // Admin-only (Sprint 3.6 §4.1). requireAdminRoute() is the
+    // shared admin guard; it throws Unauthorized()/Forbidden()
+    // for failures.
+    const { supabase } = await requireAdminRoute();
 
     const raw = await req.json().catch(() => null);
     const parsed = bodySchema.safeParse(raw);
