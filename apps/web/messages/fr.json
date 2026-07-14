@@ -909,6 +909,97 @@
         "revenueCents": "Revenus (centimes)",
         "refundsCents": "Remboursements (centimes)"
       }
+    },
+    "programs": {
+      "title": "Programmes",
+      "subline": "Regroupements de cursus de premier niveau. Un programme peut contenir des niveaux, des cours, ou les deux.",
+      "empty": "Aucun programme pour le moment.",
+      "columns": {
+        "title": "Titre",
+        "slug": "Slug",
+        "published": "Publié",
+        "sortOrder": "Tri",
+        "createdAt": "Créé le"
+      }
+    },
+    "grades": {
+      "title": "Niveaux",
+      "subline": "Niveaux (ex. Seconde, Première) rattachés à un programme.",
+      "empty": "Aucun niveau pour le moment.",
+      "columns": {
+        "title": "Titre",
+        "slug": "Slug",
+        "program": "Programme",
+        "sortOrder": "Tri"
+      }
+    },
+    "courses": {
+      "title": "Cours",
+      "subline": "Tous les cours, publiés ou brouillons.",
+      "empty": "Aucun cours pour le moment.",
+      "columns": {
+        "title": "Titre",
+        "slug": "Slug",
+        "program": "Programme",
+        "grade": "Niveau",
+        "published": "Publié"
+      }
+    },
+    "chapters": {
+      "title": "Chapitres",
+      "subline": "Chapitres dans un cours, ordonnés par sort_order.",
+      "empty": "Aucun chapitre pour le moment.",
+      "columns": {
+        "title": "Titre",
+        "slug": "Slug",
+        "course": "Cours",
+        "sortOrder": "Tri",
+        "published": "Publié"
+      }
+    },
+    "sessions": {
+      "title": "Séances",
+      "subline": "Unités atomiques de paiement et de réservation. Un chapitre → plusieurs séances.",
+      "empty": "Aucune séance pour le moment.",
+      "columns": {
+        "title": "Titre",
+        "slug": "Slug",
+        "chapter": "Chapitre",
+        "position": "Pos.",
+        "duration": "Durée",
+        "price": "Prix",
+        "published": "Pub.",
+        "preview": "Aperçu"
+      },
+      "priceTbd": "Prix à définir"
+    },
+    "payments": {
+      "title": "Paiements",
+      "subline": "Grand livre de chaque paiement Stripe lié à un grant de séance.",
+      "empty": "Aucun paiement pour le moment.",
+      "columns": {
+        "amount": "Montant",
+        "currency": "Dev.",
+        "status": "Statut",
+        "grant": "Grant",
+        "createdAt": "Créé le"
+      }
+    },
+    "students": {
+      "title": "Étudiants",
+      "subline": "Tous les comptes étudiants.",
+      "empty": "Aucun étudiant pour le moment.",
+      "columns": {
+        "name": "Nom",
+        "email": "E-mail",
+        "created": "Créé le",
+        "lastLogin": "Dernière connexion"
+      }
+    },
+    "common": {
+      "yes": "Oui",
+      "no": "Non",
+      "na": "—"
     }
   },
   "SiteHeader": {

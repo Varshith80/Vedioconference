@@ -909,6 +909,97 @@
         "revenueCents": "Revenue (cents)",
         "refundsCents": "Refunds (cents)"
       }
+    },
+    "programs": {
+      "title": "Programs",
+      "subline": "Top-level curriculum groupings. A program may contain grades, courses, or both.",
+      "empty": "No programs yet.",
+      "columns": {
+        "title": "Title",
+        "slug": "Slug",
+        "published": "Published",
+        "sortOrder": "Sort",
+        "createdAt": "Created"
+      }
+    },
+    "grades": {
+      "title": "Grades",
+      "subline": "Grade levels (e.g. Grade 11, Grade 12) that scope a program.",
+      "empty": "No grades yet.",
+      "columns": {
+        "title": "Title",
+        "slug": "Slug",
+        "program": "Program",
+        "sortOrder": "Sort"
+      }
+    },
+    "courses": {
+      "title": "Courses",
+      "subline": "All courses, published or draft.",
+      "empty": "No courses yet.",
+      "columns": {
+        "title": "Title",
+        "slug": "Slug",
+        "program": "Program",
+        "grade": "Grade",
+        "published": "Published"
+      }
+    },
+    "chapters": {
+      "title": "Chapters",
+      "subline": "Chapters inside a course, ordered by sort_order.",
+      "empty": "No chapters yet.",
+      "columns": {
+        "title": "Title",
+        "slug": "Slug",
+        "course": "Course",
+        "sortOrder": "Sort",
+        "published": "Published"
+      }
+    },
+    "sessions": {
+      "title": "Sessions",
+      "subline": "Atomic units of payment and booking. One chapter → many sessions.",
+      "empty": "No sessions yet.",
+      "columns": {
+        "title": "Title",
+        "slug": "Slug",
+        "chapter": "Chapter",
+        "position": "Pos.",
+        "duration": "Duration",
+        "price": "Price",
+        "published": "Pub.",
+        "preview": "Preview"
+      },
+      "priceTbd": "Price TBD"
+    },
+    "payments": {
+      "title": "Payments",
+      "subline": "Ledger of every Stripe charge linked to a session grant.",
+      "empty": "No payments yet.",
+      "columns": {
+        "amount": "Amount",
+        "currency": "Cur.",
+        "status": "Status",
+        "grant": "Grant",
+        "createdAt": "Created"
+      }
+    },
+    "students": {
+      "title": "Students",
+      "subline": "Everyone with a student account.",
+      "empty": "No students yet.",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "created": "Created",
+        "lastLogin": "Last login"
+      }
+    },
+    "common": {
+      "yes": "Yes",
+      "no": "No",
+      "na": "—"
     }
   },
   "SiteHeader": {
