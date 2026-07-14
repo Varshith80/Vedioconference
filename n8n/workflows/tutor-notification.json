@@ -53,7 +53,7 @@
             {"name": "to", "value": "={{ $json.body.tutor_email }}"},
             {"name": "subject", "value": "={{ $json.body.subject }}"},
             {"name": "body", "value": "={{ $json.body.body }}"},
-            {"name": "module_booking_id", "value": "={{ $json.body.module_booking_id }}"}
+            {"name": "session_booking_id", "value": "={{ $json.body.module_booking_id }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}

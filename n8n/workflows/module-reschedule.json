@@ -75,8 +75,8 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",             "value": "module_rescheduled"},
-            {"name": "module_booking_id","value": "={{ $json.body.module_booking_id }}"},
+            {"name": "type",               "value": "module_rescheduled"},
+            {"name": "session_booking_id", "value": "={{ $json.body.module_booking_id }}"},
             {"name": "new_start_time",   "value": "={{ $json.body.new_start_time }}"},
             {"name": "new_duration_min", "value": "={{ $json.body.new_duration_min }}"}
           ]

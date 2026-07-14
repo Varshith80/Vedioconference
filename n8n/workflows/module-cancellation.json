@@ -83,8 +83,8 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",             "value": "module_cancelled"},
-            {"name": "module_booking_id","value": "={{ $json.body.module_booking_id }}"},
+            {"name": "type",              "value": "module_cancelled"},
+            {"name": "session_booking_id","value": "={{ $json.body.module_booking_id }}"},
             {"name": "cancelled_reason", "value": "={{ $json.body.cancelled_reason }}"},
             {"name": "cancelled_by",     "value": "={{ $json.body.cancelled_by }}"},
             {"name": "refund_stripe",    "value": "={{ $json.body.refund_stripe ?? false }}"}

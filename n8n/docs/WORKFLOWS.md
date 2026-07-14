@@ -1,11 +1,15 @@
 # n8n Workflow Plan
 
-> ⚠️ **Phase 1 + Sprint B2 deliverable** — these workflows are
-> **designed and documented but NOT yet implemented**. The
-> Phase 1 inventory has been **replaced by the Sprint B2
-> module-based inventory** below. Implementation begins in
-> Phase 3 once the Supabase schema is fully live and the
-> Stripe / Calendly / Zoom credentials are provisioned.
+> ⚠️ **Phase 1 + Sprint B2 + Sprint 3.5 deliverable** —
+> these workflows are **designed and documented but NOT yet
+> fully implemented**. The Phase 1 inventory has been
+> **replaced by the Sprint B2 module-based inventory**
+> below, which has itself been **extended in Sprint 3.5**
+> to use the v2 session-based hierarchy (per the
+> user-approved Sprint 3.5 plan, with field renames only
+> — no filename changes). Implementation begins in Phase 3
+> once the Supabase schema is fully live and the Stripe /
+> Calendly / Zoom credentials are provisioned.
 
 This document describes every workflow that lives in n8n. n8n
 is the **automation layer** that wires together the third-party
@@ -20,6 +24,26 @@ resulting state back to Supabase.
 > via `module-booking-to-zoom`). The course is `completed` only
 > when every one of its modules is `completed` (via
 > `module-completed`).
+>
+> **Sprint 3.5 change.** The booking workflow is now
+> **session-based**. The unit of payment is the **session**
+> (one Stripe charge per session per student, via the same
+> `enrollment-created` workflow — *filename unchanged*). The
+> unit of a live class is the **session booking** (one Zoom
+> meeting per session booking, via the same
+> `module-booking-to-zoom` workflow — *filename unchanged*).
+> Only the **internal payload field names** were renamed:
+>
+> | Old field name | New field name |
+> |----------------|----------------|
+> | `enrollment_id` | `session_grant_id` |
+> | `module_id` | `session_id` |
+> | `module_booking_id` | `session_booking_id` |
+>
+> The `enrollment_status` Postgres enum is reused for
+> `session_grants.status` (the user-approved Q6 answer).
+> The next sections of this document reflect both the v1
+> (B2/C) and v2 (3.5) field names.
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌────────────┐

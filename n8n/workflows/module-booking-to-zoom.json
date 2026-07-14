@@ -112,8 +112,8 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",            "value": "meeting_created"},
-            {"name": "module_booking_id","value": "={{ $json.module_booking_id }}"},
+            {"name": "type",               "value": "meeting_created"},
+            {"name": "session_booking_id", "value": "={{ $json.module_booking_id }}"},
             {"name": "zoom_meeting_id", "value": "={{ $node['Create Zoom meeting'].json.id }}"},
             {"name": "join_url",        "value": "={{ $node['Create Zoom meeting'].json.join_url }}"},
             {"name": "start_url",       "value": "={{ $node['Create Zoom meeting'].json.start_url }}"},

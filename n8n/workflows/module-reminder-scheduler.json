@@ -49,8 +49,8 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type", "value": "schedule_reminder"},
-            {"name": "module_booking_id", "value": "={{ $json.body.module_booking_id }}"},
+            {"name": "type",               "value": "schedule_reminder"},
+            {"name": "session_booking_id", "value": "={{ $json.body.module_booking_id }}"},
             {"name": "scheduled_start",   "value": "={{ $json.body.scheduled_start }}"},
             {"name": "to",                "value": "={{ $json.body.to }}"},
             {"name": "locale",            "value": "={{ $json.body.locale }}"},

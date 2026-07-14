@@ -67,10 +67,10 @@ export async function POST(
 
     const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
-      .select('id, status, payment_id, amount_cents, currency, stripe_payment_intent_id')
+      .select('id, status, amount_cents, currency, stripe_payment_intent_id')
       .eq('id', enrollmentId)
       .single();
-    const enrollmentRow = enrollment as unknown as { id: string; status: string; payment_id: string | null; amount_cents: number; currency: string; stripe_payment_intent_id: string | null } | null;
+    const enrollmentRow = enrollment as unknown as { id: string; status: string; amount_cents: number; currency: string; stripe_payment_intent_id: string | null } | null;
     if (enrollmentError || !enrollmentRow) {
       throw NotFound('Enrollment not found.');
     }

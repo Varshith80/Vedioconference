@@ -49,11 +49,11 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",            "value": "module_completed"},
-            {"name": "module_booking_id","value": "={{ $json.body.module_booking_id }}"},
-            {"name": "module_id",       "value": "={{ $json.body.module_id }}"},
-            {"name": "enrollment_id",   "value": "={{ $json.body.enrollment_id }}"},
-            {"name": "completed_at",    "value": "={{ $json.body.completed_at }}"}
+            {"name": "type",               "value": "module_completed"},
+            {"name": "session_booking_id", "value": "={{ $json.body.module_booking_id }}"},
+            {"name": "session_id",         "value": "={{ $json.body.module_id }}"},
+            {"name": "session_grant_id",   "value": "={{ $json.body.enrollment_id }}"},
+            {"name": "completed_at",       "value": "={{ $json.body.completed_at }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
@@ -77,8 +77,8 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type", "value": "evaluate_completion"},
-            {"name": "enrollment_id", "value": "={{ $json.body.enrollment_id }}"}
+            {"name": "type",             "value": "evaluate_completion"},
+            {"name": "session_grant_id", "value": "={{ $json.body.enrollment_id }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}

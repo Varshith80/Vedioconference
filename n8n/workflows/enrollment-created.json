@@ -93,7 +93,7 @@
         "bodyParameters": {
           "parameters": [
             {"name": "type",               "value": "enrollment_checkout_created"},
-            {"name": "enrollment_id",      "value": "={{ $json.body.enrollment_id }}"},
+            {"name": "session_grant_id",   "value": "={{ $json.body.enrollment_id }}"},
             {"name": "stripe_session_id",  "value": "={{ $node['Create Stripe Checkout Session'].json.id }}"},
             {"name": "checkout_url",       "value": "={{ $node['Create Stripe Checkout Session'].json.url }}"},
             {"name": "amount_cents",       "value": "={{ $node['Create Stripe Checkout Session'].json.amount_total }}"},

@@ -6,6 +6,7 @@ import { errorResponse } from '@/lib/utils/api';
 import { Unauthorized } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
 import { serverEnv } from '@/lib/env';
+import { markSessionGrantPaid } from '@/services/curriculum/session-grants';
 
 /**
  * Stripe inbound webhook.
@@ -13,6 +14,12 @@ import { serverEnv } from '@/lib/env';
  * Verifies the `stripe-signature` header against the webhook secret,
  * records the event in `webhook_events` for idempotency, and applies
  * the relevant state change.
+ *
+ * Sprint 3.5: the unit of payment is now `session_grant` (not
+ * `enrollment`). The Stripe Checkout Session metadata key is
+ * `session_grant_id`. For one sprint we still accept the v1
+ * `enrollment_id` key for the legacy rows; the v1 path is
+ * dropped in Sprint 3.6.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -54,77 +61,74 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        // Sprint C: the unit of payment is the *enrollment*
-        // (`enrollment_id`), not the legacy `booking_id`. The
-        // metadata key is now `enrollment_id`; we still accept
-        // `booking_id` from older n8n workflows as a transitional
-        // safety net.
-        const enrollmentId = (session.metadata?.enrollment_id ??
+        // Sprint 3.5: prefer the new `session_grant_id` key. Fall
+        // back to the v1 `enrollment_id` for the legacy rows that
+        // are still in flight (this transition window ends in
+        // Sprint 3.6). The `client_reference_id` is the third
+        // fallback (older C-phase code paths).
+        const sessionGrantId = (session.metadata?.session_grant_id ??
           session.client_reference_id) as string | undefined;
-        const legacyBookingId = session.metadata?.booking_id as string | undefined;
-        if (enrollmentId) {
-          // 1. Update the payments row keyed by enrollment_id.
-          await admin.from('payments')
+        const legacyEnrollmentId = session.metadata?.enrollment_id as
+          | string
+          | undefined;
+        const legacyBookingId = session.metadata?.booking_id as
+          | string
+          | undefined;
+
+        const paymentIntentId =
+          typeof session.payment_intent === 'string'
+            ? session.payment_intent
+            : session.payment_intent?.id ?? null;
+
+        if (sessionGrantId) {
+          // 1. Update the v2 `payments` row keyed by
+          //    `session_grant_id`.
+          await admin
+            .from('payments')
             .update({
               status: 'succeeded',
               paid_at: new Date().toISOString(),
-              stripe_payment_intent_id: typeof session.payment_intent === 'string'
-                ? session.payment_intent
-                : session.payment_intent?.id ?? null,
+              stripe_payment_intent_id: paymentIntentId,
               amount_cents: session.amount_total ?? 0,
             } as never)
-            .eq('enrollment_id', enrollmentId);
-          // 2. Sprint C: flip the enrollment to `active`. The
-          //    B2 handler only updated `payments`; the
-          //    enrollment row was left `pending_payment`
-          //    forever.
-          await admin.from('enrollments')
+            .eq('session_grant_id', sessionGrantId);
+          // 2. Flip the session_grant to `active`. The
+          //    `markSessionGrantPaid` service does this and
+          //    also stamps `paid_at` and the Stripe ids.
+          await markSessionGrantPaid(
+            sessionGrantId,
+            session.id,
+            paymentIntentId ?? undefined,
+          );
+        } else if (legacyEnrollmentId) {
+          // 1. Update the v1 `payments` row keyed by
+          //    `enrollment_id`.
+          await admin
+            .from('payments')
+            .update({
+              status: 'succeeded',
+              paid_at: new Date().toISOString(),
+              stripe_payment_intent_id: paymentIntentId,
+              amount_cents: session.amount_total ?? 0,
+            } as never)
+            .eq('enrollment_id', legacyEnrollmentId);
+          // 2. Flip the v1 `enrollments` row to `active`.
+          await admin
+            .from('enrollments')
             .update({
               status: 'active',
               paid_at: new Date().toISOString(),
               stripe_session_id: session.id,
-              stripe_payment_intent_id: typeof session.payment_intent === 'string'
-                ? session.payment_intent
-                : session.payment_intent?.id ?? null,
+              stripe_payment_intent_id: paymentIntentId,
             } as never)
-            .eq('id', enrollmentId);
-          // 3. Create one module_progress row per published
-          //    module in the course. Idempotent on
-          //    (enrollment_id, module_id).
-          const { data: enrollment } = await admin
-            .from('enrollments')
-            .select('course_id')
-            .eq('id', enrollmentId)
-            .single();
-          const enrollmentRow = enrollment as unknown as { course_id: string } | null;
-          if (enrollmentRow) {
-            const { data: modules } = await admin
-              .from('modules')
-              .select('id')
-              .eq('course_id', enrollmentRow.course_id)
-              .eq('is_published', true);
-            const moduleList = (modules ?? []) as unknown as Array<{ id: string }>;
-            for (const m of moduleList) {
-              await admin
-                .from('module_progress')
-                .upsert(
-                  {
-                    enrollment_id: enrollmentId,
-                    module_id:     m.id,
-                    status:        'not_started',
-                  } as never,
-                  { onConflict: 'enrollment_id,module_id' },
-                );
-            }
-          }
+            .eq('id', legacyEnrollmentId);
         } else if (legacyBookingId) {
-          await admin.from('payments')
+          await admin
+            .from('payments')
             .update({
               status: 'succeeded',
               paid_at: new Date().toISOString(),
-              stripe_payment_intent_id: typeof session.payment_intent === 'string'
-                ? session.payment_intent
-                : session.payment_intent?.id ?? null,
+              stripe_payment_intent_id: paymentIntentId,
               amount_cents: session.amount_total ?? 0,
             } as never)
             .eq('booking_id', legacyBookingId);
@@ -133,7 +137,8 @@ export async function POST(req: NextRequest) {
       }
       case 'payment_intent.payment_failed': {
         const pi = event.data.object as Stripe.PaymentIntent;
-        await admin.from('payments')
+        await admin
+          .from('payments')
           .update({ status: 'failed' } as never)
           .eq('stripe_payment_intent_id', pi.id);
         break;
@@ -142,10 +147,14 @@ export async function POST(req: NextRequest) {
         const charge = event.data.object as Stripe.Charge;
         if (charge.payment_intent) {
           // 1. Update the payments row. The DB trigger
-          //    `trg_enrollments_refund` (added in Sprint C
+          //    `fn_enrollments_refund` (added in Sprint C
           //    migration `20260710000000_…`) cascades the
-          //    flip to the linked enrollment.
-          await admin.from('payments')
+          //    flip to the linked enrollment. The same
+          //    trigger cascades to `session_grants` via the
+          //    `session_grant_id` FK (added in
+          //    `…0003_session_bookings_meeting_links_payments.sql`).
+          await admin
+            .from('payments')
             .update({
               status: 'refunded',
               refunded_at: new Date().toISOString(),
@@ -160,7 +169,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark the event as processed.
-    await admin.from('webhook_events')
+    await admin
+      .from('webhook_events')
       .update({ processed: true, processed_at: new Date().toISOString() } as never)
       .eq('provider', 'stripe')
       .eq('event_id', event.id);
