@@ -39,6 +39,22 @@
 --     * All `enrollments_*` policies
 --     * All `modules_*` policies
 --     * All `_bookings_legacy_*` policies (if any)
+--     * 4 v1 policies on `payments` and `meeting_links` that
+--       reference the v1 FK columns §5 is about to drop
+--       (see §3 below). The chain fails with SQLSTATE 2BP01
+--       on the `drop column` statements in §5 if these are
+--       not dropped first.
+--     * `resources_select_visible` (rebuilt in
+--       20260709000001_modules_enrollments.sql:504) reads
+--       `resource_grants.enrollment_id` transitively via a
+--       JOIN in its USING clause. PostgreSQL's 2BP01 check
+--       is schema-wide: a policy on a different table that
+--       references the column in a subquery blocks the drop
+--       even when the policy is not on the column's own
+--       table. The policy is dropped in §3 and recreated
+--       against the v2 path
+--       (session_grants + sessions + chapters) before §5
+--       drops `resource_grants.enrollment_id`.
 --
 --   Indexes:
 --     * All `idx_module_bookings_*`
@@ -71,10 +87,21 @@
 -- -----------
 -- Every DROP is guarded with `if exists` (or
 -- `drop policy if exists` for policies, `drop trigger if exists`
--- for triggers). Re-applying on a partially-applied database is
--- safe. The v2 RLS policies in `20260714000007_…` and the v2
--- RLS smoke suite in `rls_smoke_assertions_v2.sql` are
--- unaffected.
+-- for triggers), with one exception: the 3 `drop trigger … on
+-- public.module_progress` statements and the 2 `drop policy … on
+-- public.module_progress` statements are wrapped in a single
+-- `do $$ … if exists (select 1 from information_schema.tables
+-- where … table_name = 'module_progress') … end if; $$;` block.
+-- `drop … if exists` does not gate on the relation's existence;
+-- without the table-presence guard, those statements fail with
+-- SQLSTATE 42P01 on a clean replay (because
+-- `20260714000005_drop_module_progress_module_unlock.sql`
+-- dropped the table earlier in the chain). The guard makes the
+-- block a no-op when the table is gone, which is the state the
+-- chain produces on a clean database. Re-applying on a
+-- partially-applied database is safe. The v2 RLS policies in
+-- `20260714000007_…` and the v2 RLS smoke suite in
+-- `rls_smoke_assertions_v2.sql` are unaffected.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -83,9 +110,31 @@
 drop trigger if exists trg_module_bookings_updated_at on public.module_bookings;
 drop trigger if exists trg_module_bookings_completion on public.module_bookings;
 drop trigger if exists trg_module_bookings_audit      on public.module_bookings;
-drop trigger if exists trg_module_progress_updated_at on public.module_progress;
-drop trigger if exists trg_module_progress_audit      on public.module_progress;
-drop trigger if exists trg_enrollments_completion    on public.module_progress;
+
+-- The next 3 statements reference `public.module_progress`, which
+-- was already dropped by `20260714000005_drop_module_progress_module_unlock.sql`
+-- earlier in the chain. `drop trigger if exists` does not gate on
+-- the relation's existence, so unguarded calls fail with SQLSTATE
+-- 42P01 ("relation does not exist") on a clean replay. Guard the
+-- block on the table's presence; if the table is gone, the
+-- triggers cannot exist either and the drops are a no-op. This is
+-- the only divergence from the v1-retirement file as first written
+-- (see the migration's Idempotency header and the original line
+-- numbers preserved in git history).
+do $$
+begin
+    if exists (
+        select 1
+        from information_schema.tables
+        where table_schema = 'public'
+          and table_name   = 'module_progress'
+    ) then
+        drop trigger if exists trg_module_progress_updated_at on public.module_progress;
+        drop trigger if exists trg_module_progress_audit      on public.module_progress;
+        drop trigger if exists trg_enrollments_completion    on public.module_progress;
+    end if;
+end $$;
+
 drop trigger if exists trg_enrollments_refund        on public.payments;
 
 -- ---------------------------------------------------------------------
@@ -144,8 +193,25 @@ drop policy if exists module_bookings_admin_write             on public.module_b
 drop policy if exists enrollments_select_owner_tutor_admin    on public.enrollments;
 drop policy if exists enrollments_no_direct_write             on public.enrollments;
 drop policy if exists enrollments_admin_write                 on public.enrollments;
-drop policy if exists module_progress_select_owner_tutor_admin on public.module_progress;
-drop policy if exists module_progress_no_direct_write         on public.module_progress;
+
+-- The next 2 statements reference `public.module_progress` for
+-- the same reason as the trigger block above (see §1): the table
+-- was dropped by `20260714000005_…` earlier in the chain and
+-- `drop policy if exists` does not gate on relation existence.
+-- Same guard pattern.
+do $$
+begin
+    if exists (
+        select 1
+        from information_schema.tables
+        where table_schema = 'public'
+          and table_name   = 'module_progress'
+    ) then
+        drop policy if exists module_progress_select_owner_tutor_admin on public.module_progress;
+        drop policy if exists module_progress_no_direct_write         on public.module_progress;
+    end if;
+end $$;
+
 drop policy if exists modules_select_published_or_admin        on public.modules;
 drop policy if exists modules_admin_write                     on public.modules;
 
@@ -165,6 +231,57 @@ begin
         execute format('drop policy if exists %I on public._bookings_legacy', pol.policyname);
     end loop;
 end $$;
+
+-- Drop the v1 RLS policies on payments + meeting_links that
+-- depend on the v1 FK columns §5 is about to drop. Without
+-- these drops, the `alter table … drop column` statements in
+-- §5 fail with SQLSTATE 2BP01 ("cannot drop column … other
+-- objects depend on it") because the policies read those
+-- columns in their USING clause. Each drop is idempotent
+-- (`if exists` is per-policy).
+--
+-- 4 policies:
+--   * `payments_select_own_or_admin` (created in
+--     20260707000006_rls_policies.sql:120) reads
+--     `payments.booking_id`.
+--   * `payments_select_owner_or_admin` (created in
+--     20260709000001_modules_enrollments.sql:738) reads
+--     `payments.enrollment_id`. The Sprint 3.5 RLS block
+--     (20260714000007_…) re-creates only the v2 path
+--     (`payments_select_via_session_grant`) and does NOT
+--     re-drop this v1 policy, so it lingers after 3.5 and
+--     must be dropped here. Leaving it in place would also
+--     cause a runtime `column "enrollment_id" does not
+--     exist` error for any non-admin RLS SELECT on
+--     `public.payments` after §5 drops the column.
+--   * `meeting_links_select_own_or_admin` (created in
+--     20260707000006_rls_policies.sql:142) reads
+--     `meeting_links.booking_id`.
+--   * `meeting_links_select_via_module_booking` (created
+--     in 20260709000001_modules_enrollments.sql:751) reads
+--     `meeting_links.module_booking_id`. Sprint 3.5
+--     re-affirms the v2 path but does not re-drop the v1
+--     policy, so it lingers and must be dropped here for
+--     the same reason.
+drop policy if exists payments_select_own_or_admin            on public.payments;
+drop policy if exists payments_select_owner_or_admin          on public.payments;
+drop policy if exists meeting_links_select_own_or_admin       on public.meeting_links;
+drop policy if exists meeting_links_select_via_module_booking on public.meeting_links;
+
+-- `resources_select_visible` (rebuilt in
+-- 20260709000001_modules_enrollments.sql:504) reads
+-- `resource_grants.enrollment_id` transitively via a JOIN
+-- in its USING clause. PostgreSQL's 2BP01 check is
+-- schema-wide: a policy on a different table that
+-- references the column in a subquery blocks the drop
+-- even when the policy is not on the column's own table.
+-- Drop it here so §5 can drop `resource_grants.enrollment_id`
+-- without 2BP01. The policy is recreated in §5 (after the
+-- `session_grant_id` column is added and the PK is
+-- re-anchored, but before the v1 `enrollment_id` column is
+-- dropped) against the v2 path
+-- (session_grants + sessions + chapters).
+drop policy if exists resources_select_visible on public.resources;
 
 -- ---------------------------------------------------------------------
 -- 4. Drop the v1 indexes
@@ -268,6 +385,61 @@ create policy resource_grants_select_via_session_grant
             from public.session_grants sg
             where sg.id = resource_grants.session_grant_id
               and sg.student_id = auth.uid()
+        )
+    );
+
+-- (c.1) Recreate `resources_select_visible` against the v2 path.
+-- This policy was dropped in §3 above (so §5 could drop
+-- `resource_grants.enrollment_id` without 2BP01). It is
+-- recreated here, AFTER the `session_grant_id` column has
+-- been added and the PK has been re-anchored, but BEFORE the
+-- v1 `enrollment_id` column is dropped.
+--
+-- The v1/B2 rule (enrolled in course C → see course C's
+-- enrolled resources) translates to the v2 rule (purchased
+-- a session in course C → see course C's enrolled resources).
+-- The JOIN walks: resource_grants → session_grants →
+-- sessions.chapter_id → chapters.course_id → resources.course_id.
+--
+-- Read-visibility semantics preserved from the v1 rebuilt
+-- version (20260709000001_modules_enrollments.sql:504):
+--   * public resources stay visible to everyone
+--   * admins see everything
+--   * `enrolled` resources are visible to the student who
+--     holds a session_grant for at least one session in
+--     the resource's course
+--   * private resources are visible to the uploader
+--
+-- The application-level writer for `resource_grants` rows is
+-- out of scope for the v1 retirement (a separate follow-up
+-- against the booking/payment workflow: Stripe → n8n → Supabase).
+-- Today, no `resource_grants` writer is shipped in v2 (the v1
+-- step was an "optional, Phase 3+" item in
+-- n8n/docs/WORKFLOWS.md:119-120 and was never implemented).
+-- This policy is therefore functionally a no-op in production
+-- today; it is a forward-compatibility definition of the
+-- intended v2 access rule.
+create policy resources_select_visible
+    on public.resources for select
+    using (
+        visibility = 'public'
+        or public.is_admin()
+        or (
+            visibility = 'enrolled'
+            and exists (
+                select 1
+                from public.resource_grants rg
+                join public.session_grants sg on sg.id = rg.session_grant_id
+                join public.sessions s on s.id = sg.session_id
+                join public.chapters ch on ch.id = s.chapter_id
+                where rg.resource_id = resources.id
+                  and ch.course_id = resources.course_id
+                  and sg.student_id = auth.uid()
+            )
+        )
+        or (
+            visibility = 'private'
+            and uploaded_by = auth.uid()
         )
     );
 
