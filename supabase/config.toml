@@ -25,6 +25,19 @@ port          = 54322
 shadow_port   = 54320
 major_version = 15
 
+# Local seed file. The Supabase CLI v2.x looks for `supabase/seed.sql`
+# at the top of the `supabase/` directory by default. This project
+# keeps the seed in `supabase/seed/000_seed.sql` (alongside the
+# `consolidated_demo_seed.sql` for Sprint 3.5+) so the directory
+# structure is preserved. We point the CLI at the base seed here.
+# The `consolidated_demo_seed.sql` is NOT loaded by `supabase start`
+# by design; it is loaded by `supabase db reset` when the user
+# wants the post-Sprint-3.5 demo data. See scripts/db-push.sh for
+# the migration push path; the seed is dev / staging only and is
+# never applied to production.
+[db.seed]
+sql_paths = ["./seed/000_seed.sql"]
+
 [studio]
 enabled = true
 port    = 54323
