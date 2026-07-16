@@ -146,7 +146,7 @@ describe('parseCurriculum (synthetic workbook)', () => {
     expect(result.programs[0]!.sessionCount).toBe(2);
 
     expect(result.courses).toHaveLength(1);
-    expect(result.courses[0]!.slug).toBe('test-course');
+    expect(result.courses[0]!.slug).toBe('test-program--test-course');
     expect(result.courses[0]!.programSlug).toBe('test-program');
 
     expect(result.chapters).toHaveLength(1);
