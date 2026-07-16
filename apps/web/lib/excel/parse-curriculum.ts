@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { resolveColumn, type CanonicalField } from '@/lib/excel/column-aliases';
+import { resolveCanonicalProgramSlug } from '@/lib/excel/program-slug-alias';
 
 // Sprint 3.6 §5.0 — three design invariants:
 //   1. The parser is data-driven. No curriculum name is
@@ -111,16 +112,15 @@ export interface ParseError {
 // trims leading/trailing `-`. Used to derive the natural key for every
 // parsed row. The result is deterministic and side-effect-free.
 // ---------------------------------------------------------------------------
-export function slugify(input: string): string {
-  if (!input) return '';
-  return input
-    .normalize('NFD')                          // split "é" -> "e" + combining accent
-    .replace(/[̀-ͯ]/g, '')           // strip combining accents
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')               // any run of non-[a-z0-9] -> "-"
-    .replace(/^-+|-+$/g, '')                   // trim leading/trailing "-"
-    .slice(0, 120);                            // DB column max
-}
+// =====================================================================
+// `slugify` lives in its own module (lib/excel/slugify.ts) so the
+// importer-only alias module (program-slug-alias.ts) can depend
+// on it without creating a circular import. We re-export it
+// from this file so the existing public surface (tests, the
+// importer route, the admin form) is unchanged.
+// =====================================================================
+import { slugify } from './slugify';
+export { slugify };
 
 // ---------------------------------------------------------------------------
 // parseCurriculum: the public entry point. Reads the workbook, walks the
@@ -162,14 +162,44 @@ export async function parseCurriculum(
   //    (today; the parser does not assume 5). A row is a
   //    program if col 2 has a non-empty string and col 1
   //    is empty.
+  //
+  //    Some workbooks include PROSE rows below the program
+  //    list (e.g. a marketing blurb like "NB: this catalog
+  //    covers our full 2026 program …"). A prose row is
+  //    rejected here: it is a sentence, not a sheet name.
+  //    The 2 conditions below (long, contains a colon) are
+  //    the structural signals of a sentence; if neither
+  //    applies, the row is a real program title (program
+  //    titles in the reference workbooks are short, often
+  //    two-word labels, and contain no colon).
   let _programOrder = 0;
   summarySheet.eachRow((row, rowNumber) => {
     if (rowNumber < 5) return;                       // skip header rows
     const col2 = cellString(row.getCell(2));
     const col3 = cellString(row.getCell(3));
     if (!col2) return;                                // empty row — skip
+    // Prose-row filter: reject anything that looks like a
+    // sentence. The structural signals are: long (> 40
+    // chars) or contains a colon. A real program title is
+    // short and contains no colon. (Internal whitespace is
+    // NOT a signal — short two-word program titles with a
+    // single space are perfectly valid labels.)
+    const looksLikeProse = col2.length > 40 || col2.includes(':');
+    if (looksLikeProse) return;
+    // For the FR workbook, the workbook's program slug is
+    // remapped to the EN canonical slug here (via the
+    // importer-only alias module). The remap is importer-only
+    // — the runtime app never sees the FR slug. For the EN
+    // workbook, the alias is a no-op. The remapped slug is
+    // what the importer writes to `programs.slug` and uses
+    // as the natural key for grades / courses / chapters /
+    // sessions.
+    const canonicalSlug =
+      opts.language === 'fr'
+        ? resolveCanonicalProgramSlug(slugify(col2))
+        : slugify(col2);
     const program: ParsedProgram = {
-      slug: slugify(col2),
+      slug: canonicalSlug,
       title: col2,
       subtitle: col3 || null,
       sheetName: col2,                               // cross-check only
@@ -186,7 +216,7 @@ export async function parseCurriculum(
   // 3. For each program, find its program sheet by name
   //    (en/fr) and parse the courses/chapters/sessions.
   for (const program of programs) {
-    const sheetName = pickProgramSheetName(wb, program, opts.language);
+    const sheetName = pickProgramSheetName(wb, program);
     if (!sheetName) {
       errors.push({ sheet: 'workbook', row: 0, reason: `No sheet found for program "${program.title}".` });
       continue;
@@ -196,7 +226,7 @@ export async function parseCurriculum(
       errors.push({ sheet: 'workbook', row: 0, reason: `Sheet "${sheetName}" missing for program "${program.title}".` });
       continue;
     }
-    const result = parseProgramSheet(programSheet, program, opts.language, errors);
+    const result = parseProgramSheet(programSheet, program, errors);
     grades.push(...result.grades);
     courses.push(...result.courses);
     chapters.push(...result.chapters);
@@ -244,7 +274,6 @@ function findSummarySheet(wb: ExcelJS.Workbook, language: Language): ExcelJS.Wor
 function pickProgramSheetName(
   wb: ExcelJS.Workbook,
   program: ParsedProgram,
-  _language: Language,
 ): string | null {
   const candidates = [program.sheetName, program.title];
   const lowered = new Map<string, string>();
@@ -270,9 +299,15 @@ function pickProgramSheetName(
 function parseProgramSheet(
   ws: ExcelJS.Worksheet,
   program: ParsedProgram,
-  language: Language,
   errors: ParseError[],
 ): { grades: ParsedGrade[]; courses: ParsedCourse[]; chapters: ParsedChapter[]; sessions: ParsedSession[] } {
+  // The `program` passed in carries the CANONICAL program
+  // slug already (the summary walker remaps the FR slug to
+  // the EN canonical slug at parse time; the alias is
+  // importer-only — the runtime app never sees it). For the
+  // EN workbook, the canonical slug equals the workbook's
+  // own slug. See `lib/excel/program-slug-alias.ts`.
+  const effectiveProgramSlug = program.slug;
   const grades: ParsedGrade[] = [];
   const courses: ParsedCourse[] = [];
   const chapters: ParsedChapter[] = [];
@@ -288,6 +323,14 @@ function parseProgramSheet(
   let headerResolved = false;
   let columnMap: Map<number, CanonicalField> | null = null;
   let dataStarted = false;
+
+  // Per-chapter session counter. The workbook's "N°" column
+  // is the chapter number within the course, NOT the session
+  // position within the chapter. The session position is
+  // computed here as a per-chapter counter (1, 2, 3, ...).
+  // This matches the existing EN-imported data, where every
+  // chapter's sessions are 1..N within the chapter.
+  const sessionPosByChapter = new Map<string, number>();
 
   // Discover grades from the Block column as we see them
   // (only relevant for programs whose Block cells start
@@ -312,16 +355,30 @@ function parseProgramSheet(
     // does not enumerate the valid course titles — it
     // simply uses whatever the workbook supplies.
     if (looksLikeCourseTitle(c2)) {
+      // The course slug is namespaced by the program slug so
+      // the same workbook-supplied course title (an ALL-CAPS
+      // course label, e.g. the EN program maths course) does
+      // not collide across programs. The same course in two
+      // different programs becomes two distinct `courses`
+      // rows, with the program as part of the natural key.
+      //
+      // For the FR workbook, the program slug in this
+      // function is the workbook-derived slug;
+      // `effectiveProgramSlug` remaps it to the EN canonical
+      // slug at the top of the function so the resulting
+      // course slug is the same shape the EN workbook would
+      // produce. The alias is importer-only — the runtime
+      // app never resolves it.
       currentCourse = {
-        slug: slugify(c2),
+        slug: `${effectiveProgramSlug}--${slugify(c2)}`,
         title: c2,
-        sortOrder: courses.filter((c) => c.programSlug === program.slug).length,
+        sortOrder: courses.filter((c) => c.programSlug === effectiveProgramSlug).length,
         gradeSlug: null,
       };
       courses.push({
         slug: currentCourse.slug,
         title: currentCourse.title,
-        programSlug: program.slug,
+        programSlug: effectiveProgramSlug,
         gradeSlug: null,
         sortOrder: currentCourse.sortOrder,
       });
@@ -399,12 +456,22 @@ function parseProgramSheet(
     const seen = chapterSeenByCourse.get(currentCourse.slug);
     if (seen && !seen.has(chapterSlug)) {
       seen.add(chapterSlug);
+      // The workbook's "N°" column carries the chapter number
+      // within the course (1, 2, 3, ...). It is the source of
+      // the chapter's position/sort_order. The pre-EN
+      // canonical import stored it as `sort_order = N - 1` and
+      // `position = N`, so we keep that mapping here. A
+      // workbook that omits the column (a future translation)
+      // falls back to a per-course counter, which preserves
+      // the original 1:1 mapping for any workbook whose
+      // chapters are listed in the order they appear.
+      const chapterNum = Number.isFinite(position) ? position : seen.size;
       chapters.push({
         courseSlug: currentCourse.slug,
         slug: chapterSlug,
         title: chapter,
         block: block,
-        sortOrder: seen.size - 1,
+        sortOrder: chapterNum - 1,
         isPublished: true,
       });
     }
@@ -420,7 +487,7 @@ function parseProgramSheet(
       gradeSeen.add(block);
       const gradeSlug = slugify(block);
       grades.push({
-        programSlug: program.slug,
+        programSlug: effectiveProgramSlug,
         slug: gradeSlug,
         title: block,
         sortOrder: grades.length,
@@ -446,10 +513,16 @@ function parseProgramSheet(
         ? (lectureHrs + exerciseHrs) * 60
         : null;
 
+    // Per-chapter session position (1, 2, 3 ...). The natural
+    // key on the sessions table is (chapter_id, position), so
+    // uniqueness within a chapter is guaranteed.
+    const sessionPosition = (sessionPosByChapter.get(chapterSlug) ?? 0) + 1;
+    sessionPosByChapter.set(chapterSlug, sessionPosition);
+
     sessions.push({
       chapterSlug,
       courseSlug: currentCourse.slug,
-      position,
+      position: sessionPosition,
       slug: sessionSlug,
       title: session,
       priceCents: null,                           // invariant #2

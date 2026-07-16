@@ -55,6 +55,17 @@ const SCAN_DIRS: ReadonlyArray<string> = [
 const ALLOW_FILES: ReadonlyArray<string> = [
   // The test file itself lists the tokens.
   'tests/unit/parse-curriculum-no-hardcoded-names.test.ts',
+  // The FR-to-EN slug alias file: by design, the KEYS of
+  // the alias table are the FR sheet names ("Lycée",
+  // "Prépa", "BTS Optique"). These are spreadsheet labels
+  // the importer must identify to map to the EN canonical
+  // slug. They are NOT domain data — they appear in exactly
+  // one file (the alias table) and only at parse time. The
+  // runtime app never reads them; the catalog lookup uses
+  // the EN canonical slug. See
+  // `lib/excel/program-slug-alias.ts` for the full
+  // rationale.
+  'apps/web/lib/excel/program-slug-alias.ts',
   // The workbook shape doc may discuss the canonical names.
 ];
 

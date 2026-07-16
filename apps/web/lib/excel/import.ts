@@ -35,6 +35,7 @@ import type {
   ParsedChapter,
   ParsedSession,
   ParseError,
+  Language,
 } from './parse-curriculum';
 import { logger } from '@/lib/utils/logger';
 import { describeError } from '@/lib/utils/errors';
@@ -71,6 +72,24 @@ type UntypedClient = {
       select: (cols?: string) => { single: () => Promise<{ data: unknown; error: unknown }> };
       then: (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) => Promise<unknown>;
     };
+    select: (cols?: string) => {
+      eq: (col: string, val: unknown) => {
+        eq: (col: string, val: unknown) => {
+          maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+        };
+        maybeSingle: () => Promise<{ data: unknown; error: unknown }>;
+        then: (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) => Promise<unknown>;
+      };
+    };
+    update: (vals: unknown) => {
+      eq: (col: string, val: unknown) => {
+        then: (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) => Promise<unknown>;
+      };
+    };
+    insert: (rows: unknown) => {
+      select: (cols?: string) => { single: () => Promise<{ data: unknown; error: unknown }> };
+      then: (onFulfilled: (v: { data: unknown; error: unknown }) => unknown) => Promise<unknown>;
+    };
   };
 };
 
@@ -93,6 +112,51 @@ type UntypedClient = {
 //   - column names (in select() / eq() / etc.)
 //   - log strings (never stored)
 const DEFAULT_CURRENCY = 'EUR';
+
+// ---- Localized-title metadata helper -----------------------------------
+// `metadata.titles[locale]` is the per-locale title written by the
+// importer and read by `lib/i18n/localized-title.ts` at render
+// time. The shape is `Record<'en' | 'fr', { title: string; slug:
+// string }>`. The runtime helper falls back to `row.title` if the
+// locale is missing from `metadata.titles`, so any row that is
+// only ever written once (the first import) still renders
+// correctly in both locales.
+type LocalizedTitle = { title: string; slug: string };
+
+function buildTitlesField(
+  language: Language | null,
+  title: string,
+  slug: string,
+): Record<string, LocalizedTitle> {
+  if (!language) return {};
+  return { [language]: { title, slug } };
+}
+
+// Merge a per-locale title entry into an existing metadata object.
+// The existing metadata is preserved (block, source, etc.); only
+// `metadata.titles[language]` is added or replaced. The merge is
+// tolerant of legacy / foreign JSON shapes: a non-object input
+// is treated as `{}`.
+function mergeSessionMetadata(
+  existing: unknown,
+  language: Language | null,
+  title: string,
+  slug: string,
+): Record<string, unknown> {
+  const base: Record<string, unknown> =
+    existing && typeof existing === 'object' && !Array.isArray(existing)
+      ? { ...(existing as Record<string, unknown>) }
+      : {};
+  if (!language) return base;
+  const titlesRaw = base.titles;
+  const titles: Record<string, LocalizedTitle> =
+    titlesRaw && typeof titlesRaw === 'object' && !Array.isArray(titlesRaw)
+      ? { ...(titlesRaw as Record<string, LocalizedTitle>) }
+      : {};
+  titles[language] = { title, slug };
+  base.titles = titles;
+  return base;
+}
 
 // ---- Helpers ----------------------------------------------------------
 
@@ -120,6 +184,7 @@ async function upsertProgram(
   supabase: UntypedClient,
   cache: IdCache,
   p: ParsedProgram,
+  language: Language | null,
   errors: ParseError[],
   sheetLabel: string,
 ): Promise<string | null> {
@@ -137,7 +202,11 @@ async function upsertProgram(
           description: null,
           is_published: true,
           sort_order: 0,
-          metadata: { source: 'excel-import', sheet: p.sheetName },
+          metadata: {
+            source: 'excel-import',
+            sheet: p.sheetName,
+            ...buildTitlesField(language, p.title, p.slug),
+          },
         } as never,
         { onConflict: 'slug' },
       )
@@ -164,6 +233,7 @@ async function upsertGrade(
   supabase: UntypedClient,
   cache: IdCache,
   g: ParsedGrade,
+  language: Language | null,
   errors: ParseError[],
   sheetLabel: string,
 ): Promise<string | null> {
@@ -185,7 +255,10 @@ async function upsertGrade(
           slug: g.slug,
           title: g.title,
           sort_order: g.sortOrder,
-          metadata: { source: 'excel-import' },
+          metadata: {
+            source: 'excel-import',
+            ...buildTitlesField(language, g.title, g.slug),
+          },
         } as never,
         { onConflict: 'program_id,slug' },
       )
@@ -229,6 +302,7 @@ async function upsertCourse(
   cache: IdCache,
   programTitles: Map<string, string>,
   c: ParsedCourse,
+  language: Language | null,
   errors: ParseError[],
   sheetLabel: string,
 ): Promise<string | null> {
@@ -276,7 +350,10 @@ async function upsertCourse(
           // admin form will expose the per-course publish
           // toggle.
           is_published: true,
-          metadata: { source: 'excel-import' },
+          metadata: {
+            source: 'excel-import',
+            ...buildTitlesField(language, c.title, c.slug),
+          },
         } as never,
         { onConflict: 'slug' },
       )
@@ -300,12 +377,20 @@ async function upsertCourse(
   }
 }
 
-// Apply a single parsed Chapter via ON CONFLICT (course_id, slug)
-// DO UPDATE.
+// Apply a single parsed Chapter. The chapters table has two
+// unique constraints: (course_id, position) and (course_id, slug).
+// For a re-import with a different language, the slug produced
+// from the FR title differs from the existing EN slug, so an
+// `upsert on course_id,sort_order` would violate the
+// (course_id, slug) constraint. The strategy: pre-fetch the
+// existing row at (course_id, position) and UPDATE its title
+// and metadata in place. The slug is preserved as the EN
+// canonical slug; only `metadata.titles[language]` is added.
 async function upsertChapter(
   supabase: UntypedClient,
   cache: IdCache,
   ch: ParsedChapter,
+  language: Language | null,
   errors: ParseError[],
   sheetLabel: string,
 ): Promise<string | null> {
@@ -318,27 +403,77 @@ async function upsertChapter(
     });
     return null;
   }
-  // The "Block" hint from the workbook is stored in the chapter's
-  // metadata. It carries structural information (a grade label
-  // for programs with grades, a block grouping otherwise) that
-  // the workbook's grading convention uses.
-  const metadata: Record<string, unknown> = { source: 'excel-import' };
+  const targetPosition = ch.sortOrder + 1;
+  const { data: existing, error: existingErr } = await supabase
+    .from('chapters')
+    .select('id, slug, title, metadata')
+    .eq('course_id', courseId)
+    .eq('position', targetPosition)
+    .maybeSingle();
+  if (existingErr) {
+    logger.error('chapter pre-fetch failed', {
+      courseId,
+      position: targetPosition,
+      ...describeError(existingErr),
+    });
+    errors.push({
+      sheet: sheetLabel,
+      row: 0,
+      reason: `chapter pre-fetch failed for "${ch.courseSlug}" position ${targetPosition}: ${describeError(existingErr).message}`,
+    });
+    return null;
+  }
+  if (existing) {
+    // Update in place: title + metadata. The slug is
+    // preserved as the canonical slug; only
+    // `metadata.titles[language]` is added.
+    const row = existing as { id: string; slug: string; title: string; metadata: unknown };
+    const merged = mergeSessionMetadata(row.metadata, language, ch.title, ch.slug);
+    const { error: updateErr } = await supabase
+      .from('chapters')
+      .update({
+        title: ch.title,
+        metadata: merged,
+      } as never)
+      .eq('id', row.id);
+    if (updateErr) {
+      logger.error('chapter update failed', {
+        courseId,
+        position: targetPosition,
+        ...describeError(updateErr),
+      });
+      errors.push({
+        sheet: sheetLabel,
+        row: 0,
+        reason: `chapter update failed for "${ch.courseSlug}" position ${targetPosition}: ${describeError(updateErr).message}`,
+      });
+      return null;
+    }
+    cache.chapterIdByKey.set(`${ch.courseSlug}::${ch.slug}`, row.id);
+    return row.id;
+  }
+
+  // No existing row at this position. This is a new chapter;
+  // insert it. (Both unique constraints are satisfied because
+  // position and slug are unique within the course.)
+  const metadata: Record<string, unknown> = {
+    source: 'excel-import',
+    ...buildTitlesField(language, ch.title, ch.slug),
+  };
   if (ch.block !== null) metadata.block = ch.block;
   try {
     const { data, error } = await supabase
       .from('chapters')
-      .upsert(
-        {
-          course_id: courseId,
-          slug: ch.slug,
-          title: ch.title,
-          default_duration_min: 60,
-          is_published: ch.isPublished,
-          sort_order: ch.sortOrder,
-          metadata,
-        } as never,
-        { onConflict: 'course_id,slug' },
-      )
+      .insert({
+        course_id: courseId,
+        slug: ch.slug,
+        title: ch.title,
+        position: targetPosition,
+        default_duration_min: 60,
+        is_published: ch.isPublished,
+        sort_order: ch.sortOrder,
+        metadata,
+      } as never)
       .select('id, course_id, slug')
       .single();
     if (error) throw error;
@@ -370,48 +505,140 @@ async function bulkUpsertSessionsForChapter(
   supabase: UntypedClient,
   chapterId: string,
   sessions: ReadonlyArray<ParsedSession>,
+  language: Language | null,
   errors: ParseError[],
   sheetLabel: string,
 ): Promise<number> {
   if (sessions.length === 0) return 0;
-  const rows = sessions.map((s) => ({
-    chapter_id: chapterId,
-    position: s.position,
-    slug: s.slug,
-    title: s.title,
-    duration_min: s.durationMin,
-    // Defensive re-validation of invariant #2: a session row
-    // with a non-null price must be a non-negative integer.
-    // The parser already enforces this; the importer is the
-    // last line of defence.
-    price_cents:
-      s.priceCents === null || (Number.isInteger(s.priceCents) && s.priceCents >= 0)
-        ? s.priceCents
-        : null,
-    currency: DEFAULT_CURRENCY,
-    is_published: s.isPublished,
-    is_preview: s.isPreview,
-    metadata: { source: 'excel-import' },
-  }));
-  try {
-    const { error } = await supabase
-      .from('sessions')
-      .upsert(rows as never, { onConflict: 'chapter_id,position' });
-    if (error) throw error;
-    return sessions.length;
-  } catch (e) {
-    logger.error('bulkUpsertSessionsForChapter failed', {
+
+  // The sessions table has two unique constraints:
+  //   (chapter_id, position)  -- the canonical natural key
+  //   (chapter_id, slug)      -- secondary, slug must be unique too
+  //
+  // For a re-import with a different language (e.g. the FR run
+  // after an earlier import), the slug produced from the FR
+  // session title will differ from the existing slug, and the
+  // position may also differ (depending on how the original
+  // import interpreted the workbook's "N°" column). The only
+  // stable key across languages is the chapter_id + the
+  // session title itself (which the importer trusts because
+  // it is the same conceptual session on both workbooks).
+  //
+  // Strategy: fetch every existing session in the chapter,
+  // then for each parsed session, try to match by position
+  // first (the canonical key); if no match, try by slug; if
+  // still no match, the session is new and gets inserted.
+  // When a match is found, UPDATE the existing row's title
+  // and metadata in place. The slug is preserved as the
+  // canonical slug; only `metadata.titles[language]` is added.
+  const { data: existing, error: existingErr } = await supabase
+    .from('sessions')
+    .select('id, position, slug, title, metadata')
+    .eq('chapter_id', chapterId);
+  if (existingErr) {
+    logger.error('could not pre-fetch existing sessions', {
       chapterId,
-      count: sessions.length,
-      ...describeError(e),
+      ...describeError(existingErr),
     });
     errors.push({
       sheet: sheetLabel,
       row: 0,
-      reason: `session bulk upsert failed for chapter ${chapterId} (${sessions.length} rows): ${describeError(e).message}`,
+      reason: `pre-fetch failed for chapter ${chapterId}: ${describeError(existingErr).message}`,
     });
     return 0;
   }
+  const existingByPosition = new Map<number, { id: string; slug: string; title: string; metadata: unknown }>();
+  const existingBySlug = new Map<string, { id: string; slug: string; title: string; metadata: unknown; position: number }>();
+  for (const row of (existing as ReadonlyArray<{ id: string; position: number; slug: string; title: string; metadata: unknown }> | null) ?? []) {
+    existingByPosition.set(row.position, row);
+    existingBySlug.set(row.slug, row);
+  }
+
+  let updated = 0;
+  for (const s of sessions) {
+    // Match existing row by position first (the canonical
+    // natural key), then fall back to slug. The slug fallback
+    // is needed when the FR parser produced a different
+    // position than the existing DB row (e.g. the existing
+    // row was imported from the EN workbook at a different
+    // position than the FR parser's per-chapter counter).
+    const match =
+      existingByPosition.get(s.position) ??
+      existingBySlug.get(s.slug) ??
+      null;
+    if (!match) {
+      // No existing row matches by position or by slug. This
+      // is a genuinely new session; insert it with the parsed
+      // position and slug. The two unique constraints are
+      // satisfied because the position is unique within the
+      // chapter and the slug is unique within the chapter.
+      const newRow = {
+        chapter_id: chapterId,
+        position: s.position,
+        slug: s.slug,
+        title: s.title,
+        duration_min: s.durationMin,
+        price_cents:
+          s.priceCents === null || (Number.isInteger(s.priceCents) && s.priceCents >= 0)
+            ? s.priceCents
+            : null,
+        currency: DEFAULT_CURRENCY,
+        is_published: s.isPublished,
+        is_preview: s.isPreview,
+        metadata: {
+          source: 'excel-import',
+          ...buildTitlesField(language, s.title, s.slug),
+        },
+      };
+      const { error } = await supabase
+        .from('sessions')
+        .insert(newRow as never);
+      if (error) {
+        logger.error('session insert failed', {
+          chapterId,
+          position: s.position,
+          ...describeError(error),
+        });
+        errors.push({
+          sheet: sheetLabel,
+          row: 0,
+          reason: `session insert failed for chapter ${chapterId} position ${s.position}: ${describeError(error).message}`,
+        });
+        continue;
+      }
+      updated++;
+      continue;
+    }
+    // Existing row matched (by position or by slug): update
+    // title + metadata in place. The slug is preserved as the
+    // existing canonical slug (which may be the EN slug if
+    // matched by position, or the parsed slug if matched by
+    // slug); only `metadata.titles[language]` is added. This
+    // is the idempotent localization path.
+    const merged = mergeSessionMetadata(match.metadata, language, s.title, s.slug);
+    const { error: updateErr } = await supabase
+      .from('sessions')
+      .update({
+        title: s.title,
+        metadata: merged,
+      } as never)
+      .eq('id', match.id);
+    if (updateErr) {
+      logger.error('session update failed', {
+        chapterId,
+        position: s.position,
+        ...describeError(updateErr),
+      });
+      errors.push({
+        sheet: sheetLabel,
+        row: 0,
+        reason: `session update failed for chapter ${chapterId} position ${s.position}: ${describeError(updateErr).message}`,
+      });
+      continue;
+    }
+    updated++;
+  }
+  return updated;
 }
 
 // Group sessions by their chapter key so they can be bulk-upserted
@@ -446,9 +673,18 @@ function groupSessionsByChapterKey(
 export async function importParsedCurriculum(
   supabase: UntypedClient,
   parsed: ParsedCurriculum,
+  opts: { language?: Language | null } = {},
 ): Promise<ImportReport> {
   const errors: ParseError[] = [];
   const cache = newIdCache();
+  // The `language` opt is the language of the workbook that
+  // produced `parsed`. When set, the importer writes
+  // `metadata.titles[language]` on every row. The runtime
+  // helper (`lib/i18n/localized-title.ts`) reads that field
+  // to render the right title per locale. A null `language`
+  // means the import is language-agnostic (no title is
+  // written; only the existing `metadata.source`).
+  const language: Language | null = opts.language ?? parsed.language ?? null;
   // Snapshot the program titles BEFORE we start mutating, so
   // that upsertCourse can copy the workbook's own program title
   // into the v1 courses.level column. (The DB returns the
@@ -467,14 +703,14 @@ export async function importParsedCurriculum(
 
   // Phase 1 — programs.
   for (const p of parsed.programs) {
-    const id = await upsertProgram(supabase, cache, p, errors, p.sheetName);
+    const id = await upsertProgram(supabase, cache, p, language, errors, p.sheetName);
     if (id) programs++;
     else skipped++;
   }
 
   // Phase 2 — grades (depends on programs being inserted).
   for (const g of parsed.grades) {
-    const id = await upsertGrade(supabase, cache, g, errors, g.programSlug);
+    const id = await upsertGrade(supabase, cache, g, language, errors, g.programSlug);
     if (id) grades++;
     else skipped++;
   }
@@ -486,6 +722,7 @@ export async function importParsedCurriculum(
       cache,
       programTitles,
       c,
+      language,
       errors,
       c.programSlug,
     );
@@ -495,7 +732,7 @@ export async function importParsedCurriculum(
 
   // Phase 4 — chapters (depends on courses).
   for (const ch of parsed.chapters) {
-    const id = await upsertChapter(supabase, cache, ch, errors, ch.courseSlug);
+    const id = await upsertChapter(supabase, cache, ch, language, errors, ch.courseSlug);
     if (id) chapters++;
     else skipped++;
   }
@@ -519,6 +756,7 @@ export async function importParsedCurriculum(
       supabase,
       chapterId,
       rows,
+      language,
       errors,
       key,
     );
