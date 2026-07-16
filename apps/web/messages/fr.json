@@ -411,11 +411,18 @@
     "h1": "Quatre parcours, un seul niveau d’exigence.",
     "intro": "Lycée, classes préparatoires, BTS, licence : chaque parcours a son programme, ses exercices, et ses profs habitués aux attendus. Choisissez le vôtre, le reste suit.",
     "requestQuote": "Demander un devis",
+    "browseProgram": "Voir les cours",
     "sectionAria": "Détail des parcours",
     "ctaTitle": "Une question sur votre niveau ?",
     "ctaDescription": "Écrivez-nous, on vous oriente vers le bon parcours et le bon prof — sans engagement.",
     "ctaPrimary": "Nous écrire",
-    "ctaSecondary": "Voir les tuteurs"
+    "ctaSecondary": "Voir les tuteurs",
+    "coursesInProgram": "Cours de ce programme",
+    "noCoursesInProgram": "Aucun cours n’est encore disponible pour ce programme.",
+    "gradesTitle": "Niveaux",
+    "gradesSubtitle": "Filtrez par niveau.",
+    "coursesInGrade": "Cours de ce niveau",
+    "noCoursesInGrade": "Aucun cours n’est encore disponible pour ce niveau."
   },
   "Pricing": {
     "eyebrow": "Tarifs",
@@ -481,6 +488,15 @@
     "techIssue": "Pour un problème technique sur une séance, merci d’utiliser la {link} en précisant le n° de réservation. Ne partagez jamais votre mot de passe.",
     "techIssueRich": "Pour un problème technique sur une séance, merci d’utiliser la <link>page de contact</link> en précisant le n° de réservation. Ne partagez jamais votre mot de passe."
   },
+  "CtaBand": {
+    "questionTitle": "Une question ?",
+    "questionDescription": "Contactez-nous pour en savoir plus.",
+    "contactLabel": "Nous contacter",
+    "browseLabel": "Parcourir les cours",
+    "readyTitle": "Prêt à démarrer ?",
+    "readyDescription": "Créez votre compte en moins d’une minute et réservez votre premier cours.",
+    "registerLabel": "Créer un compte"
+  },
   "Tutors": {
     "eyebrow": "Tuteurs",
     "title": "Tuteurs — Intégrale",
@@ -499,7 +515,11 @@
     "intro": "Parcourez l’ensemble du catalogue par matière et niveau.",
     "emptyTitle": "Aucun cours publié pour l’instant",
     "emptyDescription": "Les premiers cours seront ajoutés au fil du remplissage du catalogue.",
-    "notFoundTitle": "Cours introuvable"
+    "notFoundTitle": "Cours introuvable",
+    "viewCourse": "Voir le cours {title}",
+    "allLevels": "Tous niveaux",
+    "chaptersAndSessionsTitle": "Chapitres et sessions",
+    "chaptersAndSessionsSubtitle": "Achetez une session à la fois. Chaque session est un créneau individuel d’une heure avec un tuteur."
   },
   "NotFound": {
     "eyebrow": "404",
@@ -583,15 +603,24 @@
   },
   "Chapters": {
     "title": "Chapitres",
+    "position": "Chapitre {n}",
     "sessionCount": "{count, plural, =0 {Aucune session} =1 {1 session} other {# sessions}}",
     "totalDuration": "{minutes} min au total",
-    "noSessions": "Ce chapitre n'a pas encore de sessions."
+    "noSessions": "Ce chapitre n'a pas encore de sessions.",
+    "noSessionsHint": "Sessions de ce chapitre",
+    "emptyCourse": "Ce cours n'a pas encore de chapitres publiés.",
+    "ctaTitle": "Une question ?",
+    "ctaDescription": "Contactez-nous pour en savoir plus.",
+    "ctaPrimary": "Nous contacter"
   },
   "Sessions": {
     "title": "Sessions",
     "duration": "{minutes} min",
     "price": "Prix",
     "priceTbd": "Prix à venir",
+    "priceTbdHint": "Le prix de cette session sera disponible prochainement.",
+    "positionTitle": "Session {n} · {title}",
+    "viewChapter": "Voir le chapitre",
     "buy": "Acheter cette session",
     "buyPending": "Ouverture du paiement…",
     "buyError": "Impossible de démarrer le paiement. Veuillez réessayer.",
@@ -602,10 +631,20 @@
     "cancelled": "Annulée",
     "refunded": "Remboursée",
     "pendingPayment": "Paiement en attente",
-    "notFoundTitle": "Session introuvable"
+    "notFoundTitle": "Session introuvable",
+    "liveOnlineSession": "Session en visio",
+    "freePreview": "Aperçu gratuit"
   },
   "Dashboard": {
     "loading": "Chargement de votre espace…",
+    "labels": {
+      "start": "Début",
+      "end": "Fin",
+      "duration": "Durée",
+      "paid": "Payé",
+      "cancelledNotice": "Cette séance a été annulée.",
+      "linkPendingNotice": "Le lien Zoom sera disponible quelques minutes avant le début de la séance."
+    },
     "layout": {
       "loading": "Chargement de votre espace…"
     },

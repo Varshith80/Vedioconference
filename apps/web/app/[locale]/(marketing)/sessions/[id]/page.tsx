@@ -12,6 +12,7 @@ import { CtaBand } from '@/components/marketing/cta-band';
 import { BuySessionButton } from '@/components/marketing/buy-session-button';
 import { getSessionWithChapter } from '@/services/curriculum/sessions';
 import { getCourseById } from '@/services/curriculum/courses';
+import { localizedTitle } from '@/lib/i18n/localized-title';
 import { formatCents } from '@/lib/utils/format';
 import { BRAND } from '@/lib/constants/brand';
 import type { SessionWithChapter } from '@/types/domain';
@@ -65,8 +66,14 @@ export async function generateMetadata(
     const t = await getTranslations({ locale, namespace: 'Sessions' });
     return { title: t('notFoundTitle') };
   }
+  // Metadata uses the localized session title so the
+  // <title> reflects the active locale. The runtime app
+  // never reads the FR workbook's slug alias — the import
+  // is keyed on the EN canonical slug, and the localized
+  // string lives in `session.metadata.titles[locale]`.
+  const sessionTitle = localizedTitle(session, locale as 'en' | 'fr');
   return {
-    title: `${session.title} — ${BRAND.name}`,
+    title: `${sessionTitle} — ${BRAND.name}`,
     description: session.description ?? session.title,
     alternates: { canonical: `/${locale}/sessions/${id}` },
   };
@@ -91,30 +98,38 @@ export default async function SessionDetailPage(
 
   const t = await getTranslations({ locale, namespace: 'Sessions' });
   const tChapters = await getTranslations({ locale, namespace: 'Chapters' });
+  const tCta = await getTranslations({ locale, namespace: 'CtaBand' });
 
   // Best-effort course lookup for the breadcrumb. The course
   // page already lists the chapters + sessions, so the
   // back-link chain is chapter → course.
   const course = await getCourseById(session.chapter.course_id);
 
+  // Pre-resolve the localized titles on the server. The
+  // runtime app never reads the FR workbook's slug alias.
+  const sessionTitle = localizedTitle(session, locale as 'en' | 'fr');
+  const chapterTitle = localizedTitle(session.chapter, locale as 'en' | 'fr');
+  const courseTitle = course
+    ? localizedTitle(course, locale as 'en' | 'fr')
+    : null;
+
   return (
     <>
       <PageHeader
-        title={session.title}
+        title={sessionTitle}
         description={
-          session.description ??
-          (locale === 'fr' ? 'Session en visio' : 'Live online session')
+          session.description ?? t('liveOnlineSession')
         }
         breadcrumbs={[
           { label: 'Accueil', href: '/' },
-          ...(course
+          ...(course && courseTitle
             ? [
                 {
-                  label: course.title,
+                  label: courseTitle,
                   href: `/${locale}/courses/${course.slug}`,
                 },
                 {
-                  label: session.chapter.title,
+                  label: chapterTitle,
                   href: `/${locale}/courses/${course.slug}/chapters/${session.chapter.slug}`,
                 },
               ]
@@ -132,7 +147,7 @@ export default async function SessionDetailPage(
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h2 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                        {session.title}
+                        {sessionTitle}
                       </h2>
                       {session.description ? (
                         <p className="mt-2 text-sm text-muted-foreground sm:text-base">
@@ -148,12 +163,12 @@ export default async function SessionDetailPage(
                         ) : null}
                         {session.is_preview ? (
                           <Badge variant="outline" className="text-[10px]">
-                            Free preview
+                            {t('freePreview')}
                           </Badge>
                         ) : null}
                       </div>
                       <p className="mt-4 text-xs text-muted-foreground">
-                        {tChapters('title')} · {session.chapter.title}
+                        {tChapters('title')} · {chapterTitle}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
@@ -178,6 +193,7 @@ export default async function SessionDetailPage(
             <aside className="lg:col-span-4">
               <SessionCard
                 session={session}
+                displayTitle={sessionTitle}
                 chapterHref={
                   course
                     ? `/${locale}/courses/${course.slug}/chapters/${session.chapter.slug}`
@@ -191,12 +207,10 @@ export default async function SessionDetailPage(
       </Section>
 
       <CtaBand
-        title={locale === 'fr' ? 'Une question ?' : 'Have a question?'}
-        description={locale === 'fr'
-          ? 'Contactez-nous pour en savoir plus.'
-          : 'Get in touch to learn more.'}
+        title={tCta('questionTitle')}
+        description={tCta('questionDescription')}
         primaryHref="/contact"
-        primaryLabel={locale === 'fr' ? 'Nous contacter' : 'Contact us'}
+        primaryLabel={tCta('contactLabel')}
       />
     </>
   );

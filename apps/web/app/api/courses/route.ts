@@ -32,7 +32,13 @@ const bodySchema = z.object({
   level: z.string().min(1).max(120).optional(),
   level_group: z.string().min(1).max(120).optional(),
   is_published: z.boolean().optional(),
-  sort_order: z.number().int().nonnegative().optional(),
+  // NOTE: `sort_order` is intentionally NOT in the schema. The
+  // v2 `courses` table does NOT have a `sort_order` column
+  // (the v1 schema never had one either). Course ordering at
+  // read time is by `title` (see
+  // services/curriculum/courses.ts:getCoursesByProgram).
+  // If a per-program position is needed later, it must be
+  // added as a forward-only migration.
 });
 
 export async function POST(req: NextRequest) {
@@ -85,7 +91,6 @@ export async function POST(req: NextRequest) {
       level: parsed.data.level ?? null,
       level_group: parsed.data.level_group ?? parsed.data.program_slug,
       is_published: parsed.data.is_published ?? false,
-      sort_order: parsed.data.sort_order ?? 0,
     };
 
     const { data, error } = await supabase

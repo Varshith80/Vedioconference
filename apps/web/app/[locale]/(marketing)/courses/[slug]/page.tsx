@@ -9,6 +9,7 @@ import { ChapterList } from '@/components/marketing/chapter-list';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
+import { localizedTitle } from '@/lib/i18n/localized-title';
 
 export const revalidate = 60;
 export const dynamic = 'force-dynamic';
@@ -27,12 +28,15 @@ export async function generateMetadata(
     const t = await getTranslations({ locale, namespace: 'Courses' });
     return { title: t('notFoundTitle') };
   }
+  // Metadata uses the localized course title so the
+  // <title> + OpenGraph card reflect the active locale.
   const t = await getTranslations({ locale, namespace: 'Courses' });
+  const title = localizedTitle(c, locale as 'en' | 'fr');
   return {
-    title: c.title,
+    title,
     description: c.subtitle ?? c.description ?? t('description'),
     alternates: { canonical: `/${locale}/courses/${slug}` },
-    openGraph: { title: c.title, description: c.subtitle ?? undefined, type: 'article' },
+    openGraph: { title, description: c.subtitle ?? undefined, type: 'article' },
   };
 }
 
@@ -41,8 +45,15 @@ export default async function CourseDetailPage(
 ) {
   const { slug, locale } = await params;
   setRequestLocale(locale);
+  const tCourses = await getTranslations({ locale, namespace: 'Courses' });
   const course = await getCourseWithChapters(slug);
   if (!course) notFound();
+  // Pre-resolve the localized title once on the server and
+  // pass it to the presentational component. The runtime
+  // app never reads the FR workbook's slug alias — the
+  // import is keyed on the EN canonical slug, and the FR
+  // title lives in `course.metadata.titles.fr`.
+  const courseTitle = localizedTitle(course, locale as 'en' | 'fr');
   // Tutors who teach this course. We fetch all published tutors
   // (small set) and filter by course membership on the server.
   const courseId = course.id;
@@ -63,22 +74,19 @@ export default async function CourseDetailPage(
 
   return (
     <>
-      <CourseDetail course={course} tutors={tutors} />
+      <CourseDetail course={course} displayTitle={courseTitle} tutors={tutors} />
       {course.chapters.length > 0 ? (
         <Section spacing="default" tone="muted" aria-labelledby="course-chapters-title">
           <Container>
             <Heading id="course-chapters-title" level="h2" className="text-2xl sm:text-3xl">
-              {locale === 'fr' ? 'Chapitres et sessions' : 'Chapters and sessions'}
+              {tCourses('chaptersAndSessionsTitle')}
             </Heading>
             <p className="mt-2 max-w-prose text-sm text-muted-foreground sm:text-base">
-              {locale === 'fr'
-                ? 'Achetez une session à la fois. Chaque session est un créneau individuel d’une heure avec un tuteur.'
-                : 'Buy one session at a time. Each session is an individual one-hour slot with a tutor.'}
+              {tCourses('chaptersAndSessionsSubtitle')}
             </p>
             <div className="mt-6">
               <ChapterList
                 chapters={course.chapters}
-                courseSlug={course.slug}
                 basePath={`/${locale}/courses/${course.slug}/chapters`}
               />
             </div>

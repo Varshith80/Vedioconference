@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { setRequestLocale } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ArrowRight, GraduationCap } from 'lucide-react';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
@@ -12,6 +12,7 @@ import { CourseCard } from '@/components/marketing/course-card';
 import { CtaBand } from '@/components/marketing/cta-band';
 import { getProgramBySlug, getProgramWithGrades } from '@/services/curriculum/programs';
 import { getCoursesByProgram } from '@/services/curriculum/courses';
+import { localizedTitle } from '@/lib/i18n/localized-title';
 import { BRAND } from '@/lib/constants/brand';
 
 export const revalidate = 60;
@@ -25,8 +26,14 @@ export async function generateMetadata(
   if (!program) {
     return { title: 'Not found' };
   }
+  // Metadata uses the localized program title so the
+  // <title> reflects the active locale. The runtime app
+  // never reads the FR workbook's slug alias — the import
+  // is keyed on the EN canonical slug, and the localized
+  // string lives in `program.metadata.titles[locale]`.
+  const programTitle = localizedTitle(program, locale as 'en' | 'fr');
   return {
-    title: `${program.title} — ${BRAND.name}`,
+    title: `${programTitle} — ${BRAND.name}`,
     description: program.description ?? program.subtitle ?? program.title,
     alternates: { canonical: `/${locale}/levels/${levelSlug}` },
   };
@@ -53,16 +60,22 @@ export default async function LevelSlugPage(
     getCoursesByProgram(program.id),
   ]);
   const grades = withGrades?.grades ?? [];
+  const tLevels = await getTranslations({ locale, namespace: 'Levels' });
+  const tCta = await getTranslations({ locale, namespace: 'CtaBand' });
+
+  // Pre-resolve the localized program title on the server.
+  // The runtime app never reads the FR workbook's slug alias.
+  const programTitle = localizedTitle(program, locale as 'en' | 'fr');
 
   return (
     <>
       <PageHeader
-        title={program.title}
+        title={programTitle}
         description={program.subtitle ?? program.description ?? ''}
         breadcrumbs={[
           { label: 'Accueil', href: '/' },
           { label: 'Programs', href: `/${locale}/levels` },
-          { label: program.title },
+          { label: programTitle },
         ]}
       />
 
@@ -71,13 +84,11 @@ export default async function LevelSlugPage(
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
             <div className="lg:col-span-8">
               <Heading level="h2" className="text-2xl sm:text-3xl">
-                {locale === 'fr' ? 'Cours de ce programme' : 'Courses in this program'}
+                {tLevels('coursesInProgram')}
               </Heading>
               {courses.length === 0 ? (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  {locale === 'fr'
-                    ? 'Aucun cours n’est encore disponible pour ce programme.'
-                    : 'No courses are available in this program yet.'}
+                  {tLevels('noCoursesInProgram')}
                 </p>
               ) : (
                 <ul
@@ -86,7 +97,10 @@ export default async function LevelSlugPage(
                 >
                   {courses.map((c) => (
                     <li key={c.id}>
-                      <CourseCard course={c} />
+                      <CourseCard
+                        course={c}
+                        displayTitle={localizedTitle(c, locale as 'en' | 'fr')}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -99,12 +113,10 @@ export default async function LevelSlugPage(
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <GraduationCap className="h-4 w-4" aria-hidden="true" />
-                      {locale === 'fr' ? 'Niveaux' : 'Grades'}
+                      {tLevels('gradesTitle')}
                     </CardTitle>
                     <CardDescription>
-                      {locale === 'fr'
-                        ? 'Filtrez par niveau.'
-                        : 'Filter by grade.'}
+                      {tLevels('gradesSubtitle')}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col gap-2">
@@ -114,7 +126,7 @@ export default async function LevelSlugPage(
                         href={`/${locale}/levels/${levelSlug}/grades/${g.slug}`}
                         className="flex items-center justify-between gap-3 rounded-md border bg-background p-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <span>{g.title}</span>
+                        <span>{localizedTitle(g, locale as 'en' | 'fr')}</span>
                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </Link>
                     ))}
@@ -127,12 +139,10 @@ export default async function LevelSlugPage(
       </Section>
 
       <CtaBand
-        title={locale === 'fr' ? 'Une question ?' : 'Have a question?'}
-        description={locale === 'fr'
-          ? 'Contactez-nous pour en savoir plus sur ce programme.'
-          : 'Get in touch to learn more about this program.'}
+        title={tCta('questionTitle')}
+        description={tCta('questionDescription')}
         primaryHref="/contact"
-        primaryLabel={locale === 'fr' ? 'Nous contacter' : 'Contact us'}
+        primaryLabel={tCta('contactLabel')}
       />
     </>
   );

@@ -8,6 +8,7 @@ import { Heading } from '@/components/shared/heading';
 import { CtaBand } from '@/components/marketing/cta-band';
 import { getCourseWithChapters } from '@/services/curriculum/courses';
 import { getChapterWithSessions } from '@/services/curriculum/chapters';
+import { localizedTitle } from '@/lib/i18n/localized-title';
 import { BRAND } from '@/lib/constants/brand';
 
 export const revalidate = 60;
@@ -26,8 +27,15 @@ export async function generateMetadata(
   if (!chapter || !course) {
     return { title: 'Not found' };
   }
+  // Metadata uses the localized course + chapter titles so
+  // the <title> reflects the active locale. The runtime app
+  // never reads the FR workbook's slug alias — the import is
+  // keyed on the EN canonical slug, and the localized strings
+  // live in `row.metadata.titles[locale]`.
+  const courseTitle = localizedTitle(course, locale as 'en' | 'fr');
+  const chapterTitle = localizedTitle(chapter, locale as 'en' | 'fr');
   return {
-    title: `${chapter.title} · ${course.title} — ${BRAND.name}`,
+    title: `${chapterTitle} · ${courseTitle} — ${BRAND.name}`,
     description: chapter.description ?? course.subtitle ?? course.description ?? '',
     alternates: {
       canonical: `/${locale}/courses/${slug}/chapters/${chapterSlug}`,
@@ -57,21 +65,24 @@ export default async function ChapterPage(
   const t = await getTranslations({ locale, namespace: 'Chapters' });
   const tSessions = await getTranslations({ locale, namespace: 'Sessions' });
 
+  // Pre-resolve the localized titles on the server and use
+  // them for the page header + breadcrumbs + session list. The
+  // runtime app never reads the FR workbook's slug alias.
+  const courseTitle = localizedTitle(course, locale as 'en' | 'fr');
+  const chapterTitle = localizedTitle(chapter, locale as 'en' | 'fr');
+
   return (
     <>
       <PageHeader
-        title={chapter.title}
+        title={chapterTitle}
         description={
-          chapter.description ??
-          (locale === 'fr'
-            ? 'Sessions de ce chapitre'
-            : 'Sessions in this chapter')
+          chapter.description ?? t('noSessionsHint')
         }
         breadcrumbs={[
           { label: 'Accueil', href: '/' },
           { label: 'Courses', href: `/${locale}/courses` },
-          { label: course.title, href: `/${locale}/courses/${slug}` },
-          { label: chapter.title },
+          { label: courseTitle, href: `/${locale}/courses/${slug}` },
+          { label: chapterTitle },
         ]}
       />
 
@@ -88,6 +99,9 @@ export default async function ChapterPage(
             <ul role="list" className="mt-6 flex flex-col gap-3">
               {chapter.sessions.map((s) => {
                 const priceKnown = s.price_cents != null;
+                // Localized session title. The importer is the
+                // only writer of `metadata.titles[locale]`.
+                const sessionTitle = localizedTitle(s, locale as 'en' | 'fr');
                 return (
                   <li
                     key={s.id}
@@ -95,7 +109,7 @@ export default async function ChapterPage(
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-foreground">
-                        {tSessions('title')} {s.position} · {s.title}
+                        {tSessions('positionTitle', { n: s.position, title: sessionTitle })}
                       </p>
                       {s.description ? (
                         <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
@@ -114,7 +128,7 @@ export default async function ChapterPage(
                       ) : (
                         <span
                           aria-disabled="true"
-                          title="The price for this session will be available soon."
+                          title={tSessions('priceTbdHint')}
                           className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground"
                         >
                           {tSessions('priceTbd')}
@@ -130,12 +144,10 @@ export default async function ChapterPage(
       </Section>
 
       <CtaBand
-        title={locale === 'fr' ? 'Une question ?' : 'Have a question?'}
-        description={locale === 'fr'
-          ? 'Contactez-nous pour en savoir plus.'
-          : 'Get in touch to learn more.'}
+        title={t('ctaTitle')}
+        description={t('ctaDescription')}
         primaryHref="/contact"
-        primaryLabel={locale === 'fr' ? 'Nous contacter' : 'Contact us'}
+        primaryLabel={t('ctaPrimary')}
       />
     </>
   );

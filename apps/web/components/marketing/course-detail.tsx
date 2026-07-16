@@ -16,20 +16,30 @@ import Link from 'next/link';
 
 interface CourseDetailProps {
   course: Course;
+  /** Optional pre-localized course title. If set, used
+   *  instead of `course.title` for the page header and
+   *  breadcrumbs. The runtime app computes this from
+   *  `row.metadata?.titles?.[locale]?.title` via
+   *  `lib/i18n/localized-title.ts`; the importer is the
+   *  only writer of the metadata field. */
+  displayTitle?: string;
   /** Tutors who teach this course. Empty array is fine. */
   tutors: Array<{ id: string; full_name: string; avatar_url: string | null; rating: number }>;
 }
 
-export function CourseDetail({ course, tutors }: CourseDetailProps) {
+export function CourseDetail({ course, displayTitle, tutors }: CourseDetailProps) {
+  // The display title is the localized string; fall back to
+  // `course.title` when the caller did not pre-resolve it.
+  const title = displayTitle ?? course.title;
   return (
     <>
       <PageHeader
-        title={course.title}
+        title={title}
         description={course.subtitle ?? 'Cours particulier en visioconférence'}
         breadcrumbs={[
           { label: 'Accueil', href: '/' },
           { label: 'Cours', href: '/courses' },
-          { label: course.title },
+          { label: title },
         ]}
         actions={
           <Button asChild size="lg" disabled aria-disabled>
@@ -158,7 +168,7 @@ export function CourseDetail({ course, tutors }: CourseDetailProps) {
         data={{
           '@context': 'https://schema.org',
           '@type': 'Course',
-          name: course.title,
+          name: title,
           description: course.subtitle ?? course.description ?? '',
           provider: {
             '@type': 'Organization',

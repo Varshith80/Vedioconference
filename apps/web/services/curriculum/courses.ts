@@ -40,12 +40,18 @@ export const getCoursesByProgram = cache(
   ): Promise<ReadonlyArray<CourseListItem>> => {
     try {
       const supabase = await createSupabaseServerClient();
+      // The v2 `courses` table does NOT have a `sort_order`
+      // column (the v1 schema never had one). We order by
+      // `title` only — same pattern the v1 `services/courses.ts
+      // :getPublishedCourses` already uses (line 15). This
+      // matches the documented `mark-issue: courses.sort_order
+      // 42703` fix: do not invent a `position` column here, as
+      // adding a column would be a schema change.
       let query = supabase
         .from('courses')
         .select('*, program:programs(*), grade:grades(*)')
         .eq('program_id', programId)
         .eq('is_published', true)
-        .order('sort_order', { ascending: true })
         .order('title', { ascending: true });
 
       if (options.gradeId !== undefined) {

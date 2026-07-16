@@ -13,6 +13,7 @@ import { BRAND } from '@/lib/constants/brand';
 import { getCurrentUser } from '@/services/auth';
 import { getSessionBookingWithDetails } from '@/services/curriculum/session-bookings';
 import { getSessionWithChapter } from '@/services/curriculum/sessions';
+import { localizedTitle } from '@/lib/i18n/localized-title';
 import { formatCents } from '@/lib/utils/format';
 
 export async function generateMetadata({
@@ -41,6 +42,7 @@ export default async function DashboardSessionDetailPage({
   const t = await getTranslations('Dashboard.sessions');
   const tNav = await getTranslations('Nav');
   const tBookings = await getTranslations('Dashboard.bookings');
+  const tLabels = await getTranslations('Dashboard.labels');
 
   const user = await getCurrentUser();
   if (!user) notFound();
@@ -75,6 +77,13 @@ export default async function DashboardSessionDetailPage({
 
   const joinUrl = booking.meeting?.join_url ?? null;
 
+  // Pre-resolve the localized titles on the server so the
+  // breadcrumb, heading, and chapter label all reflect the
+  // active locale. The runtime app never reads the FR
+  // workbook's slug alias.
+  const sessionTitle = localizedTitle(session, locale as 'en' | 'fr');
+  const chapterTitle = localizedTitle(session.chapter, locale as 'en' | 'fr');
+
   return (
     <Section spacing="default" aria-labelledby="session-detail-title">
       <Container>
@@ -83,16 +92,16 @@ export default async function DashboardSessionDetailPage({
             { label: tNav('breadcrumbs.home'), href: '/' },
             { label: tNav('breadcrumbs.dashboard'), href: `/${locale}/dashboard` },
             { label: t('title'), href: `/${locale}/dashboard/sessions` },
-            { label: session.title },
+            { label: sessionTitle },
           ]}
         />
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <Heading id="session-detail-title" level="h1" className="text-3xl sm:text-4xl">
-              {session.title}
+              {sessionTitle}
             </Heading>
             <p className="mt-2 text-sm text-muted-foreground">
-              {session.chapter.title}
+              {chapterTitle}
             </p>
           </div>
           <Badge variant={statusVariant} className="text-[10px]">
@@ -112,23 +121,23 @@ export default async function DashboardSessionDetailPage({
               <CardContent className="space-y-3 text-sm">
                 <p>
                   <span className="font-medium text-foreground">
-                    {locale === 'fr' ? 'Début' : 'Start'}:
+                    {tLabels('start')}:
                   </span>{' '}
                   <span className="text-muted-foreground">{startFmt}</span>
                 </p>
                 <p>
                   <span className="font-medium text-foreground">
-                    {locale === 'fr' ? 'Fin' : 'End'}:
+                    {tLabels('end')}:
                   </span>{' '}
                   <span className="text-muted-foreground">{endFmt}</span>
                 </p>
                 {session.duration_min ? (
                   <p>
                     <span className="font-medium text-foreground">
-                      {locale === 'fr' ? 'Durée' : 'Duration'}:
+                      {tLabels('duration')}:
                     </span>{' '}
                     <span className="text-muted-foreground">
-                      {session.duration_min} min
+                      {tBookings('duration', { minutes: session.duration_min })}
                     </span>
                   </p>
                 ) : null}
@@ -144,7 +153,7 @@ export default async function DashboardSessionDetailPage({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <MapPin className="h-4 w-4" aria-hidden="true" />
-                  {locale === 'fr' ? 'Rejoindre la séance' : 'Join the session'}
+                  {tBookings('joinSession')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
@@ -158,17 +167,13 @@ export default async function DashboardSessionDetailPage({
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     {booking.status === 'cancelled'
-                      ? (locale === 'fr'
-                          ? 'Cette séance a été annulée.'
-                          : 'This session was cancelled.')
-                      : (locale === 'fr'
-                          ? 'Le lien Zoom sera disponible quelques minutes avant le début de la séance.'
-                          : 'The Zoom link will be available a few minutes before the session starts.')}
+                      ? tLabels('cancelledNotice')
+                      : tLabels('linkPendingNotice')}
                   </p>
                 )}
                 {session.price_cents != null ? (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {locale === 'fr' ? 'Payé' : 'Paid'}:{' '}
+                    {tLabels('paid')}:{' '}
                     <span className="font-semibold text-foreground">
                       {formatCents(session.price_cents as number, session.currency)}
                     </span>

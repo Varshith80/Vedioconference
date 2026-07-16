@@ -9,6 +9,12 @@ import type { Session } from '@/types/domain';
 
 interface SessionCardProps {
   session: Session;
+  /** Optional pre-localized session title. If set, used
+   *  instead of `session.title`. The runtime app computes
+   *  this from `row.metadata?.titles?.[locale]?.title` via
+   *  `lib/i18n/localized-title.ts`; the importer is the
+   *  only writer of the metadata field. */
+  displayTitle?: string;
   /** Locale-prefixed path the "View chapter" link points at. */
   chapterHref: string;
   /** Locale-prefixed path the "Buy" button POSTs to. */
@@ -21,15 +27,16 @@ interface SessionCardProps {
  * button is disabled when `session.price_cents` is NULL
  * (Sprint 5 will populate prices from the Excel curriculum).
  */
-export function SessionCard({ session, chapterHref, buyHref }: SessionCardProps) {
+export function SessionCard({ session, displayTitle, chapterHref, buyHref }: SessionCardProps) {
   const priceKnown = session.price_cents != null;
+  const title = displayTitle ?? session.title;
   return (
     <Card>
       <CardContent className="p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {session.title}
+              {title}
             </h2>
             {session.description ? (
               <p className="mt-2 text-sm text-muted-foreground sm:text-base">
