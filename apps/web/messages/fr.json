@@ -882,6 +882,11 @@
           "href": "/admin/students"
         },
         {
+          "id": "bookings",
+          "label": "Réservations",
+          "href": "/admin/bookings"
+        },
+        {
           "id": "import",
           "label": "Importer un cursus",
           "href": "/admin/import"
@@ -925,6 +930,11 @@
           "id": "students",
           "label": "Étudiants",
           "href": "/admin/students"
+        },
+        {
+          "id": "bookings",
+          "label": "Réservations",
+          "href": "/admin/bookings"
         },
         {
           "id": "import",
@@ -1038,6 +1048,88 @@
         "created": "Créé le",
         "lastLogin": "Dernière connexion"
       }
+    },
+    "bookings": {
+      "title": "Réservations",
+      "subline": "Toutes les séances réservées, avec le tuteur, l’étudiant et la réunion Zoom au même endroit.",
+      "empty": "Aucune réservation pour le moment.",
+      "columns": {
+        "id": "ID",
+        "student": "Étudiant",
+        "program": "Programme",
+        "course": "Cours",
+        "chapter": "Chapitre",
+        "session": "Séance",
+        "tutor": "Tuteur",
+        "when": "Date",
+        "status": "Réservation",
+        "payment": "Paiement"
+      },
+      "filters": {
+        "search": "Rechercher",
+        "searchPlaceholder": "ID, nom, e-mail, cours…",
+        "all": "Tous",
+        "program": "Programme",
+        "tutor": "Tuteur",
+        "bookingStatus": "Statut de la réservation",
+        "paymentStatus": "Statut du paiement",
+        "date": "Date",
+        "reset": "Réinitialiser les filtres",
+        "results": "{n} sur {total} réservations",
+        "emptyFiltered": "Aucune réservation ne correspond aux filtres actuels."
+      },
+      "status": {
+        "scheduled": "Planifiée",
+        "confirmed": "Confirmée",
+        "completed": "Terminée",
+        "cancelled": "Annulée",
+        "no_show": "Absent",
+        "rescheduled": "Replanifiée"
+      },
+      "paymentStatus": {
+        "pending": "En attente",
+        "succeeded": "Payée",
+        "failed": "Échouée",
+        "refunded": "Remboursée",
+        "partially_refunded": "Partielle"
+      }
+    },
+    "bookingDetail": {
+      "title": "Détails de la réservation",
+      "back": "Retour aux réservations",
+      "sections": {
+        "booking": "Réservation",
+        "student": "Étudiant",
+        "tutor": "Tuteur",
+        "curriculum": "Cursus",
+        "payment": "Paiement",
+        "meeting": "Réunion"
+      },
+      "fields": {
+        "id": "ID de la réservation",
+        "status": "Statut",
+        "scheduledStart": "Heure de début",
+        "scheduledEnd": "Heure de fin",
+        "timezone": "Fuseau horaire",
+        "notes": "Notes",
+        "createdAt": "Réservée le",
+        "calendlyInvitee": "Invité Calendly",
+        "noCalendly": "Pas encore relié à Calendly"
+      },
+      "actions": {
+        "copyLink": "Copier le lien",
+        "copyMeetingId": "Copier l’ID de réunion",
+        "copyPasscode": "Copier le code",
+        "openZoom": "Ouvrir Zoom",
+        "openZoomNewTab": "Ouvrir dans un nouvel onglet",
+        "viewStudent": "Voir l’étudiant",
+        "viewTutor": "Voir le tuteur",
+        "resendEmail": "Renvoyer l’e-mail de réservation",
+        "resendEmailDisabled": "Le renvoi de l’e-mail de réservation n’est pas encore branché — disponible dans un prochain sprint."
+      },
+      "copied": "Copié !",
+      "noMeeting": "Aucune réunion Zoom n’a encore été créée pour cette réservation.",
+      "noPayment": "Aucun paiement n’est encore associé à cette réservation."
     },
     "common": {
       "yes": "Oui",

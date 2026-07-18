@@ -882,6 +882,11 @@
           "href": "/admin/students"
         },
         {
+          "id": "bookings",
+          "label": "Bookings",
+          "href": "/admin/bookings"
+        },
+        {
           "id": "import",
           "label": "Import curriculum",
           "href": "/admin/import"
@@ -925,6 +930,11 @@
           "id": "students",
           "label": "Students",
           "href": "/admin/students"
+        },
+        {
+          "id": "bookings",
+          "label": "Bookings",
+          "href": "/admin/bookings"
         },
         {
           "id": "import",
@@ -1038,6 +1048,88 @@
         "created": "Created",
         "lastLogin": "Last login"
       }
+    },
+    "bookings": {
+      "title": "Bookings",
+      "subline": "Every booked live session, with the tutor, student, and Zoom meeting in one place.",
+      "empty": "No bookings yet.",
+      "columns": {
+        "id": "ID",
+        "student": "Student",
+        "program": "Program",
+        "course": "Course",
+        "chapter": "Chapter",
+        "session": "Session",
+        "tutor": "Tutor",
+        "when": "When",
+        "status": "Booking",
+        "payment": "Payment"
+      },
+      "filters": {
+        "search": "Search",
+        "searchPlaceholder": "ID, name, email, course…",
+        "all": "All",
+        "program": "Program",
+        "tutor": "Tutor",
+        "bookingStatus": "Booking status",
+        "paymentStatus": "Payment status",
+        "date": "Date",
+        "reset": "Reset filters",
+        "results": "{n} of {total} bookings",
+        "emptyFiltered": "No bookings match the current filters."
+      },
+      "status": {
+        "scheduled": "Scheduled",
+        "confirmed": "Confirmed",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "no_show": "No-show",
+        "rescheduled": "Rescheduled"
+      },
+      "paymentStatus": {
+        "pending": "Pending",
+        "succeeded": "Paid",
+        "failed": "Failed",
+        "refunded": "Refunded",
+        "partially_refunded": "Partial"
+      }
+    },
+    "bookingDetail": {
+      "title": "Booking details",
+      "back": "Back to bookings",
+      "sections": {
+        "booking": "Booking",
+        "student": "Student",
+        "tutor": "Tutor",
+        "curriculum": "Curriculum",
+        "payment": "Payment",
+        "meeting": "Meeting"
+      },
+      "fields": {
+        "id": "Booking ID",
+        "status": "Status",
+        "scheduledStart": "Start time",
+        "scheduledEnd": "End time",
+        "timezone": "Timezone",
+        "notes": "Notes",
+        "createdAt": "Booked on",
+        "calendlyInvitee": "Calendly invitee",
+        "noCalendly": "Not yet linked to Calendly"
+      },
+      "actions": {
+        "copyLink": "Copy link",
+        "copyMeetingId": "Copy meeting ID",
+        "copyPasscode": "Copy passcode",
+        "openZoom": "Open Zoom",
+        "openZoomNewTab": "Open in new tab",
+        "viewStudent": "View student",
+        "viewTutor": "View tutor",
+        "resendEmail": "Resend booking email",
+        "resendEmailDisabled": "Resend booking email is not yet wired up — coming in a later sprint."
+      },
+      "copied": "Copied!",
+      "noMeeting": "No Zoom meeting has been created for this booking yet.",
+      "noPayment": "No payment linked to this booking yet."
     },
     "common": {
       "yes": "Yes",

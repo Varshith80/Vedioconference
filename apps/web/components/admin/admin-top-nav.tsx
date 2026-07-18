@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   BookOpen,
   BookText,
+  CalendarCheck,
   CalendarRange,
   CreditCard,
   LayoutDashboard,
@@ -33,6 +34,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   sessions: CalendarRange,
   payments: CreditCard,
   students: Users,
+  bookings: CalendarCheck,
   import: Upload,
 };
 
