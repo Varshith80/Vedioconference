@@ -106,10 +106,8 @@ describe('getAllBookingsWithDetails', () => {
             },
           },
         },
-        grant: {
-          id: 'g1',
-          payments: { id: 'pay1', amount_cents: 5000, currency: 'EUR', status: 'succeeded', provider: 'stripe', created_at: '2026-07-15T08:00:00Z' },
-        },
+        grant: { id: 'g1' },
+        payment: { id: 'pay1', amount_cents: 5000, currency: 'EUR', status: 'succeeded', provider: 'stripe', created_at: '2026-07-15T08:00:00Z' },
         meeting: {
           id: 'm1',
           provider: 'zoom',
@@ -164,6 +162,7 @@ describe('getAllBookingsWithDetails', () => {
         tutor: null,
         session: null,
         grant: null,
+        payment: null,
         meeting: null,
       },
     ];
@@ -214,7 +213,8 @@ describe('getAllBookingsWithDetails', () => {
             },
           },
         },
-        grant: { id: 'g1', payments: null },
+        grant: { id: 'g1' },
+        payment: null,
         meeting: null,
       },
     ];
@@ -274,7 +274,8 @@ describe('getBookingByIdWithDetails', () => {
           },
         },
       },
-      grant: { id: 'g1', payments: { id: 'pay1', amount_cents: 5000, currency: 'EUR', status: 'succeeded', provider: 'stripe', created_at: '2026-05-15T08:00:00Z' } },
+      grant: { id: 'g1' },
+      payment: { id: 'pay1', amount_cents: 5000, currency: 'EUR', status: 'succeeded', provider: 'stripe', created_at: '2026-05-15T08:00:00Z' },
       meeting: { id: 'm1', provider: 'zoom', meeting_id: '999', join_url: 'https://zoom.us/j/999', passcode: null, start_url: null },
     };
     mockFrom.mockImplementation(() => buildChain({ data: raw }));

@@ -114,6 +114,14 @@ export interface BookingWithDetails {
 // row to be dropped if any of the required joins is missing; we
 // keep the joins nullable so that a brand-new booking with no
 // meeting / no payment yet still appears in the list.
+//
+// Join direction note: the FK on `payments.session_grant_id` points
+// AT `session_grants`, not the other way around, so PostgREST cannot
+// nest `payments` under the `grant:` alias. We pull `payments` as a
+// sibling join on the booking, scoped by the booking's
+// `session_grant_id` column. The hint is the actual constraint name
+// created by `ALTER TABLE … ADD COLUMN … REFERENCES public.session_grants`
+// in migration 20260714000003.
 const BOOKINGS_SELECT = `
   id,
   status,
@@ -153,10 +161,10 @@ const BOOKINGS_SELECT = `
     )
   ),
   grant:session_grants!session_bookings_session_grant_id_fkey (
-    id,
-    payments:payments_payments_session_grant_id_fkey (
-      id, amount_cents, currency, status, provider, created_at
-    )
+    id
+  ),
+  payment:payments!payments_session_grant_id_fkey (
+    id, amount_cents, currency, status, provider, created_at
   ),
   meeting:meeting_links!meeting_links_session_booking_id_fkey (
     id, provider, meeting_id, join_url, passcode, start_url
@@ -198,8 +206,8 @@ interface RawBookingRow {
   } | null;
   grant: {
     id: string;
-    payments: { id: string; amount_cents: number; currency: string; status: PaymentStatus; provider: string | null; created_at: string } | { id: string; amount_cents: number; currency: string; status: PaymentStatus; provider: string | null; created_at: string }[] | null;
   } | null;
+  payment: { id: string; amount_cents: number; currency: string; status: PaymentStatus; provider: string | null; created_at: string } | { id: string; amount_cents: number; currency: string; status: PaymentStatus; provider: string | null; created_at: string }[] | null;
   meeting: {
     id: string;
     provider: string;
@@ -220,7 +228,7 @@ function toBookingWithDetails(row: RawBookingRow): BookingWithDetails {
   const course = row.session?.chapter?.course ?? null;
   const program = first(course?.program);
   const grade = first(course?.grade);
-  const payment = first(row.grant?.payments);
+  const payment = first(row.payment);
 
   return {
     id: row.id,
