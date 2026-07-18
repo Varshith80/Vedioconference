@@ -362,7 +362,9 @@ supabase db reset          # drop + migrate + seed (dev only)
 
 `supabase/seed/000_seed.sql` creates:
 
-- One admin (`admin@example.com` / `Admin#1234`)
+- One administrator (`webvedioconference@gmail.com` / `WebVedio@999`,
+  `super_admin`). This is the **only** administrator account.
+  Re-running the seed is idempotent and re-asserts the row.
 - One demo student (`student@example.com` / `Student#1234`)
 - Three published courses (each pre-populated with **3 published
   modules** in Sprint B2)

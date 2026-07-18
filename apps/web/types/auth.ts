@@ -74,6 +74,9 @@ export interface AuthSubscription {
   unsubscribe(): void;
 }
 
+/** The canonical profile role, mirrored from `public.user_role`. */
+export type ProfileRole = 'student' | 'admin' | 'super_admin';
+
 /** The AuthProvider contract. Every method is async and returns a
  *  discriminated AuthResult so callers must handle failure. */
 export interface AuthProvider {
@@ -82,6 +85,12 @@ export interface AuthProvider {
 
   /** Returns the current session, or null if signed out. */
   getSession(): Promise<AuthResult<AuthSession | null>>;
+
+  /** Returns the role of the currently signed-in user, or null if
+   *  signed out. The role is read from `public.profiles.role` for
+   *  the Supabase provider; the local stub returns 'student' (the
+   *  stub has no role concept; it is a B1 placeholder). */
+  getRole(): Promise<AuthResult<ProfileRole | null>>;
 
   /** Signs the user in with an e-mail + password. */
   signInWithPassword(input: SignInInput): Promise<AuthResult<AuthSession>>;

@@ -5,6 +5,7 @@ import { useAuthContext } from './auth-context';
 import type {
   AuthResult,
   AuthSession,
+  ProfileRole,
   SignInInput,
   SignUpInput,
   ResetPasswordInput,
@@ -34,6 +35,14 @@ export interface UseAuthValue {
   resetPasswordForEmail(input: ResetPasswordInput): Promise<void>;
   updatePassword(input: UpdatePasswordInput): Promise<void>;
   verifyOtp(input: VerifyOtpInput): Promise<AuthSession>;
+  /**
+   * Resolve the role of the currently signed-in user. Returns
+   * `null` when no session is active. Throws on error. The role
+   * comes from `public.profiles.role` via the auth provider, so
+   * the same security boundary applies (no service-role key, no
+   * `process.env` access — see CLAUDE.md §3.9).
+   */
+  getRole(): Promise<ProfileRole | null>;
 }
 
 export function useAuth(): UseAuthValue {
@@ -68,6 +77,11 @@ export function useAuth(): UseAuthValue {
         await unwrap(provider.updatePassword(input));
       },
       verifyOtp: (input) => unwrap(provider.verifyOtp(input)),
+      getRole: async () => {
+        const r: AuthResult<ProfileRole | null> = await provider.getRole();
+        if (!r.ok) throw new Error(r.error.message);
+        return r.data;
+      },
     }),
     [provider, status, session, unwrap],
   );

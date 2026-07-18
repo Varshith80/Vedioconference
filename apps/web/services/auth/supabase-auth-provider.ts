@@ -6,6 +6,7 @@ import type {
   AuthResult,
   AuthSession,
   AuthSubscription,
+  ProfileRole,
   SignInInput,
   SignUpInput,
   ResetPasswordInput,
@@ -146,6 +147,52 @@ export class SupabaseAuthProvider implements AuthProvider {
     }
     if (!data.session) return { ok: true, data: null };
     return { ok: true, data: buildSession(data.session) };
+  }
+
+  async getRole(): Promise<AuthResult<ProfileRole | null>> {
+    // The auth.users row does not carry the application role;
+    // `public.profiles.role` is the source of truth (CLAUDE.md
+    // §3.9). We read it through the anon-keyed browser client
+    // under the `profiles_select_own_or_admin` RLS policy: a
+    // signed-in user may always read their own profile row, so
+    // this is the same security boundary as the rest of the
+    // session, no service-role key required.
+    //
+    // Returns `null` when the session is missing or the profile
+    // row is not yet provisioned (e.g. the `handle_new_user`
+    // trigger has not fired yet for a brand-new signup).
+    const { data: sessionData, error: sessionErr } = await this.client.auth.getSession();
+    if (sessionErr) {
+      const e = mapSupabaseError(sessionErr);
+      return { ok: false, error: authError(e.code, e.message, sessionErr) };
+    }
+    if (!sessionData.session) return { ok: true, data: null };
+
+    const { data, error } = await this.client
+      .from('profiles')
+      .select('role')
+      .eq('id', sessionData.session.user.id)
+      .maybeSingle();
+
+    if (error) {
+      // PostgrestError carries `code`, `message`, `details`, and
+      // `hint` — no `status` field (that lives on the Supabase
+      // Auth error type). Forward only the fields the mapper
+      // understands; the mapper falls back to 'unknown' for
+      // anything Postgrest-specific.
+      const e = mapSupabaseError({ code: error.code, message: error.message });
+      return { ok: false, error: authError(e.code, e.message, error) };
+    }
+    if (!data) return { ok: true, data: null };
+
+    // The DB enum is the authority; coerce defensively so a
+    // future enum value added on the DB side cannot crash the
+    // browser by reaching this code path.
+    const role = (data as { role?: string }).role;
+    if (role === 'student' || role === 'admin' || role === 'super_admin') {
+      return { ok: true, data: role };
+    }
+    return { ok: true, data: 'student' };
   }
 
   async signInWithPassword({ email, password }: SignInInput): Promise<AuthResult<AuthSession>> {

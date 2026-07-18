@@ -422,7 +422,11 @@
     "gradesTitle": "Niveaux",
     "gradesSubtitle": "Filtrez par niveau.",
     "coursesInGrade": "Cours de ce niveau",
-    "noCoursesInGrade": "Aucun cours n’est encore disponible pour ce niveau."
+    "noCoursesInGrade": "Aucun cours n’est encore disponible pour ce niveau.",
+    "coursesCount": "{n, plural, =0 {Aucun cours} =1 {1 cours} other {# cours}}",
+    "gradesCount": "{n, plural, =0 {Aucun niveau} =1 {1 niveau} other {# niveaux}}",
+    "jsonLdName": "Filières proposées par {brand}",
+    "exploreCta": "Explorer"
   },
   "Pricing": {
     "eyebrow": "Tarifs",
@@ -937,7 +941,7 @@
     },
     "overview": {
       "title": "Vue d’ensemble",
-      "subline": "Métriques de la plateforme, dernier import le {lastImport}.",
+      "subline": "Métriques de la plateforme.",
       "counters": {
         "students": "Étudiants",
         "courses": "Cours",

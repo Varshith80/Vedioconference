@@ -3,6 +3,7 @@ import type {
   AuthResult,
   AuthSession,
   AuthSubscription,
+  ProfileRole,
   SignInInput,
   SignUpInput,
   ResetPasswordInput,
@@ -103,6 +104,18 @@ export class LocalStubAuthProvider implements AuthProvider {
     const u = state.users.find((x) => x.id === state.currentUserId);
     if (!u) return { ok: true, data: null };
     return { ok: true, data: buildSession(toPublicUser(u)) };
+  }
+
+  async getRole(): Promise<AuthResult<ProfileRole | null>> {
+    // The local stub has no role concept; it is a B1 placeholder
+    // for the auth UI. Real users in production go through the
+    // SupabaseAuthProvider, which reads the role from
+    // `public.profiles.role`. Returning 'student' here keeps the
+    // post-login redirect stable for stub-only test runs.
+    await wait(50);
+    const state = readState();
+    if (!state.currentUserId) return { ok: true, data: null };
+    return { ok: true, data: 'student' as ProfileRole };
   }
 
   async signInWithPassword({ email, password }: SignInInput): Promise<AuthResult<AuthSession>> {

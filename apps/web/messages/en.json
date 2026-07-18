@@ -409,7 +409,7 @@
   "Levels": {
     "eyebrow": "Levels",
     "h1": "Four tracks, one standard of rigour.",
-    "intro": "High school, classes préparatoires, BTS, bachelor's: every track has its own programme, its own exercises, and tutors who know the exam expectations. Pick yours, the rest follows.",
+    "intro": "High school, prépa, BTS, bachelor's: every track has its own programme, its own exercises, and tutors who know the exam expectations. Pick yours, the rest follows.",
     "requestQuote": "Request a quote",
     "browseProgram": "Browse courses",
     "sectionAria": "Track details",
@@ -422,7 +422,11 @@
     "gradesTitle": "Grades",
     "gradesSubtitle": "Filter by grade.",
     "coursesInGrade": "Courses in this grade",
-    "noCoursesInGrade": "No courses are available in this grade yet."
+    "noCoursesInGrade": "No courses are available in this grade yet.",
+    "coursesCount": "{n, plural, =0 {No courses} =1 {1 course} other {# courses}}",
+    "gradesCount": "{n, plural, =0 {No grades} =1 {1 grade} other {# grades}}",
+    "jsonLdName": "Programs offered by {brand}",
+    "exploreCta": "Explore"
   },
   "Pricing": {
     "eyebrow": "Pricing",
@@ -937,7 +941,7 @@
     },
     "overview": {
       "title": "Overview",
-      "subline": "Live platform metrics, last import at {lastImport}.",
+      "subline": "Live platform metrics.",
       "counters": {
         "students": "Students",
         "courses": "Courses",

@@ -40,8 +40,40 @@ export function LoginForm() {
     setServerError(null);
     try {
       await auth.signInWithPassword(values);
+
+      // Resolve the post-login destination from the signed-in
+      // user's `public.profiles.role`. The session itself
+      // (auth.users) does not carry the application role — the
+      // profile row is the source of truth (CLAUDE.md §3.9 +
+      // Sprint 3.6 §4.1). Without this lookup, admins would
+      // fall through to the student dashboard.
+      //
+      // Role mapping (matches the `public.user_role` enum):
+      //   admin / super_admin -> /<locale>/admin
+      //   student (default)   -> /<locale>/dashboard
+      let role: 'student' | 'admin' | 'super_admin' | null = null;
+      try {
+        role = await auth.getRole();
+      } catch {
+        // If the role lookup fails (e.g. the profile row has not
+        // been provisioned yet for a brand-new signup), fall
+        // through to the safe default of `/dashboard`. The
+        // session itself succeeded; we just couldn't resolve
+        // the role to decide on a more specific landing page.
+        role = null;
+      }
+      const isAdmin = role === 'admin' || role === 'super_admin';
+      // A `?next=` query param (set by `?error=forbidden` redirect
+      // links from /admin etc.) still wins when present, as long
+      // as it stays inside the current locale. This preserves the
+      // pre-fix behaviour for the "you must sign in to view this
+      // page" UX.
       const next = sp.get('next');
-      router.push(next && next.startsWith(`/${locale}`) ? next : `/${locale}/dashboard`);
+      const safeNext = next && next.startsWith(`/${locale}`) ? next : null;
+      const dest =
+        safeNext ??
+        (isAdmin ? `/${locale}/admin` : `/${locale}/dashboard`);
+      router.push(dest);
       router.refresh();
     } catch (err) {
       setServerError(err instanceof Error ? err.message : tLogin('fallbackError'));
