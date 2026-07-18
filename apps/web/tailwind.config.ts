@@ -18,12 +18,25 @@ const config: Config = {
       xl: '1280px',
       '2xl': '1536px',
     },
+    // Tailwind's `container` utility. `center: true` adds
+    // auto horizontal margins; `padding` is the side padding
+    // at the base breakpoint; `screens` sets the max-width at
+    // each named breakpoint. The keys MUST be valid Tailwind
+    // screen names (defined above) and the values MUST be
+    // real CSS lengths — NOT padding values. The previous
+    // config had `sm: '1.5rem'` / `lg: '2rem'` which Tailwind
+    // interpreted as `max-width: 1.5rem` (24px) / `2rem`
+    // (32px) at every breakpoint, collapsing every page that
+    // uses the bare `.container` class to ~24px wide and
+    // destroying the auth header / admin overview grid.
     container: {
       center: true,
       padding: '1rem',
       screens: {
-        sm: '1.5rem',
-        lg: '2rem',
+        sm: '640px',
+        md: '768px',
+        lg: '1024px',
+        xl: '1280px',
         '2xl': '1400px',
       },
     },
