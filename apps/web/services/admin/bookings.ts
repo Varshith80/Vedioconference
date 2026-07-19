@@ -24,10 +24,48 @@ import { logger } from '@/lib/utils/logger';
 //     └─ meeting_link  (1:1, nullable)  → meeting_links
 //                                       (Zoom join_url / meeting_id / passcode)
 //
-// We pull all of that in a single Supabase query and project it
-// onto a flat `BookingWithDetails` shape. The admin list and the
-// admin detail page consume the same shape; the list only renders
-// a subset of fields, the detail renders all of them.
+// Payment join: WHY TWO QUERIES
+// -----------------------------
+// The real FK chain is:
+//
+//     session_bookings.session_grant_id ─► session_grants.id
+//                                              ▲
+//                                              │
+//     payments.session_grant_id ──────────────┘
+//
+// There is **no** direct FK from `session_bookings` to
+// `payments`; the two `session_grant_id` columns are
+// independent FKs that share a column value (one FK from the
+// booking, one FK from the payment). PostgREST's embed syntax
+// requires a direct FK from the parent to the embedded table;
+// it cannot express "join across a shared column". A single
+// nested query like
+//
+//     payment:payments!payments_session_grant_id_fkey (...)
+//
+// always errors with `PGRST200` ("Could not find a relationship
+// between 'session_bookings' and 'payments' using the hint
+// 'payments_session_grant_id_fkey'"). That is not a naming
+// bug; it is a structural impossibility for the embed syntax.
+//
+// The fix is to issue **two** PostgREST queries:
+//   1. The booking + its direct joins (everything except
+//      `payments`).
+//   2. A sibling `payments` query scoped to the set of
+//      `session_grant_id`s we just read.
+//
+// The merge is a `Map<session_grant_id, payment>`. We keep
+// the most recent payment per grant (sorted by `created_at`
+// desc, then `id` desc) because `BookingWithDetails` is
+// 1:1 booking → payment, and a grant can have multiple
+// ledger rows (refunds, partial refunds).
+//
+// The single-query call (`getBookingByIdWithDetails`) needs
+// the same treatment: after reading the booking, we look up
+// its single grant's payment in a follow-up query.
+//
+// RLS is still in effect on every round-trip. No service-role
+// key is introduced; no schema change is required.
 // =====================================================================
 
 export type BookingStatus =
@@ -110,18 +148,10 @@ export interface BookingWithDetails {
   } | null;
 }
 
-// The Supabase select string. Trailing `!inner` would force the
-// row to be dropped if any of the required joins is missing; we
-// keep the joins nullable so that a brand-new booking with no
-// meeting / no payment yet still appears in the list.
-//
-// Join direction note: the FK on `payments.session_grant_id` points
-// AT `session_grants`, not the other way around, so PostgREST cannot
-// nest `payments` under the `grant:` alias. We pull `payments` as a
-// sibling join on the booking, scoped by the booking's
-// `session_grant_id` column. The hint is the actual constraint name
-// created by `ALTER TABLE … ADD COLUMN … REFERENCES public.session_grants`
-// in migration 20260714000003.
+// The Supabase select string. **Excludes the `payment:` embed**
+// — we fetch payments separately to keep the join expressible
+// in PostgREST (see the file-level comment). All other joins
+// are real, direct FKs from the parent table.
 const BOOKINGS_SELECT = `
   id,
   status,
@@ -163,12 +193,13 @@ const BOOKINGS_SELECT = `
   grant:session_grants!session_bookings_session_grant_id_fkey (
     id
   ),
-  payment:payments!payments_session_grant_id_fkey (
-    id, amount_cents, currency, status, provider, created_at
-  ),
   meeting:meeting_links!meeting_links_session_booking_id_fkey (
     id, provider, meeting_id, join_url, passcode, start_url
   )
+`;
+
+const PAYMENTS_SELECT = `
+  id, amount_cents, currency, status, provider, created_at, session_grant_id
 `;
 
 interface RawBookingRow {
@@ -207,7 +238,6 @@ interface RawBookingRow {
   grant: {
     id: string;
   } | null;
-  payment: { id: string; amount_cents: number; currency: string; status: PaymentStatus; provider: string | null; created_at: string } | { id: string; amount_cents: number; currency: string; status: PaymentStatus; provider: string | null; created_at: string }[] | null;
   meeting: {
     id: string;
     provider: string;
@@ -218,17 +248,30 @@ interface RawBookingRow {
   } | null;
 }
 
+interface RawPaymentRow {
+  id: string;
+  amount_cents: number;
+  currency: string;
+  status: PaymentStatus;
+  provider: string | null;
+  created_at: string;
+  session_grant_id: string;
+}
+
 function first<T>(v: T | T[] | null | undefined): T | null {
   if (v == null) return null;
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-function toBookingWithDetails(row: RawBookingRow): BookingWithDetails {
+function toBookingWithDetails(
+  row: RawBookingRow,
+  paymentByGrant: ReadonlyMap<string, RawPaymentRow>,
+): BookingWithDetails {
   const tutorProfile = first(row.tutor?.profile);
   const course = row.session?.chapter?.course ?? null;
   const program = first(course?.program);
   const grade = first(course?.grade);
-  const payment = first(row.payment);
+  const payment = row.grant ? paymentByGrant.get(row.grant.id) ?? null : null;
 
   return {
     id: row.id,
@@ -295,6 +338,39 @@ function toBookingWithDetails(row: RawBookingRow): BookingWithDetails {
   };
 }
 
+// Fetch the most recent payment for each grant in `grantIds`.
+// Returns a `Map<session_grant_id, payment>` so callers can do
+// `O(1)` lookup by grant. Returns an empty map when there are
+// no grants to look up. Failures degrade to an empty map; the
+// booking is still rendered with `payment = null`.
+async function fetchPaymentsByGrant(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClientUntyped>>,
+  grantIds: ReadonlyArray<string>,
+): Promise<ReadonlyMap<string, RawPaymentRow>> {
+  if (grantIds.length === 0) return new Map();
+  try {
+    const { data, error } = await supabase
+      .from('payments')
+      .select(PAYMENTS_SELECT)
+      .in('session_grant_id', [...grantIds])
+      // Newest first so the Map keeps the most recent payment
+      // per grant (we overwrite older rows).
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
+    if (error) throw error;
+    const out = new Map<string, RawPaymentRow>();
+    for (const row of (data ?? []) as unknown as RawPaymentRow[]) {
+      if (!out.has(row.session_grant_id)) {
+        out.set(row.session_grant_id, row);
+      }
+    }
+    return out;
+  } catch (e) {
+    logger.error('admin.bookings: payments fetch failed', describeError(e));
+    return new Map();
+  }
+}
+
 // Every booking with its full join, ordered newest first.
 // Cached per request — the admin page is RSC, so this is
 // a single fetch per render. Returns [] on read failure so
@@ -308,7 +384,10 @@ export const getAllBookingsWithDetails = cache(
         .select(BOOKINGS_SELECT)
         .order('scheduled_start', { ascending: false });
       if (error) throw error;
-      return ((data ?? []) as unknown as RawBookingRow[]).map(toBookingWithDetails);
+      const rows = (data ?? []) as unknown as RawBookingRow[];
+      const grantIds = rows.map((r) => r.grant?.id).filter((id): id is string => typeof id === 'string');
+      const paymentByGrant = await fetchPaymentsByGrant(supabase, grantIds);
+      return rows.map((row) => toBookingWithDetails(row, paymentByGrant));
     } catch (e) {
       logger.error('admin.getAllBookingsWithDetails failed', describeError(e));
       return [];
@@ -329,7 +408,10 @@ export const getBookingByIdWithDetails = cache(
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      return toBookingWithDetails(data as unknown as RawBookingRow);
+      const row = data as unknown as RawBookingRow;
+      const grantIds = row.grant?.id ? [row.grant.id] : [];
+      const paymentByGrant = await fetchPaymentsByGrant(supabase, grantIds);
+      return toBookingWithDetails(row, paymentByGrant);
     } catch (e) {
       logger.error('admin.getBookingByIdWithDetails failed', {
         id,

@@ -11,18 +11,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { makeAuthSchemas, type LoginInput } from '@/lib/validations/auth';
-import { useAuth } from '@/services/auth/use-auth';
+import { loginAction, type LoginActionError } from '@/app/[locale]/auth/login/actions';
 
 /**
- * Sign-in form. Uses the auth abstraction (`useAuth()`), so it
- * works the same way against the B1 stub and the future B2
- * Supabase provider. On success, redirects to `?next=` (locale-aware)
- * or to the locale-aware dashboard.
+ * Sign-in form. The sign-in itself and the post-login redirect
+ * are now handled by the `loginAction` Server Action (Sprint
+ * 3.7) — the form no longer decides the destination in
+ * `useEffect` / `useAuth().getRole()`. The Server Action reads
+ * the role on the server, on a single Supabase client that has
+ * the just-issued session, and `redirect()`s in a single
+ * server-side frame. That eliminates the cookie-write race
+ * that used to push the admin to `/dashboard` on the first
+ * login after a fresh server start.
  */
 export function LoginForm() {
   const router = useRouter();
   const sp = useSearchParams();
-  const auth = useAuth();
   const locale = useLocale();
   const t = useTranslations();
   const tLogin = useTranslations('Auth.login');
@@ -39,44 +43,34 @@ export function LoginForm() {
     setSubmitting(true);
     setServerError(null);
     try {
-      await auth.signInWithPassword(values);
-
-      // Resolve the post-login destination from the signed-in
-      // user's `public.profiles.role`. The session itself
-      // (auth.users) does not carry the application role — the
-      // profile row is the source of truth (CLAUDE.md §3.9 +
-      // Sprint 3.6 §4.1). Without this lookup, admins would
-      // fall through to the student dashboard.
-      //
-      // Role mapping (matches the `public.user_role` enum):
-      //   admin / super_admin -> /<locale>/admin
-      //   student (default)   -> /<locale>/dashboard
-      let role: 'student' | 'admin' | 'super_admin' | null = null;
-      try {
-        role = await auth.getRole();
-      } catch {
-        // If the role lookup fails (e.g. the profile row has not
-        // been provisioned yet for a brand-new signup), fall
-        // through to the safe default of `/dashboard`. The
-        // session itself succeeded; we just couldn't resolve
-        // the role to decide on a more specific landing page.
-        role = null;
-      }
-      const isAdmin = role === 'admin' || role === 'super_admin';
-      // A `?next=` query param (set by `?error=forbidden` redirect
-      // links from /admin etc.) still wins when present, as long
-      // as it stays inside the current locale. This preserves the
-      // pre-fix behaviour for the "you must sign in to view this
-      // page" UX.
-      const next = sp.get('next');
-      const safeNext = next && next.startsWith(`/${locale}`) ? next : null;
-      const dest =
-        safeNext ??
-        (isAdmin ? `/${locale}/admin` : `/${locale}/dashboard`);
-      router.push(dest);
+      // The Server Action will throw if sign-in fails. On
+      // success it calls `redirect()` which navigates the
+      // browser; we never reach the next line.
+      await loginAction({
+        email: values.email,
+        password: values.password,
+        locale,
+        next: sp.get('next'),
+      });
+      // Defensive: if for any reason the action did NOT throw a
+      // redirect (e.g. a future change to return-only on
+      // success), refresh the page so the auth state on the
+      // server is reflected in the client tree.
       router.refresh();
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : tLogin('fallbackError'));
+      // The action throws serialised `LoginActionError` objects
+      // for known failures and `NEXT_REDIRECT` sentinels for
+      // success. We must let the redirect sentinel through.
+      // `next/navigation` exposes `isRedirectError` for exactly
+      // this case; we re-throw when the thrown value is a
+      // redirect, otherwise we parse the JSON payload.
+      const message = err instanceof Error ? err.message : '';
+      if (isRedirectLikeError(message)) {
+        // Allow the framework to perform the navigation.
+        throw err;
+      }
+      const parsed = parseLoginError(message);
+      setServerError(parsed?.message ?? tLogin('fallbackError'));
     } finally {
       setSubmitting(false);
     }
@@ -132,4 +126,31 @@ export function LoginForm() {
       </div>
     </form>
   );
+}
+
+// `next/navigation`'s `redirect()` throws a `NEXT_REDIRECT`
+// sentinel whose message starts with `NEXT_REDIRECT;`. We
+// detect it by message prefix because the type is internal and
+// not exported under a stable name. Anything matching the
+// prefix is a navigation that must be re-thrown, not a user
+// error to display.
+function isRedirectLikeError(message: string): boolean {
+  return message.startsWith('NEXT_REDIRECT');
+}
+
+function parseLoginError(message: string): LoginActionError | null {
+  if (!message) return null;
+  try {
+    const obj = JSON.parse(message) as Partial<LoginActionError>;
+    if (obj && typeof obj === 'object' && typeof obj.message === 'string') {
+      return {
+        code: obj.code ?? 'unknown',
+        message: obj.message,
+        field: obj.field,
+      };
+    }
+  } catch {
+    // Not JSON — fall through to null.
+  }
+  return null;
 }
