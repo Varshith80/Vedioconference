@@ -4,6 +4,148 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0-phase2-sprint-3.8] — 2026-07-19
+
+### Added — Admin Manual CRUD (Sprint 3.5..3.8)
+
+The admin dashboard is now a full CRUD console for the entire
+curriculum hierarchy (programs → grades → courses → chapters →
+sessions) plus a dedicated tutors directory. The Excel import
+remains the bulk path on the same natural keys.
+
+#### Schema (S0)
+- `supabase/migrations/20260719000001_sessions_tutor_id.sql` (NEW)
+  — adds `sessions.tutor_id` (NULLable FK to `tutors` ON DELETE
+  SET NULL) + a partial index. The existing admin UPDATE policy
+  on `sessions` covers the new column automatically; no RLS
+  rewrite.
+
+#### Services (S0)
+- `apps/web/services/admin/catalog.ts` (EXTENDED) — read
+  helpers for every curriculum level.
+- `apps/web/services/admin/tutors.ts` (NEW) — admin-variant of
+  the tutor directory (no `is_published` filter), per-tutor
+  counts, and `getSessionsForTutor(tutorId)`.
+- `apps/web/services/curriculum/session-bookings.ts` (EXTENDED)
+  — `createSessionBooking` defaults `tutor_id` from the parent
+  session's `tutor_id` when the caller passes `null`/omits.
+
+#### API surface (S1..S3)
+- `app/api/programs/route.ts` (NEW POST) and `[id]/route.ts`
+  (NEW PATCH + DELETE).
+- `app/api/grades/route.ts` (NEW POST) and `[id]/route.ts`
+  (NEW PATCH + DELETE).
+- `app/api/courses/[id]/route.ts` (NEW PATCH + DELETE).
+- `app/api/chapters/[id]/route.ts` (NEW PATCH + DELETE).
+- `app/api/sessions/route.ts` (EXTENDED — body accepts
+  `tutor_id`).
+- `app/api/sessions/[id]/route.ts` (EXTENDED — body accepts
+  `tutor_id`; new DELETE method).
+- `app/api/sessions/next-position/route.ts` (NEW — admin-only
+  GET returns the next position pre-fill for the create
+  dialog).
+- `app/api/admin/tutors/route.ts` (NEW — admin-only GET returns
+  the full tutor directory).
+
+#### Pages (S1..S4)
+- `app/[locale]/admin/programs/[id]/page.tsx`,
+  `app/[locale]/admin/grades/[id]/page.tsx`,
+  `app/[locale]/admin/courses/[id]/page.tsx`,
+  `app/[locale]/admin/chapters/[id]/page.tsx` (NEW) — edit
+  pages for every curriculum level.
+- `app/[locale]/admin/sessions/[id]/page.tsx` (EXTENDED) —
+  `tutor_id` picker in the edit form.
+- `app/[locale]/admin/tutors/page.tsx` (NEW) — every tutor
+  (active + inactive + archived) with per-tutor counts.
+- `app/[locale]/admin/tutors/[id]/page.tsx` (NEW) — tutor
+  detail + table of assigned sessions with the full curriculum
+  chain.
+- `app/[locale]/admin/bookings/[id]/page.tsx` (EXTENDED) —
+  three-line polish: (a) tutor "View" link now goes to
+  `/admin/tutors/{id}` (was a copy-paste bug to
+  `/admin/students`); (b) meeting card shows the host
+  `start_url` row with a `CopyButton`; (c) meeting card shows
+  a "Zoom link created" / "Awaiting Zoom link" status badge.
+
+#### Components (S0..S3)
+- `components/ui/searchable-select.tsx` (NEW) — reusable
+  searchable dropdown (no Radix Popover; keyboard nav;
+  outside-click closes).
+- `components/admin/delete-confirm-dialog.tsx` (NEW) — Radix
+  `Dialog` for destructive deletes (admin types the slug).
+- `components/admin/admin-list-page.tsx` (EXTENDED) — adds
+  `headerAction` + `actions` props.
+- `components/admin/{program,grade,course,chapter,session}-create-form.tsx`
+  (5 NEW) and
+  `components/admin/{program,grade,course,chapter}-edit-form.tsx`
+  (4 NEW).
+- `components/admin/session-edit-form.tsx` (EXTENDED) —
+  `tutor_id` `SearchableSelect` picker.
+- `components/admin/session-create-trigger.tsx` (NEW) and
+  `session-row-actions.tsx` (NEW) — dialog wrapper + per-row
+  Edit/Delete for the sessions list.
+- `components/admin/admin-sidebar.tsx`,
+  `components/admin/admin-top-nav.tsx` (EXTENDED) — `tutors`
+  icon (`GraduationCap`).
+
+#### i18n
+- `messages/en.json` and `messages/fr.json`:
+  - `Admin.tutors.{title, subline, empty, columns.*,
+    status.*, detail.*}` (NEW namespace, FR parity).
+  - `Admin.sidebar.items[]` and `Admin.topNav.items[]`:
+    `tutors` entry (both locales).
+  - `Admin.bookings.columns.tutor` → "Assigned tutor" /
+    "Tuteur assigné".
+  - `Admin.sessionEdit.{assignedTutorHint, placeholders.tutor,
+    empty.tutors}`.
+  - `Admin.sessionCreate.{positionHint, priceTbdHint,
+    errors.chapterRequired, fields.*, placeholders.*, empty.*}`
+    (FR brought to parity with EN).
+  - `Admin.sessions.columns.assignedTutor`.
+
+#### Tests (S3..S4)
+- `tests/unit/sessions-tutor-default.test.ts` (NEW, 4) —
+  `createSessionBooking` inherits `tutor_id` from parent
+  session when caller omits/passes `null`; explicit caller
+  value wins; NULL fallback when session has no tutor.
+- `tests/unit/admin-tutors-route.test.ts` (NEW, 3) — 401 for
+  anonymous; 200 for admins; 200 body includes unpublished
+  tutors.
+- `tests/unit/booking-detail-polish.test.tsx` (NEW, 7) — tutor
+  "View" link → `/admin/tutors/{id}`; host `start_url` row +
+  CopyButton; "Zoom link created" badge when meeting exists;
+  "Awaiting Zoom link" when null; i18n key usage; source-grep
+  regression guards.
+- Pre-existing: `admin-{programs,grades,courses-edit-delete,
+  chapters-edit-delete}-route.test.ts`,
+  `admin-sessions-patch-route.test.ts`.
+
+#### Quality gates
+- `pnpm type-check` → 0
+- `pnpm lint` → 0 (no new warnings; pre-existing
+  `lib/utils/logger.ts:31` unchanged)
+- `pnpm test` → 35 files / 274 tests pass (+7 new in
+  Sprint 3.5..3.8)
+- `pnpm build` → 0; all 4 new routes present
+  (`/api/admin/tutors`, `/api/sessions/next-position`,
+  `/[locale]/admin/tutors`, `/[locale]/admin/tutors/[id]`)
+
+#### Out of scope (per plan §14)
+- No tutor profile create / edit / archive UI on
+  `/admin/tutors` in this version (the page is read-only +
+  status display).
+- No new RLS policies except the one covered by the existing
+  admin UPDATE policy on `sessions`.
+- No new SaaS, no new top-level folders, no new env vars.
+- No bulk delete. No undo. Hard delete only, governed by FK
+  rules.
+- No resend-booking-email wiring (existing disabled button
+  stays).
+- No new tutor-side flows.
+
+See `docs/review/PHASE2_SPRINT_3.8_SUMMARY.md` for the full
+file-by-file record.
+
 ## [1.5.0-phase2-sprint-3.6] — 2026-07-15
 
 ### Added — Admin Dashboard, Excel Curriculum Import, and v1 Retirement (Sprint 3.6)

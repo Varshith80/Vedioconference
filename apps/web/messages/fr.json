@@ -887,6 +887,11 @@
           "href": "/admin/bookings"
         },
         {
+          "id": "tutors",
+          "label": "Tuteurs",
+          "href": "/admin/tutors"
+        },
+        {
           "id": "import",
           "label": "Importer un cursus",
           "href": "/admin/import"
@@ -935,6 +940,11 @@
           "id": "bookings",
           "label": "Réservations",
           "href": "/admin/bookings"
+        },
+        {
+          "id": "tutors",
+          "label": "Tuteurs",
+          "href": "/admin/tutors"
         },
         {
           "id": "import",
@@ -1021,6 +1031,7 @@
         "position": "Pos.",
         "duration": "Durée",
         "price": "Prix",
+        "assignedTutor": "Tuteur assigné",
         "published": "Pub.",
         "preview": "Aperçu"
       },
@@ -1060,7 +1071,7 @@
         "course": "Cours",
         "chapter": "Chapitre",
         "session": "Séance",
-        "tutor": "Tuteur",
+        "tutor": "Tuteur assigné",
         "when": "Date",
         "status": "Réservation",
         "payment": "Paiement"
@@ -1129,12 +1140,34 @@
       },
       "copied": "Copié !",
       "noMeeting": "Aucune réunion Zoom n’a encore été créée pour cette réservation.",
-      "noPayment": "Aucun paiement n’est encore associé à cette réservation."
+      "noPayment": "Aucun paiement n’est encore associé à cette réservation.",
+      "meetingStatus": {
+        "created": "Lien Zoom créé",
+        "pending": "En attente du lien Zoom"
+      },
+      "fieldsWithHost": {
+        "startUrl": "URL de démarrage hôte",
+        "hostStartLabel": "URL de démarrage hôte (tuteur)"
+      }
     },
     "common": {
       "yes": "Oui",
       "no": "Non",
-      "na": "—"
+      "na": "—",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "createCta": "Créer un(e) {resource}",
+      "confirmDeleteTitle": "Supprimer {resource} ?",
+      "confirmDeleteBody": "Cette action est définitive. Saisissez le slug de la ressource ci-dessous pour confirmer.",
+      "confirmDeletePrompt": "Saisissez {slug} pour confirmer",
+      "confirmDeleteCta": "Supprimer",
+      "resource": {
+        "program": "programme",
+        "grade": "niveau",
+        "course": "cours",
+        "chapter": "chapitre",
+        "session": "séance"
+      }
     },
     "import": {
       "title": "Importer le cursus",
@@ -1160,13 +1193,22 @@
       "submitting": "Enregistrement…",
       "cancel": "Annuler",
       "saveOk": "Enregistré.",
-      "saveError": "Impossible d'enregistrer. Vérifiez les champs puis réessayez."
+      "saveError": "Impossible d'enregistrer. Vérifiez les champs puis réessayez.",
+      "deleting": "Suppression…",
+      "deleteError": "La suppression a échoué. Veuillez réessayer."
     },
     "sessionEdit": {
       "title": "Modifier la séance",
       "subline": "Mettez à jour l'affichage, le prix et les drapeaux de publication de la séance. price_cents accepte null pour « prix à définir ».",
       "priceTbdHint": "Laissez price_cents vide (null) pour marquer la séance comme « prix à définir » — Stripe Checkout renverra alors 422 tant qu'un prix n'est pas saisi.",
       "saved": "Séance mise à jour.",
+      "assignedTutorHint": "Réassigner un tuteur ne modifie pas les réservations passées ; la nouvelle affectation s'applique uniquement aux réservations à venir.",
+      "placeholders": {
+        "tutor": "Non assigné"
+      },
+      "empty": {
+        "tutors": "Aucun tuteur pour le moment."
+      },
       "fields": {
         "title": "Titre",
         "description": "Description",
@@ -1175,7 +1217,184 @@
         "currency": "Devise",
         "calendlyUri": "URI de l'événement Calendly",
         "isPublished": "Publiée",
+        "isPreview": "Aperçu gratuit",
+        "assignedTutor": "Tuteur assigné"
+      }
+    },
+    "programCreate": {
+      "title": "Créer un programme",
+      "subline": "Ajoutez un nouveau programme au cursus. Le slug devient l'identifiant URL.",
+      "submit": "Créer le programme",
+      "saved": "Programme créé.",
+      "resource": "programme"
+    },
+    "programEdit": {
+      "title": "Modifier le programme",
+      "subline": "Mettez à jour le programme. Les renommages de slug sont conservés — relancer l'import Excel ne réécrira pas le slug.",
+      "submit": "Enregistrer",
+      "saved": "Programme mis à jour.",
+      "resource": "programme"
+    },
+    "gradeCreate": {
+      "title": "Créer un niveau",
+      "subline": "Ajoutez un niveau sous un programme. Un niveau représente l'année d'études (Seconde, Première, Terminale…).",
+      "submit": "Créer le niveau",
+      "saved": "Niveau créé.",
+      "resource": "niveau"
+    },
+    "gradeEdit": {
+      "title": "Modifier le niveau",
+      "subline": "Mettez à jour le niveau. Les renommages de slug sont conservés.",
+      "submit": "Enregistrer",
+      "saved": "Niveau mis à jour.",
+      "resource": "niveau"
+    },
+    "courseCreate": {
+      "title": "Créer un cours",
+      "subline": "Ajoutez un cours sous un programme et (optionnellement) un niveau. Le slug est l'identifiant URL.",
+      "submit": "Créer le cours",
+      "saved": "Cours créé.",
+      "resource": "cours",
+      "errors": {
+        "programRequired": "Sélectionnez d'abord un programme parent."
+      },
+      "empty": {
+        "programs": "Aucun programme pour l'instant — créez-en un d'abord.",
+        "grades": "Aucun niveau pour ce programme."
+      },
+      "placeholders": {
+        "program": "Choisir un programme…",
+        "grade": "Choisir un niveau (optionnel)…"
+      },
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "subtitle": "Sous-titre",
+        "description": "Description",
+        "program": "Programme parent",
+        "grade": "Niveau parent (optionnel)",
+        "isPublished": "Publié"
+      }
+    },
+    "courseEdit": {
+      "title": "Modifier le cours",
+      "subline": "Mettez à jour le cours. Les renommages de slug sont conservés.",
+      "submit": "Enregistrer",
+      "saved": "Cours mis à jour.",
+      "resource": "cours",
+      "placeholders": {
+        "program": "Choisir un programme…",
+        "grade": "Choisir un niveau…"
+      },
+      "empty": {
+        "programs": "Aucun programme.",
+        "grades": "Aucun niveau pour ce programme."
+      },
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "subtitle": "Sous-titre",
+        "description": "Description",
+        "program": "Programme parent",
+        "grade": "Niveau parent",
+        "isPublished": "Publié"
+      }
+    },
+    "chapterCreate": {
+      "title": "Créer un chapitre",
+      "subline": "Ajoutez un chapitre sous un cours.",
+      "submit": "Créer le chapitre",
+      "saved": "Chapitre créé.",
+      "resource": "chapitre",
+      "errors": {
+        "courseRequired": "Sélectionnez d'abord un cours parent."
+      },
+      "empty": {
+        "courses": "Aucun cours pour l'instant — créez-en un d'abord."
+      },
+      "placeholders": {
+        "course": "Choisir un cours…"
+      },
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "description": "Description",
+        "course": "Cours parent",
+        "sortOrder": "Ordre",
+        "durationMin": "Durée par défaut (minutes)",
+        "isPublished": "Publié"
+      }
+    },
+    "chapterEdit": {
+      "title": "Modifier le chapitre",
+      "subline": "Mettez à jour le chapitre. Les renommages de slug sont conservés.",
+      "submit": "Enregistrer",
+      "saved": "Chapitre mis à jour.",
+      "resource": "chapitre",
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "description": "Description",
+        "sortOrder": "Ordre",
+        "durationMin": "Durée par défaut (minutes)",
+        "isPublished": "Publié"
+      }
+    },
+    "sessionCreate": {
+      "title": "Créer une séance",
+      "subline": "Ajoutez une séance sous un chapitre. La position est pré-remplie avec max(position)+1 ; vous pouvez la remplacer (doublon rejeté en 409).",
+      "submit": "Créer la séance",
+      "resource": "séance",
+      "positionHint": "Pré-rempli avec max(position)+1 pour le chapitre choisi. Modifiable ; les doublons sont rejetés en 409.",
+      "priceTbdHint": "Laissez vide pour marquer cette séance comme « prix à définir » — Stripe Checkout renverra alors 422 tant qu'un prix n'est pas saisi.",
+      "errors": {
+        "chapterRequired": "Sélectionnez d'abord un chapitre parent."
+      },
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "chapter": "Chapitre parent",
+        "position": "Position",
+        "durationMin": "Durée (minutes)",
+        "priceCents": "Prix (centimes)",
+        "currency": "Devise",
+        "calendlyUri": "URI de l'événement Calendly",
+        "assignedTutor": "Tuteur assigné (optionnel)",
+        "isPublished": "Publiée",
         "isPreview": "Aperçu gratuit"
+      },
+      "placeholders": {
+        "chapter": "Choisir un chapitre…",
+        "tutor": "Non assigné"
+      },
+      "empty": {
+        "chapters": "Aucun chapitre disponible — créez-en un d'abord.",
+        "tutors": "Aucun tuteur pour le moment."
+      }
+    },
+    "tutors": {
+      "title": "Tuteurs",
+      "subline": "Annuaire complet de tous les tuteurs. Les tuteurs sont en lecture seule ici ; leur profil est géré ailleurs.",
+      "empty": "Aucun tuteur pour le moment.",
+      "columns": {
+        "name": "Nom",
+        "email": "E-mail",
+        "headline": "Titre",
+        "activeSessions": "Séances actives",
+        "totalAssigned": "Total assigné",
+        "status": "Statut",
+        "joinedAt": "Inscrit le"
+      },
+      "status": {
+        "active": "Actif",
+        "inactive": "Inactif"
+      },
+      "detail": {
+        "title": "Profil du tuteur",
+        "back": "Retour aux tuteurs",
+        "sessionsSubline": "Séances assignées à ce tuteur.",
+        "noSessions": "Aucune séance assignée à ce tuteur.",
+        "viewSession": "Voir la séance"
       }
     }
   },

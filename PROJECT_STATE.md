@@ -15,51 +15,29 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint 3.6 done (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 3.8 done (awaiting approval)**.
 
 ## Current status
 
-🟢 **Sprint 3.6 (Admin Dashboard & Excel Curriculum Import) is done.**
-The platform has a working admin dashboard backed by the v2
-session hierarchy and a one-shot Excel importer that
-bulk-inserts the real curriculum from the two
-`Integrale_cours_visio_130726_*.xlsx` workbooks. The
-admin shell (sidebar + top-nav + header + client layout)
-mirrors the dashboard pattern; the overview re-anchors on
-v2 counters (students / courses / chapters / sessions /
-grants / bookings / revenue / refunds); the catalog list +
-detail pages for `programs`, `grades`, `courses`,
-`chapters`, `sessions`, `payments`, `students` are all
-read-only; the catalog has create / edit forms for
-`courses`, `chapters`, `sessions`. Three new admin API
-endpoints (`POST /api/courses`, `POST /api/chapters`,
-`PATCH /api/sessions/[id]`) close the read-write loop.
-The Excel importer is **fully data-driven** — no hardcoded
-curriculum tokens anywhere in `apps/web/lib/excel/*`
-(enforced by `parse-curriculum-no-hardcoded-names.test.ts`,
-15 assertions); session prices are `NULL` for any cell
-with no price (Sprint 3.5 decision, enforced by
-`parse-curriculum.test.ts`); the importer is **fully
-idempotent** — re-running it never creates duplicate
-`programs` / `grades` / `courses` / `chapters` / `sessions`
-rows (enforced by `import-idempotency.test.ts`). The v1
-module-based hierarchy is retired in a single forward-only
-migration (`20260715000000_drop_v1_back_compat_tables.sql`):
-5 v1 tables + 7 v1 triggers + 2 v1 functions + 9 v1 RLS
-policies + 13 v1 indexes + 6 v1 FK columns + the v1
-`module_progress_status` type + the `_bookings_legacy` view
-are all dropped. The 4 `410`-stamped v1 route files + 12
-other v1 back-compat files (services / components / email
-templates / tests) are deleted. `resource_grants` PK is
-re-anchored from `(resource_id, enrollment_id)` to
-`(resource_id, session_grant_id)`. `fn_enrollments_refund`
-is recreated as v2-only. The 3 `/api/bookings/*` 410 shims
-now point to v2 endpoints. RLS v2 suite is wired into
-`scripts/rls-smoke.sh` (one line). `pnpm type-check`,
-`pnpm lint`, `pnpm test`, `pnpm build` all green. Tests:
-**153/153** passing across 24 test files (71 new in Sprint
-3.6). `pnpm build` succeeded. **Awaiting explicit approval
-before the next sprint.**
+🟢 **Sprint 3.8 (Admin Manual CRUD) is done.** The admin dashboard
+is now a full CRUD console for the entire curriculum hierarchy
+(programs → grades → courses → chapters → sessions) plus a dedicated
+tutors directory. Every list page exposes Create + Edit + Delete with
+the typed-slug confirmation dialog; the Excel import is preserved
+and remains the bulk path on the same natural keys. The new
+`sessions.tutor_id` FK (one forward-only migration) lets an admin
+assign a tutor per session; new bookings inherit that tutor via
+`createSessionBooking`, historical bookings keep theirs. The booking
+detail page is polished: the tutor "View" link now goes to
+`/admin/tutors/{id}` (was a copy-paste bug to `/admin/students`),
+the meeting card shows the host `start_url` with a CopyButton and a
+"Zoom link created" / "Awaiting Zoom link" status badge. **Tutor
+scope reminder preserved verbatim:** tutors are admin-managed
+reference records only — no Tutor Dashboard, no tutor auth, no
+tutor-side flows in this version. Quality gates:
+`pnpm type-check` ✓, `pnpm lint` ✓, `pnpm test` ✓ (35 files / 274
+tests, +7 new in Sprint 3.5..3.8), `pnpm build` ✓. **Awaiting
+explicit approval before the next sprint.**
 
 > **Known security follow-up (B2 close-out):**
 > `apps/web/.env.example` contains real Supabase keys. These
@@ -76,7 +54,7 @@ before the next sprint.**
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
 | **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 done | 2026-07-15 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ✅ Shipped in Sprint C | 2026-07-10 |
-| 4 | Admin dashboard + Excel curriculum import | ✅ Shipped in Sprint 3.6 | 2026-07-15 |
+| 4 | Admin dashboard + manual CRUD + Excel curriculum import | ✅ Shipped in Sprints 3.6 + 3.8 | 2026-07-19 |
 | 5 | Resources, notifications, polish | ⏳ | — |
 | 6 | E2E tests, observability, deploy | ⏳ | — |
 

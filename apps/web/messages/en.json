@@ -887,6 +887,11 @@
           "href": "/admin/bookings"
         },
         {
+          "id": "tutors",
+          "label": "Tutors",
+          "href": "/admin/tutors"
+        },
+        {
           "id": "import",
           "label": "Import curriculum",
           "href": "/admin/import"
@@ -935,6 +940,11 @@
           "id": "bookings",
           "label": "Bookings",
           "href": "/admin/bookings"
+        },
+        {
+          "id": "tutors",
+          "label": "Tutors",
+          "href": "/admin/tutors"
         },
         {
           "id": "import",
@@ -1021,6 +1031,7 @@
         "position": "Pos.",
         "duration": "Duration",
         "price": "Price",
+        "assignedTutor": "Assigned tutor",
         "published": "Pub.",
         "preview": "Preview"
       },
@@ -1060,7 +1071,7 @@
         "course": "Course",
         "chapter": "Chapter",
         "session": "Session",
-        "tutor": "Tutor",
+        "tutor": "Assigned tutor",
         "when": "When",
         "status": "Booking",
         "payment": "Payment"
@@ -1129,12 +1140,34 @@
       },
       "copied": "Copied!",
       "noMeeting": "No Zoom meeting has been created for this booking yet.",
-      "noPayment": "No payment linked to this booking yet."
+      "noPayment": "No payment linked to this booking yet.",
+      "meetingStatus": {
+        "created": "Zoom link created",
+        "pending": "Awaiting Zoom link"
+      },
+      "fieldsWithHost": {
+        "startUrl": "Host start URL",
+        "hostStartLabel": "Host start URL (tutor)"
+      }
     },
     "common": {
       "yes": "Yes",
       "no": "No",
-      "na": "—"
+      "na": "—",
+      "edit": "Edit",
+      "delete": "Delete",
+      "createCta": "Create {resource}",
+      "confirmDeleteTitle": "Delete {resource}?",
+      "confirmDeleteBody": "This is permanent. Type the resource slug below to confirm.",
+      "confirmDeletePrompt": "Type {slug} to confirm",
+      "confirmDeleteCta": "Delete",
+      "resource": {
+        "program": "program",
+        "grade": "grade",
+        "course": "course",
+        "chapter": "chapter",
+        "session": "session"
+      }
     },
     "import": {
       "title": "Import curriculum",
@@ -1160,13 +1193,22 @@
       "submitting": "Saving…",
       "cancel": "Cancel",
       "saveOk": "Saved.",
-      "saveError": "Could not save. Please check the fields and try again."
+      "saveError": "Could not save. Please check the fields and try again.",
+      "deleting": "Deleting…",
+      "deleteError": "Could not delete. Please try again."
     },
     "sessionEdit": {
       "title": "Edit session",
       "subline": "Update the session's display, pricing, and publish flags. price_cents accepts null for 'price TBD'.",
       "priceTbdHint": "Leave price_cents blank (null) to mark this session as 'price TBD' — Stripe Checkout will then return 422 until a price is set.",
       "saved": "Session updated.",
+      "assignedTutorHint": "Reassigning a tutor does not rewrite historical bookings; the new assignment applies to future bookings only.",
+      "placeholders": {
+        "tutor": "Unassigned"
+      },
+      "empty": {
+        "tutors": "No tutors yet."
+      },
       "fields": {
         "title": "Title",
         "description": "Description",
@@ -1175,7 +1217,206 @@
         "currency": "Currency",
         "calendlyUri": "Calendly event URI",
         "isPublished": "Published",
+        "isPreview": "Free preview",
+        "assignedTutor": "Assigned tutor"
+      }
+    },
+    "programCreate": {
+      "title": "Create program",
+      "subline": "Add a new curriculum program. The slug is the unique URL key (lowercase, dashes).",
+      "submit": "Create program",
+      "resource": "program",
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "description": "Description",
+        "sortOrder": "Sort order",
+        "isPublished": "Published"
+      }
+    },
+    "programEdit": {
+      "title": "Edit program",
+      "subline": "Update the program. Slug renames are sticky — the Excel importer will not overwrite them on re-import.",
+      "saved": "Program updated.",
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "description": "Description",
+        "sortOrder": "Sort order",
+        "isPublished": "Published"
+      }
+    },
+    "gradeCreate": {
+      "title": "Create grade",
+      "subline": "Add a grade under a program. A grade is the optional middle layer of the curriculum hierarchy (e.g. Seconde, Première, Terminale).",
+      "submit": "Create grade",
+      "resource": "grade",
+      "errors": {
+        "programRequired": "Select a parent program first."
+      },
+      "empty": {
+        "programs": "No programs yet — create one first."
+      },
+      "placeholders": {
+        "program": "Pick a program…"
+      },
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "program": "Parent program",
+        "sortOrder": "Sort order"
+      }
+    },
+    "gradeEdit": {
+      "title": "Edit grade",
+      "subline": "Update the grade. Slug renames are sticky.",
+      "saved": "Grade updated.",
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "programSlug": "Parent program slug",
+        "sortOrder": "Sort order"
+      }
+    },
+    "courseCreate": {
+      "title": "Create course",
+      "subline": "Add a course under a program and (optionally) a grade.",
+      "submit": "Create course",
+      "resource": "course",
+      "errors": {
+        "programRequired": "Select a parent program first."
+      },
+      "empty": {
+        "programs": "No programs yet — create one first.",
+        "grades": "No grades yet for this program."
+      },
+      "placeholders": {
+        "program": "Pick a program…",
+        "grade": "Pick a grade (optional)…"
+      },
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "subtitle": "Subtitle",
+        "description": "Description",
+        "program": "Parent program",
+        "grade": "Parent grade (optional)",
+        "isPublished": "Published"
+      }
+    },
+    "courseEdit": {
+      "title": "Edit course",
+      "subline": "Update the course. Slug renames are sticky.",
+      "saved": "Course updated.",
+      "placeholders": {
+        "program": "Pick a program…",
+        "grade": "Pick a grade…"
+      },
+      "empty": {
+        "programs": "No programs yet.",
+        "grades": "No grades yet for this program."
+      },
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "subtitle": "Subtitle",
+        "description": "Description",
+        "program": "Parent program",
+        "grade": "Parent grade",
+        "isPublished": "Published"
+      }
+    },
+    "chapterCreate": {
+      "title": "Create chapter",
+      "subline": "Add a chapter under a course.",
+      "submit": "Create chapter",
+      "resource": "chapter",
+      "errors": {
+        "courseRequired": "Select a parent course first."
+      },
+      "empty": {
+        "courses": "No courses yet — create one first."
+      },
+      "placeholders": {
+        "course": "Pick a course…"
+      },
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "description": "Description",
+        "course": "Parent course",
+        "sortOrder": "Sort order",
+        "durationMin": "Default duration (minutes)",
+        "isPublished": "Published"
+      }
+    },
+    "chapterEdit": {
+      "title": "Edit chapter",
+      "subline": "Update the chapter. Slug renames are sticky.",
+      "saved": "Chapter updated.",
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "description": "Description",
+        "sortOrder": "Sort order",
+        "durationMin": "Default duration (minutes)",
+        "isPublished": "Published"
+      }
+    },
+    "sessionCreate": {
+      "title": "Create session",
+      "subline": "Add a session under a chapter. The position is pre-filled to max(position)+1; you can override it (a duplicate position is rejected with 409).",
+      "submit": "Create session",
+      "resource": "session",
+      "positionHint": "Pre-filled with max(position)+1 for the chosen chapter. You can override; duplicates are rejected with 409.",
+      "priceTbdHint": "Leave blank to mark this session as 'price TBD' — Stripe Checkout will then return 422 until a price is set.",
+      "errors": {
+        "chapterRequired": "Select a parent chapter first."
+      },
+      "fields": {
+        "title": "Title",
+        "slug": "Slug",
+        "chapter": "Parent chapter",
+        "position": "Position",
+        "durationMin": "Duration (minutes)",
+        "priceCents": "Price (cents)",
+        "currency": "Currency",
+        "calendlyUri": "Calendly event URI",
+        "assignedTutor": "Assigned tutor (optional)",
+        "isPublished": "Published",
         "isPreview": "Free preview"
+      },
+      "placeholders": {
+        "chapter": "Pick a chapter…",
+        "tutor": "Unassigned"
+      },
+      "empty": {
+        "chapters": "No chapters yet — create one first.",
+        "tutors": "No tutors yet."
+      }
+    },
+    "tutors": {
+      "title": "Tutors",
+      "subline": "Directory of every tutor. Tutors are read-only here; assign them to sessions from /admin/sessions.",
+      "empty": "No tutors yet.",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "activeSessions": "Active sessions",
+        "totalAssigned": "Total assigned",
+        "status": "Status",
+        "joinedAt": "Joined"
+      },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "detail": {
+        "title": "Tutor",
+        "back": "Back to tutors",
+        "sessionsSubline": "Sessions assigned to this tutor.",
+        "noSessions": "No sessions are currently assigned to this tutor.",
+        "viewSession": "View session"
       }
     }
   },

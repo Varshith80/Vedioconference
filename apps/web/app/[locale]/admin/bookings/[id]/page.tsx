@@ -28,19 +28,22 @@ import {
 } from '@/components/admin/bookings-filtered-list';
 
 // =====================================================================
-// Sprint 3.7 — /admin/bookings/[id] (read-only detail view).
+// Sprint 3.7 + 3.8 — /admin/bookings/[id] (read-only detail view).
 //
 // Shows everything the operator needs in one place:
 //   - Booking info (id, status, scheduled_start/end, timezone,
 //     Calendly invitee, created_at, notes)
 //   - Student (name, email)
-//   - Tutor (name, email)
+//   - Tutor (name, email) — deep link to /admin/tutors/[id]
+//     (Sprint 3.8 polish: was previously the wrong href pointing
+//     to /admin/students)
 //   - Curriculum chain (Program → Course → Chapter → Session)
 //   - Payment (amount, status, provider, created_at)
-//   - Meeting (Zoom join_url, meeting_id, passcode, start_url)
+//   - Meeting (Zoom join_url, meeting_id, passcode, start_url,
+//     meeting-status badge at top-right)
 //
 // Admin actions:
-//   - Copy Zoom link / meeting id / passcode
+//   - Copy Zoom link / meeting id / passcode / start_url
 //   - Open Zoom in a new tab
 //   - View student / tutor (deep links to /admin/students and
 //     /admin/tutors — both still 404 today, marked as placeholders)
@@ -256,12 +259,14 @@ export default async function AdminBookingDetailPage({
                 )}
               </Row>
               <div className="pt-1">
-                <Link
-                  href={`/${locale}/admin/students`}
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  {t('actions.viewTutor')} →
-                </Link>
+                {booking.tutor ? (
+                  <Link
+                    href={`/${locale}/admin/tutors/${booking.tutor.id}`}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    {t('actions.viewTutor')} →
+                  </Link>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -318,12 +323,23 @@ export default async function AdminBookingDetailPage({
           {/* MEETING ---------------------------------------------- */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle className="text-base">
-                <span className="inline-flex items-center gap-2">
-                  <CalendarCheck className="h-4 w-4" aria-hidden={true} />
-                  {t('sections.meeting')}
-                </span>
-              </CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base">
+                  <span className="inline-flex items-center gap-2">
+                    <CalendarCheck className="h-4 w-4" aria-hidden={true} />
+                    {t('sections.meeting')}
+                  </span>
+                </CardTitle>
+                {booking.meeting ? (
+                  <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    {t('meetingStatus.created')}
+                  </span>
+                ) : (
+                  <span className="inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    {t('meetingStatus.pending')}
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {booking.meeting ? (
@@ -343,6 +359,18 @@ export default async function AdminBookingDetailPage({
                       {t('actions.openZoom')}
                     </a>
                   </div>
+                  {booking.meeting.start_url ? (
+                    <Row label={t('fieldsWithHost.hostStartLabel')}>
+                      <span className="break-all font-mono text-xs">
+                        {booking.meeting.start_url}
+                      </span>
+                      <CopyButton
+                        value={booking.meeting.start_url}
+                        label={t('fieldsWithHost.startUrl')}
+                        className="ml-2"
+                      />
+                    </Row>
+                  ) : null}
                   <Row label="Meeting ID">
                     <span className="font-mono">{booking.meeting.meeting_id}</span>
                     <CopyButton
