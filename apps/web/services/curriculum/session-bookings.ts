@@ -6,7 +6,6 @@ import { logger } from '@/lib/utils/logger';
 import type {
   SessionBooking,
   SessionBookingWithDetails,
-  SessionWithChapter,
   MeetingLink,
 } from '@/types/domain';
 
@@ -107,6 +106,13 @@ export const getSessionBookingWithDetails = cache(
  *      grant (the API route does this check before calling
  *      here).
  *
+ * `tutorId` is optional. When the caller does not pass one
+ * (or passes `null`), the new booking's `tutor_id` defaults
+ * to the parent session's `tutor_id` (Sprint 3.8 plan §11).
+ * Bookings created before this default existed keep the
+ * `tutor_id` they were created with — historical immutability
+ * (Sprint 3.8 plan §17).
+ *
  * Returns a discriminated-union result so the route handler
  * can map it to a structured HTTP response.
  */
@@ -117,7 +123,9 @@ export async function createSessionBooking(args: {
   scheduledStart: string; // ISO 8601
   scheduledEnd: string; // ISO 8601
   calendlyInviteeUri?: string;
-  tutorId: string;
+  /** Optional. When null/undefined, the parent session's
+   *  `tutor_id` is used. */
+  tutorId?: string | null;
 }): Promise<CreateBookingResult> {
   try {
     const supabase = await createSupabaseServerClientUntyped();
@@ -131,8 +139,6 @@ export async function createSessionBooking(args: {
       .maybeSingle();
     if (sErr) throw sErr;
     if (!session) return { kind: 'session_not_found' };
-
-    const sess = session as unknown as SessionWithChapter;
 
     const { data: grant, error: gErr } = await supabase
       .from('session_grants')
@@ -150,13 +156,30 @@ export async function createSessionBooking(args: {
       return { kind: 'grant_not_active' };
     }
 
+    // Sprint 3.8 §11: when the caller did not pass a tutor,
+    // default to the parent session's assigned tutor. The
+    // explicit argument still wins.
+    //
+    // The boundary cast to a record is intentional: the
+    // `sessions.tutor_id` column is new (migration
+    // 20260719000001) and will appear on the Session type
+    // after `pnpm db:types` regen. We read it off the raw
+    // session object so this code compiles before AND after
+    // the regen.
+    const sessRecord = session as unknown as Record<string, unknown>;
+    const sessionTutorId =
+      typeof sessRecord['tutor_id'] === 'string'
+        ? (sessRecord['tutor_id'] as string)
+        : null;
+    const resolvedTutorId = args.tutorId ?? sessionTutorId;
+
     const { data, error } = await supabase
       .from('session_bookings')
       .insert({
         student_id: args.studentId,
         session_id: args.sessionId,
         session_grant_id: args.sessionGrantId,
-        tutor_id: args.tutorId,
+        tutor_id: resolvedTutorId,
         scheduled_start: args.scheduledStart,
         scheduled_end: args.scheduledEnd,
         calendly_invitee_uri: args.calendlyInviteeUri ?? null,

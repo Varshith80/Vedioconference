@@ -15,29 +15,27 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint 3.8 done (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 3.8 done + standalone-tutor refactor done (awaiting approval)**.
 
 ## Current status
 
-🟢 **Sprint 3.8 (Admin Manual CRUD) is done.** The admin dashboard
+🟢 **Sprint 3.8 (Admin Manual CRUD) is done.** A post-sprint debug
++ i18n audit + Create-tutor pass is also done. The admin dashboard
 is now a full CRUD console for the entire curriculum hierarchy
 (programs → grades → courses → chapters → sessions) plus a dedicated
-tutors directory. Every list page exposes Create + Edit + Delete with
-the typed-slug confirmation dialog; the Excel import is preserved
-and remains the bulk path on the same natural keys. The new
+tutors directory with a working "Create tutor" dialog. Every list
+page exposes Create + Edit + Delete with the typed-slug
+confirmation dialog; the Excel import is preserved and remains
+the bulk path on the same natural keys. The new
 `sessions.tutor_id` FK (one forward-only migration) lets an admin
 assign a tutor per session; new bookings inherit that tutor via
-`createSessionBooking`, historical bookings keep theirs. The booking
-detail page is polished: the tutor "View" link now goes to
-`/admin/tutors/{id}` (was a copy-paste bug to `/admin/students`),
-the meeting card shows the host `start_url` with a CopyButton and a
-"Zoom link created" / "Awaiting Zoom link" status badge. **Tutor
-scope reminder preserved verbatim:** tutors are admin-managed
-reference records only — no Tutor Dashboard, no tutor auth, no
-tutor-side flows in this version. Quality gates:
-`pnpm type-check` ✓, `pnpm lint` ✓, `pnpm test` ✓ (35 files / 274
-tests, +7 new in Sprint 3.5..3.8), `pnpm build` ✓. **Awaiting
-explicit approval before the next sprint.**
+`createSessionBooking`, historical bookings keep theirs. The
+booking detail page is polished: the tutor "View" link now goes
+to `/admin/tutors/{id}` (was a copy-paste bug to `/admin/students`),
+the meeting card shows the host `start_url` with a CopyButton and
+a "Zoom link created" / "Awaiting Zoom link" status badge.
+
+🟢 **Standalone-tutor refactor (2026-07-19, follow-up to Sprint 3.8) is done.** The Tutor model is now a flat reference table with **zero dependency on `auth.users`, `profiles`, `course_tutors`, or any auth flow**. There is no `auth.admin.createUser()` call anywhere that creates a tutor. The `createTutor` service inserts directly into the standalone `tutors` table using the regular server client (admin-only RLS). The `fn_lock_tutor_profile_id()` trigger and the `trg_tutors_lock_profile` trigger are removed from the schema; all RLS policies that referenced `t.profile_id = auth.uid()` or the `course_tutors` join are rewritten. The marketing "Tuteurs qui enseignent ce cours" block on the course detail page is removed; the persona-style tutor card (avatar / bio / rating / years_experience) is replaced with an operational contact card. **Tutor scope reminder preserved verbatim:** tutors are admin-managed reference records only — no Tutor Dashboard, no tutor auth, no tutor-side flows, no tutor RLS, no tutor JWT. **i18n:** every server + client `t('...')` call has a matching key in **both** `en.json` and `fr.json`; raw keys no longer appear in the UI. **Quality gates after the refactor:** `pnpm type-check` ✓, `pnpm lint` ✓, `pnpm test` ✓ (35 files / 276 tests), `pnpm build` ✓. **Awaiting explicit approval before the next sprint.**
 
 > **Known security follow-up (B2 close-out):**
 > `apps/web/.env.example` contains real Supabase keys. These
@@ -903,8 +901,59 @@ Sprint 3.5 = +8%, Sprint 3.6 = +9%).
 
 ## Last updated
 
-**2026-07-15** by Sprint 3.6 (Admin Dashboard & Excel
-Curriculum Import + v1 Retirement) close-out.
+**2026-07-19** by Sprint 3.8 (Admin Manual CRUD) + post-sprint
+debug + i18n audit + Create-tutor flow + **standalone-tutor
+refactor** close-out.
+
+> **Standalone-tutor refactor (2026-07-19) — final tutor
+> architecture.** The Tutor model is now a flat reference table
+> with **zero dependency on `auth.users`, `profiles`,
+> `course_tutors`, or any auth flow**. There is no
+> `auth.admin.createUser()` call anywhere that creates a tutor;
+> the `createTutor` service inserts directly into the standalone
+> `tutors` table using the regular server client. The
+> `fn_lock_tutor_profile_id()` and `trg_tutors_lock_profile` are
+> removed from the schema; every RLS policy that referenced
+> `t.profile_id = auth.uid()` or the `course_tutors` join is
+> rewritten. The session-booking flow reads
+> `sessions.tutor_id` directly and 409s with
+> `session_has_no_tutor` if the session is unassigned. The
+> marketing persona surface (avatar / bio / rating / years /
+> headline) is replaced with an operational contact card
+> (full_name, email, phone, status, notes) on the public
+> `/tutors/[uuid]` page. The course detail page no longer
+> renders a "Tuteurs qui enseignent ce cours" block. The
+> tutor RLS is admin-only. The full file list and rationale
+> are in
+> `docs/review/PHASE2_SPRINT_3.8_STANDALONE_TUTORS_SUMMARY.md`.
+> All four quality gates are green after the refactor:
+> `pnpm type-check` ✓, `pnpm lint` ✓, `pnpm test` ✓
+> (35 files / 276 tests), `pnpm build` ✓. **The next sprint
+> is gated on explicit user approval.**
+
+> **Sprint 3.8 — Admin Manual CRUD is complete.** The admin
+> dashboard is now a full CRUD console for the entire curriculum
+> hierarchy plus a dedicated tutors directory. The post-sprint
+> debug pass fixed all runtime errors (35 × `MISSING_MESSAGE:
+> Admin.sessionCreate.fields.description`), added the missing
+> i18n keys (6 × `Dashboard.labels.*`, `Admin.tutorCreate` full
+> namespace, 4 × FR-only `programCreate/gradeCreate/programEdit/
+> gradeEdit` namespaces brought to parity, 5 × `Checkout.*` /
+> `Dashboard.module.*` keys), and shipped the **Create tutor**
+> flow (validation schema + `createTutor` service using the
+> service-role client to provision an `auth.users` row + a
+> `profiles` row via the existing `handle_new_user` trigger +
+> a `tutors` row + a `POST /api/admin/tutors` route + a Radix
+> Dialog trigger wired into the `/admin/tutors` page header).
+> The migration index
+> (`docs/database/MIGRATIONS.md`) is now a single source of
+> truth listing every forward-only migration in apply order.
+> All four quality gates are green after the pass:
+> `pnpm type-check` ✓, `pnpm lint` ✓, `pnpm test` ✓ (35 files /
+> 276 tests), `pnpm build` ✓. The tutor scope reminder is
+> preserved verbatim (no tutor dashboard, no tutor auth, no
+> tutor-side flows in this version). **The next sprint is
+> gated on explicit user approval.**
 
 > **Sprint 3.6 — Admin Dashboard & Excel Curriculum Import is
 > complete.** The platform has a working admin dashboard

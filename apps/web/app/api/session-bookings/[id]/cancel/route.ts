@@ -7,14 +7,17 @@ import { requireAdminRoute } from '@/lib/auth/require-admin-route';
 import { cancelSessionBooking } from '@/services/curriculum/session-bookings';
 
 /**
- * POST /api/session-bookings/[id]/cancel — student, tutor, or
- * admin cancel of a `session_booking` row.
+ * POST /api/session-bookings/[id]/cancel — student or admin
+ * cancel of a `session_booking` row.
  *
  * The route checks ownership before calling the service:
  *   - Student must be the row's `student_id`.
- *   - Tutor must own the row's `tutor_id` (i.e. the linked
- *     `tutors.profile_id` matches the caller's auth.uid()).
  *   - Admins can cancel any booking.
+ *
+ * Sprint 3.8 — Tutors are standalone reference records (no
+ * `profile_id`, no auth account). A tutor cannot self-cancel a
+ * booking through this endpoint; if the admin wants to cancel
+ * on a tutor's behalf they use the admin branch.
  *
  * The n8n `module-cancellation` workflow (filename unchanged)
  * is responsible for deleting the Zoom meeting; it fires on
@@ -59,20 +62,10 @@ export async function POST(
       status: string;
     };
 
-    // Ownership: student, tutor (via tutors.profile_id), or
-    // admin (via the shared requireAdminRoute() helper). For
-    // Sprint 3.5 we trust RLS for the admin branch (the
-    // `session_bookings_student_update_cancel` policy).
+    // Ownership: student, or admin (via requireAdminRoute()).
+    // Sprint 3.8 — tutors are standalone (no profile_id), so
+    // there is no tutor-self-cancel branch in the MVP.
     let authorized = bRow.student_id === user.id;
-    if (!authorized) {
-      const { data: tutor } = await supabase
-        .from('tutors')
-        .select('id, profile_id')
-        .eq('id', bRow.tutor_id)
-        .maybeSingle();
-      const tRow = tutor as unknown as { profile_id: string } | null;
-      authorized = tRow?.profile_id === user.id;
-    }
     if (!authorized) {
       // Admin check: the shared requireAdminRoute() throws
       // Forbidden() for non-admins. We catch that and treat

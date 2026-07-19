@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { cn } from '@/lib/utils/cn';
 import {
   adminSessionEditSchema,
@@ -23,7 +24,20 @@ import {
 // is a number input; submitting with the field blank maps
 // to `null` (price TBD) — the API preserves nullability
 // (Sprint 3.5 invariant).
+//
+// Sprint 3.8 — the assigned-tutor FK is managed outside RHF
+// (controlled <SearchableSelect>), and the PATCH body only
+// includes `tutor_id` when the selection differs from the
+// initial value. Clearing the picker sends `null` (unassigned);
+// picking a tutor sends the tutor's UUID. Historical
+// `session_bookings.tutor_id` rows are not affected by session
+// reassignment — that's an immutable history invariant.
 // =====================================================================
+
+export interface TutorOption {
+  value: string; // tutor uuid
+  label: string; // "Full name" (standalone tutor, no headline — Sprint 3.8)
+}
 
 export interface SessionEditFormProps {
   sessionId: string;
@@ -36,13 +50,16 @@ export interface SessionEditFormProps {
     calendly_event_uri: string | null;
     is_published: boolean;
     is_preview: boolean;
+    tutor_id: string | null; // Sprint 3.8 — current assigned tutor
   };
+  tutors: ReadonlyArray<TutorOption>;
   className?: string;
 }
 
 export function SessionEditForm({
   sessionId,
   initial,
+  tutors,
   className,
 }: SessionEditFormProps): React.JSX.Element {
   const t = useTranslations('Admin.sessionEdit');
@@ -52,6 +69,11 @@ export function SessionEditForm({
   const [submitting, setSubmitting] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [savedAt, setSavedAt] = React.useState<number | null>(null);
+  // Sprint 3.8 — the assigned-tutor picker is controlled
+  // outside RHF (matches the create form pattern). `null`
+  // means unassigned. The PATCH body only carries `tutor_id`
+  // when this value diverges from `initial.tutor_id`.
+  const [tutorId, setTutorId] = React.useState<string | null>(initial.tutor_id);
 
   const {
     register,
@@ -108,6 +130,14 @@ export function SessionEditForm({
       }
       if (values.is_preview !== initial.is_preview) {
         body.is_preview = values.is_preview;
+      }
+      // Sprint 3.8 — assigned-tutor FK. We only send it when
+      // the admin's selection diverges from the initial value
+      // to keep PATCH bodies small. `null` (Unassigned) is
+      // distinct from the field being omitted: the API maps
+      // both to the right behavior.
+      if (tutorId !== initial.tutor_id) {
+        body.tutor_id = tutorId;
       }
 
       if (Object.keys(body).length === 0) {
@@ -234,6 +264,21 @@ export function SessionEditForm({
               <input type="checkbox" {...register('is_preview')} />
               {t('fields.isPreview')}
             </label>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="session-tutor">{t('fields.assignedTutor')}</Label>
+            <SearchableSelect
+              id="session-tutor"
+              aria-label={t('fields.assignedTutor')}
+              options={tutors}
+              value={tutorId}
+              onChange={setTutorId}
+              placeholder={t('placeholders.tutor')}
+              emptyMessage={t('empty.tutors')}
+              clearable
+            />
+            <p className="text-xs text-muted-foreground">{t('assignedTutorHint')}</p>
           </div>
 
           <div className="flex items-center gap-3">

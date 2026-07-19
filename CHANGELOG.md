@@ -146,6 +146,261 @@ remains the bulk path on the same natural keys.
 See `docs/review/PHASE2_SPRINT_3.8_SUMMARY.md` for the full
 file-by-file record.
 
+## [1.5.1-phase2-sprint-3.8-debug] — 2026-07-19
+
+### Fixed — Post-sprint debug + i18n audit + Create-tutor flow
+
+This is an **additive** patch on top of Sprint 3.8. The plan and
+S0..S4 deliverables from the 1.5.0 entry above remain valid; this
+entry only lists the additional bugs fixed, missing keys added, and
+the new tutor-creation flow.
+
+#### Runtime fixes
+
+- **35 × `MISSING_MESSAGE: Could not resolve 'Admin.sessionCreate.fields.description'`.**
+  Root cause: `session-create-form.tsx:208` calls
+  `t('fields.description')` but neither locale had the key. Added
+  to **both** `en.json` and `fr.json`.
+
+#### Missing translation keys (server + client)
+
+All added to **both** `en.json` and `fr.json`:
+
+| Namespace | Key(s) | Locale(s) that were missing |
+|-----------|--------|-----------------------------|
+| `Admin.sessionCreate.fields` | `description` | EN + FR |
+| `Admin.common.resource` | `tutor` | EN + FR |
+| `Admin.tutorCreate` (full namespace) | `title, subline, resource, fields.*, placeholders.*, submit` | EN + FR |
+| `Admin.programCreate.{fields, placeholders, empty, errors}` | (full set) | FR only |
+| `Admin.programEdit.fields` | (full set) | FR only |
+| `Admin.gradeCreate.{fields, placeholders, empty, errors}` | (full set) | FR only |
+| `Admin.gradeEdit.fields.programSlug` | 1 key | FR only |
+| `Dashboard.labels` | `start, end, duration, cancelledNotice, linkPendingNotice, paid` (6 keys) | EN + FR |
+| `Dashboard.module` | `book, completed, locked` | EN + FR |
+| `Checkout.sessionGrant` | `cancel` | EN + FR |
+| `Checkout.cancel` | `enrollmentId` | EN + FR |
+
+#### New "Create tutor" flow (additive, no migration)
+
+The S0..S4 plan explicitly left `/admin/tutors` read-only; the
+post-sprint user request asked for the ability to add tutors. New
+additive flow:
+
+- `lib/validations/admin-catalog.ts` — adds
+  `adminTutorCreateSchema` (Zod: `full_name`, `email`, plus
+  optional `headline`, `bio`, `years_experience`, `zoom_user_id`,
+  `calendly_event_uri`, `is_published`).
+- `services/admin/tutors.ts` — adds `createTutor(input)`:
+  1. `admin.auth.admin.listUsers({ email })` to find an existing
+     auth user.
+  2. If none, `admin.auth.admin.createUser` with a 36-char
+     random hex password (tutors never log in) + `email_confirm:
+     true` + `user_metadata: { source: 'admin_tutor_create' }`.
+     The `handle_new_user` trigger mirrors the row into
+     `profiles`.
+  3. `upsert profiles` (handles "profile already exists").
+  4. `insert tutors` with `hourly_rate: 0`, `currency: 'EUR'`.
+     23505 → 409 Conflict.
+- `app/api/admin/tutors/route.ts` — adds the `POST` handler
+  returning 201 + `AdminTutor` JSON.
+- `components/admin/tutor-create-form.tsx` (NEW) — RHF +
+  `zodResolver` + `useTranslations('Admin.tutorCreate')` +
+  `useTranslations('Admin.forms')`; POSTs to `/api/admin/tutors`.
+- `components/admin/tutor-create-trigger.tsx` (NEW) — Radix
+  `Dialog` wrapping the form; "Create tutor" header button.
+- `app/[locale]/admin/tutors/page.tsx` — wires the trigger as
+  `headerAction`.
+
+#### Migration index
+
+- `docs/database/MIGRATIONS.md` (NEW) — every forward-only
+  migration in `supabase/migrations/` listed in apply order with
+  a one-line purpose + RLS impact. No new migration files were
+  added, deleted, or modified during this debug pass. The only
+  schema change in Sprint 3.8 remains
+  `20260719000001_sessions_tutor_id.sql` (the nullable
+  `sessions.tutor_id` column the user explicitly pre-approved).
+
+#### Quality gates
+
+- `pnpm type-check` → exit 0.
+- `pnpm lint` → exit 0 (1 pre-existing `console.log` warning in
+  `lib/utils/logger.ts`, by design).
+- `pnpm test` → **35 files / 276 tests pass** (was 274; the
+  existing `admin-tutors-route` suite picked up the new POST
+  path).
+- `pnpm build` → exit 0. No new top-level routes added;
+  `/api/admin/tutors` now also accepts POST.
+
+#### Out of scope (still)
+
+- No tutor profile edit / archive UI on `/admin/tutors/[id]` in
+  this version. Detail page is read-only.
+- No new RLS policies; no new SaaS; no new top-level folders; no
+  new env vars.
+- No bulk delete. No undo. No audit log of CRUD operations.
+
+## [1.5.2-phase2-sprint-3.8-standalone-tutors] — 2026-07-19
+
+### Changed — Tutors become standalone reference records (final architecture)
+
+The Tutor model is now a flat reference table with **zero dependency
+on `auth.users`, `profiles`, `course_tutors`, or any auth flow**.
+This is the **final** Tutor architecture per the user's explicit
+instruction (no Tutor Dashboard, no Tutor Login, no Tutor
+Authentication, no Tutor Profile, no Tutor Permissions, no Tutor
+RLS, no Tutor Session, no Tutor JWT, no Tutor Auth account).
+
+#### Schema (forward-only migrations, idempotent)
+- `20260707000003_tutors_courses.sql` — `tutors` is now a flat
+  table (`id, full_name, email, phone, status, notes, created_at,
+  updated_at`). No `profile_id`. No FK to `auth.users` or
+  `profiles`. The `course_tutors` M:N join is dropped.
+- `20260707000005_resources_notifications_audit.sql` — removes
+  the now-unused `resources.tutor_id` column.
+- `20260707000006_rls_policies.sql` — removes the
+  `course_tutors_write_admin_only` policy (the table is dropped).
+- `20260707000008_subscriptions_billing.sql` — removes
+  `fn_lock_tutor_profile_id()` and `trg_tutors_lock_profile`
+  (the column they locked no longer exists).
+- `20260714000002_session_grants.sql` and
+  `20260714000003_session_bookings_meeting_links_payments.sql` —
+  RLS rewrite (no `course_tutors` joins; no tutor-as-user
+  checks).
+- `20260714000007_rls_policies_curriculum_v2.sql` — renames
+  `_tutor_admin` → `_admin`; removes all references to
+  `t.profile_id = auth.uid()` and the `course_tutors` join.
+- `supabase/seed/000_seed.sql` and
+  `supabase/seed/consolidated_demo_seed.sql` — standalone tutor
+  row; no `auth.users` / `profiles` / `course_tutors` rows
+  for a tutor.
+- `20260719000001_sessions_tutor_id.sql` — unchanged from
+  Sprint 3.8 S0; `sessions.tutor_id` is the bridge to the
+  standalone `tutors` table.
+
+#### Services
+- `apps/web/services/admin/tutors.ts` (REWRITTEN) —
+  `createTutor()` no longer calls `auth.admin.listUsers`,
+  `auth.admin.createUser`, or `profiles.upsert`. It inserts
+  directly into the standalone `tutors` table with the regular
+  `createSupabaseServerClient`. The `AdminTutor` shape is
+  `{id, full_name, email, phone, status, notes, created_at,
+  updated_at}`.
+- `apps/web/services/tutors.ts` (REWRITTEN, public) — the
+  `PublicTutor` shape mirrors the standalone fields. The
+  persona-style `listCoursesForTutor` is replaced by
+  `listCoursesForTutorStandalone(tutorId)`, which derives the
+  tutor's courses from `sessions.tutor_id` joined to
+  `chapters → courses`. The marketing directory
+  `getAllPublishedTutorSlugs()` returns `[]`.
+- `apps/web/services/admin/bookings.ts` — `BOOKINGS_SELECT`
+  no longer joins `tutor:profiles(...)`; the join is the
+  standalone `tutor:tutors!session_bookings_tutor_id_fkey(...)`.
+
+#### API
+- `apps/web/app/api/session-bookings/route.ts` — replaces the
+  `course_tutors` lookup with a direct read of
+  `sessions.tutor_id`. Returns `409 session_has_no_tutor` if
+  the session is unassigned.
+- `apps/web/app/api/session-bookings/[id]/cancel/route.ts` —
+  removes the tutor-self-cancel branch (tutors are no longer
+  users with `auth.uid()`). Only the student or an admin can
+  cancel.
+- `apps/web/app/api/courses/[slug]/route.ts` — removes the
+  `course_tutors` embed from the select.
+- `apps/web/app/api/tutors/route.ts` (public) — selects the
+  standalone fields, filters by `status: 'active'`, orders by
+  `full_name`.
+- `apps/web/app/api/admin/tutors/route.ts` — already
+  standalone; consumes the new `createTutor` / `getAllTutors`
+  service contract.
+
+#### Validation
+- `apps/web/lib/validations/admin-catalog.ts` —
+  `adminTutorCreateSchema` is rewritten to
+  `{full_name, email, phone?, status?, notes?}` (was
+  `{full_name, email, headline?, bio?, years_experience?,
+  zoom_user_id?, calendly_event_uri?, is_published?}`).
+  `adminTutorEditSchema` is the `.partial()` of the new
+  create schema.
+
+#### Forms / components
+- `apps/web/components/admin/tutor-create-form.tsx`
+  (REWRITTEN) — new fields: full_name, email, phone, status
+  (active / inactive), notes.
+- `apps/web/components/admin/session-create-form.tsx` and
+  `session-edit-form.tsx` — `TutorOption.label` is now just
+  the tutor's `full_name` (no headline).
+- `apps/web/components/marketing/tutor-card.tsx`
+  (REWRITTEN) — operational contact card; no avatar / bio /
+  rating / years_experience.
+- `apps/web/components/marketing/tutor-detail.tsx`
+  (REWRITTEN) — operational contact card + assigned courses
+  list (no avatar, no Star, no BookOpen).
+- `apps/web/components/marketing/course-detail.tsx` — drops
+  the `tutors` prop and the "Tuteurs qui enseignent ce cours"
+  block.
+
+#### Pages
+- `apps/web/app/[locale]/(marketing)/courses/[slug]/page.tsx`
+  — removes the `listPublishedTutors` / `listCoursesForTutor`
+  lookup and the tutor block; renders only the course content.
+- `apps/web/app/[locale]/(marketing)/tutors/[slug]/page.tsx`
+  — `generateStaticParams` removed (no marketing persona
+  directory); metadata uses just `tutor.full_name`.
+- `apps/web/app/[locale]/admin/tutors/page.tsx` — list uses
+  the new shape; phone shown in the name column; status
+  derived from `tutor.status === 'active'`.
+- `apps/web/app/[locale]/admin/tutors/[id]/page.tsx` —
+  replaces `headline` with `phone`; `is_published` →
+  `status === 'active'`; shows `notes` when present.
+
+#### Tests
+- `apps/web/tests/unit/admin-tutors-route.test.ts`
+  (REWRITTEN) — mock data is the standalone shape; both
+  `active` and `inactive` tutors are returned.
+- `apps/web/tests/unit/admin-bookings-service.test.ts`
+  (FIXTURES UPDATED) — `tutor.profile.full_name` →
+  `tutor.full_name` (no `profile` sub-join).
+- `apps/web/tests/unit/session-bookings-route.test.ts`
+  (FIXTURES UPDATED) — `SESSION_ROW` carries `tutor_id`
+  directly (was `chapter: { course_id }` + a separate
+  `course_tutors` lookup); the "no tutor" test asserts the
+  new `session_has_no_tutor` error code.
+
+#### i18n
+- `apps/web/messages/en.json` — `Admin.tutors.*` and
+  `Admin.tutorCreate.*` namespaces rewritten to the standalone
+  fields (`fullName, email, phone, status, notes`).
+- `apps/web/messages/fr.json` — same rewrite to French.
+
+#### Types
+- `apps/web/types/database.generated.ts` — `TutorRow` shape
+  is the standalone fields; `course_tutors` and
+  `fn_lock_tutor_profile_id` are removed.
+- `apps/web/types/domain.ts` — `CourseTutor` type alias is
+  removed; doc comment updated.
+
+#### Docs
+- `docs/database/MIGRATIONS.md` — `tutors` row in the
+  migration index now describes the standalone shape; the
+  `app_role` enum note is updated to remove the `tutor` value.
+- `docs/review/PHASE2_SPRINT_3.8_STANDALONE_TUTORS_SUMMARY.md`
+  (NEW) — full close-out note (rationale, file list, smoke
+  checklist).
+- `PROJECT_STATE.md` — current status now mentions the
+  standalone-tutor refactor; the "Last updated" block has a
+  dedicated section for the refactor.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `pnpm type-check` | ✓ exit 0 |
+| `pnpm lint` | ✓ exit 0 (only the pre-existing `lib/utils/logger.ts:31` warning, unrelated) |
+| `pnpm test` | ✓ 35 files / **276 tests pass** (5 tests fixed to match the new shape) |
+| `pnpm build` | ✓ exit 0; 110/110 static pages generated |
+
 ## [1.5.0-phase2-sprint-3.6] — 2026-07-15
 
 ### Added — Admin Dashboard, Excel Curriculum Import, and v1 Retirement (Sprint 3.6)
@@ -1088,3 +1343,6 @@ student purchases and attends **sessions**, not courses.
 [1.2.0-phase2-sprint-b1]: 2026-07-09
 [1.3.0-phase2-sprint-b1-i18n]: 2026-07-09
 [1.4.0-phase2-sprint-b2]: 2026-07-09
+[1.5.0-phase2-sprint-3.6]: 2026-07-15
+[1.5.0-phase2-sprint-3.8]: 2026-07-19
+[1.5.1-phase2-sprint-3.8-debug]: 2026-07-19

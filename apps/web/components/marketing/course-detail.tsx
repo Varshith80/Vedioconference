@@ -1,18 +1,15 @@
 import * as React from 'react';
-import { Clock, BookOpen, GraduationCap, Star } from 'lucide-react';
+import { Clock, BookOpen, GraduationCap } from 'lucide-react';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/shared/empty-state';
 import { formatCents } from '@/lib/utils/format';
 import { JsonLd } from '@/components/marketing/jsonld';
 import type { Course } from '@/types/domain';
-import Link from 'next/link';
 
 interface CourseDetailProps {
   course: Course;
@@ -23,11 +20,12 @@ interface CourseDetailProps {
    *  `lib/i18n/localized-title.ts`; the importer is the
    *  only writer of the metadata field. */
   displayTitle?: string;
-  /** Tutors who teach this course. Empty array is fine. */
-  tutors: Array<{ id: string; full_name: string; avatar_url: string | null; rating: number }>;
+  // Sprint 3.8 — `tutors` is removed. Tutors are now
+  // operational reference records, not marketing personas;
+  // the course detail page no longer renders a tutor list.
 }
 
-export function CourseDetail({ course, displayTitle, tutors }: CourseDetailProps) {
+export function CourseDetail({ course, displayTitle }: CourseDetailProps) {
   // The display title is the localized string; fall back to
   // `course.title` when the caller did not pre-resolve it.
   const title = displayTitle ?? course.title;
@@ -53,7 +51,7 @@ export function CourseDetail({ course, displayTitle, tutors }: CourseDetailProps
       <Section spacing="default">
         <Container>
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-12">
               <Heading level="h2" className="text-2xl sm:text-3xl">
                 Présentation
               </Heading>
@@ -85,7 +83,7 @@ export function CourseDetail({ course, displayTitle, tutors }: CourseDetailProps
               </div>
             </div>
 
-            <aside className="lg:col-span-4">
+            <aside className="lg:col-span-12">
               <Card>
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground">Tarif</p>
@@ -107,59 +105,6 @@ export function CourseDetail({ course, displayTitle, tutors }: CourseDetailProps
               </Card>
             </aside>
           </div>
-        </Container>
-      </Section>
-
-      <Section spacing="default" tone="muted" aria-labelledby="course-tutors-title">
-        <Container>
-          <Heading id="course-tutors-title" level="h2" className="text-2xl sm:text-3xl">
-            Tuteurs qui enseignent ce cours
-          </Heading>
-          {tutors.length === 0 ? (
-            <div className="mt-6">
-              <EmptyState
-                title="Aucun tuteur disponible pour ce cours"
-                description="Revenez bientôt : de nouveaux profils sont ajoutés chaque semaine."
-              />
-            </div>
-          ) : (
-            <ul
-              role="list"
-              className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            >
-              {tutors.map((t) => (
-                <li key={t.id}>
-                  <Link
-                    href={`/tutors/${t.id}`}
-                    className="block rounded-xl border bg-card p-5 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-6"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        {t.avatar_url ? <AvatarImage src={t.avatar_url} alt="" /> : null}
-                        <AvatarFallback>
-                          {t.full_name
-                            .split(' ')
-                            .map((w) => w[0])
-                            .slice(0, 2)
-                            .join('')
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
-                          {t.full_name}
-                        </p>
-                        <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Star className="h-3 w-3 fill-warning text-warning" aria-hidden="true" />
-                          {t.rating.toFixed(1)} / 5
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
         </Container>
       </Section>
 

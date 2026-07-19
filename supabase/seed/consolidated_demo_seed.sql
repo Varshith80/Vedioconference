@@ -17,20 +17,19 @@
 --     lands in Sprint 5 with the Excel import
 --     (`POST /api/sessions` bulk endpoint).
 --
--- Safety audit (2026-07-11, updated 2026-07-15)
+-- Safety audit (2026-07-19, Sprint 3.8 standalone-tutor refactor)
 -- ------------------------
 -- Operations present in this file:
---   - 5 x INSERT INTO auth.users ... on conflict (id) do nothing
---   - 4 x INSERT INTO public.profiles ... on conflict (id) do nothing
---         (one uses do update set role = excluded.role; this only
---          escalates the demo admin profile to 'super_admin' if
---          the row already exists, never touching other rows)
+--   - 2 x INSERT INTO auth.users ... on conflict (id) do nothing
+--   - 2 x INSERT INTO public.profiles ... on conflict (id) do nothing
+--         (the admin profile uses do update set role = excluded.role;
+--          it re-asserts the role to 'super_admin' and refreshes the
+--          email + full_name if the row already exists — never touches
+--          any other row or any other column)
 --   - 3 x INSERT INTO public.courses ... on conflict (id) do nothing
 --   - 1 x INSERT INTO public.tutors ... on conflict (id) do nothing
---   - 1 x INSERT INTO public.course_tutors ... on conflict do nothing
---   - 1 x UPDATE public.tutors SET zoom_user_id = ... WHERE id = ... AND zoom_user_id IS NULL
---         (only affects rows where zoom_user_id is null — never overwrites an
---          existing value; never touches any other column)
+--         (Sprint 3.8: tutor is now a STANDALONE row — no auth.users,
+--          no profiles, no course_tutors mapping)
 --
 -- Operations NOT present in this file:
 --   - DROP, DELETE, TRUNCATE: ZERO
@@ -43,7 +42,15 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- Demo admin user
+-- Single administrator user
+--
+-- This is the ONLY administrator provisioned by the seed. The
+-- UUID below is the canonical admin id; re-running the seed
+-- keeps the same row and re-asserts `role = 'super_admin'`.
+-- `super_admin` is the strictest role in `public.user_role`; it
+-- satisfies both `is_admin()` and `is_super_admin()` so this
+-- account has every admin permission currently in the codebase
+-- (Admin Dashboard, every admin API, every admin page).
 -- ---------------------------------------------------------------------
 insert into auth.users (
     instance_id, id, aud, role, email,
@@ -53,10 +60,10 @@ insert into auth.users (
 )
 values (
     '00000000-0000-0000-0000-000000000000',
-    '11111111-1111-1111-1111-111111111111',
+    '191a7a66-3bdc-4bba-8461-7d349ca9c04d',
     'authenticated', 'authenticated',
-    'admin@example.com',
-    crypt('Admin#1234', gen_salt('bf')),
+    'webvedioconference@gmail.com',
+    crypt('WebVedio@999', gen_salt('bf')),
     now(),
     jsonb_build_object('provider','email','providers', array['email']),
     jsonb_build_object('full_name','Site Admin'),
@@ -65,8 +72,11 @@ values (
 on conflict (id) do nothing;
 
 insert into public.profiles (id, email, full_name, role)
-values ('11111111-1111-1111-1111-111111111111', 'admin@example.com', 'Site Admin', 'super_admin')
-on conflict (id) do update set role = excluded.role;
+values ('191a7a66-3bdc-4bba-8461-7d349ca9c04d', 'webvedioconference@gmail.com', 'Site Admin', 'super_admin')
+on conflict (id) do update set
+    role      = excluded.role,
+    email     = excluded.email,
+    full_name = excluded.full_name;
 
 -- ---------------------------------------------------------------------
 -- Demo student user
@@ -105,20 +115,16 @@ values
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------
--- Demo tutor profile + tutors row
+-- Demo tutor (standalone — no auth.users, no profiles row)
 -- ---------------------------------------------------------------------
-insert into public.profiles (id, email, full_name, role)
-values ('33333333-3333-3333-3333-333333333333', 'tutor@example.com', 'Demo Tutor', 'student')
+insert into public.tutors (id, full_name, email, status, phone, notes)
+values ('cccccccc-cccc-cccc-cccc-cccccccccc01',
+        'Demo Tutor',
+        'tutor@example.com',
+        'active',
+        null,
+        'Seeded demo tutor for development & manual smoke tests.')
 on conflict (id) do nothing;
-
-insert into public.tutors (id, profile_id, bio, headline, years_experience, hourly_rate, is_published)
-values ('cccccccc-cccc-cccc-cccc-cccccccccc01', '33333333-3333-3333-3333-333333333333',
-        'Professeur certifié, 8 ans d''expérience.', 'Agrégé de Mathématiques', 8, 60.00, true)
-on conflict (id) do nothing;
-
-insert into public.course_tutors (course_id, tutor_id, is_primary)
-values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccc01', true)
-on conflict do nothing;
 
 -- ---------------------------------------------------------------------
 -- Demo modules (3 per course = 9 total)
@@ -132,11 +138,8 @@ on conflict do nothing;
 -- Sprint 5 with the Excel import.
 
 -- ---------------------------------------------------------------------
--- Backfill the demo tutor with a placeholder Zoom user id. This UPDATE
--- only fires when zoom_user_id IS NULL — it never overwrites an
--- existing value and never touches any other column.
+-- Note: the v1 `tutors.zoom_user_id` column is gone. Tutors are
+-- standalone records in Sprint 3.8+; the Zoom account linkage
+-- happens at session-assignment time via the session-edit form's
+-- Calendly event URI + the n8n Zoom workflow.
 -- ---------------------------------------------------------------------
-update public.tutors
-   set zoom_user_id = 'demo-zoom-user-id'
- where id = 'cccccccc-cccc-cccc-cccc-cccccccccc01'
-   and zoom_user_id is null;

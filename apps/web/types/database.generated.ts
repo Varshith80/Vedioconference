@@ -149,23 +149,18 @@ export interface ProfileRow {
 }
 
 /**
- * `public.tutors` — 1:1 with a profile. Holds the Calendly
- * event type and the Zoom user id. (Migration 03)
+ * `public.tutors` — STANDALONE reference records (Sprint 3.8).
+ * No `profile_id` FK, no auth.users linkage, no RLS for self-read.
+ * Used only for session assignment and Zoom meeting ownership.
+ * (Migration 03)
  */
 export interface TutorRow {
   id: string;
-  profile_id: string;
-  bio: string | null;
-  headline: string | null;
-  years_experience: number | null;
-  hourly_rate: number | string; // numeric(10,2)
-  currency: string;
-  calendly_event_uri: string | null;
-  zoom_user_id: string | null;
-  is_published: boolean;
-  rating_avg: number | string | null; // numeric(3,2)
-  rating_count: number;
-  metadata: Json;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  status: 'active' | 'inactive';
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -206,14 +201,11 @@ export interface CourseRow {
 }
 
 /**
- * `public.course_tutors` — many-to-many course ↔ tutor. (Migration 03)
+ * `public.tutors` is now a standalone reference table (Sprint 3.8)
+ * — the previous many-to-many `course_tutors` join is removed.
+ * Sessions carry their assigned tutor directly via
+ * `sessions.tutor_id`. See `SessionRow.tutor_id` below.
  */
-export interface CourseTutorRow {
-  course_id: string;
-  tutor_id: string;
-  is_primary: boolean;
-  created_at: string;
-}
 
 /**
  * `public.payments` — one row per payment attempt. The unit of
@@ -265,11 +257,15 @@ export interface MeetingLinkRow {
 /**
  * `public.resources` — study material. Visibility is `public`,
  * `enrolled`, or `private`. (Migration 05)
+ *
+ * Sprint 3.8 — `tutor_id` column removed. Tutors are standalone
+ * reference records with no authorship role. Resources are
+ * uploaded by admins (via `uploaded_by`, which still points to
+ * `public.profiles` for the real user that performed the upload).
  */
 export interface ResourceRow {
   id: string;
   course_id: string | null;
-  tutor_id: string | null;
   title: string;
   description: string | null;
   file_path: string;
@@ -507,6 +503,11 @@ export interface SessionRow {
   metadata: Json;
   created_at: string;
   updated_at: string;
+  // Sprint 3.8 — assigned-tutor FK. NULLable so existing
+  // Excel-imported sessions stay valid until the admin
+  // backfills via /admin/sessions/[id]. See
+  // supabase/migrations/20260719000001_sessions_tutor_id.sql.
+  tutor_id: string | null;
 }
 
 /**
@@ -585,7 +586,6 @@ export type Database = {
       profiles: Table<ProfileRow>;
       tutors: Table<TutorRow>;
       courses: Table<CourseRow>;
-      course_tutors: Table<CourseTutorRow>;
       payments: Table<PaymentRow>;
       meeting_links: Table<MeetingLinkRow>;
       resources: Table<ResourceRow>;
@@ -621,7 +621,9 @@ export type Database = {
       handle_new_user: FunctionDef<Record<string, never>, unknown>;
       fn_no_tutor_overlap: FunctionDef<Record<string, never>, unknown>;
       fn_block_role_self_escalation: FunctionDef<Record<string, never>, unknown>;
-      fn_lock_tutor_profile_id: FunctionDef<Record<string, never>, unknown>;
+      // Sprint 3.8 — `fn_lock_tutor_profile_id` is REMOVED.
+      // Tutors are standalone (no `profile_id` column), so the
+      // immutability trigger has no column to guard.
       fn_block_late_cancel: FunctionDef<Record<string, never>, unknown>;
       // Sprint 3.5 — the no-op completion hook for
       // session_grants. Triggered on session_bookings updates;

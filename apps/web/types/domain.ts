@@ -48,9 +48,14 @@ export type EnrollmentStatus = Database['public']['Enums']['enrollment_status'];
 // -- Row types (derived from the typed Database) ---------------------------
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
+// Sprint 3.8 — `Tutor` is the standalone reference record. The
+// shape is `{ id, full_name, email, phone, status, notes, ... }`.
+// Tutors are NOT users, do NOT have a `profile_id`, and the
+// `tutors` table is admin-only via RLS.
 export type Tutor = Database['public']['Tables']['tutors']['Row'];
 export type Course = Database['public']['Tables']['courses']['Row'];
-export type CourseTutor = Database['public']['Tables']['course_tutors']['Row'];
+// Sprint 3.8 — the `course_tutors` join is removed. Session
+// assignment is now direct via `sessions.tutor_id`.
 
 /**
  * `payments` — one row per Stripe charge. The unit of payment

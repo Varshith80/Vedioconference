@@ -29,6 +29,10 @@ const bodySchema = z.object({
   price_cents: z.number().int().nonnegative().nullable().optional(),
   currency: z.string().length(3).optional(),
   calendly_event_uri: z.string().url().optional(),
+  // Sprint 3.8 — assigned-tutor FK (nullable). The value comes
+  // from the admin session-create form's SearchableSelect; it
+  // may also be `null` to mark the session as unassigned.
+  tutor_id: z.string().uuid().nullable().optional(),
   is_published: z.boolean().optional(),
   is_preview: z.boolean().optional(),
 });
@@ -65,6 +69,10 @@ export async function POST(req: NextRequest) {
       price_cents: parsed.data.price_cents ?? null,
       currency: parsed.data.currency ?? 'EUR',
       calendly_event_uri: parsed.data.calendly_event_uri ?? null,
+      // Sprint 3.8 — `tutor_id` defaults to NULL when the admin
+      // picked "Unassigned". The 23503 FK violation (tutor no
+      // longer exists) is mapped to 409 below.
+      tutor_id: parsed.data.tutor_id ?? null,
       is_published: parsed.data.is_published ?? false,
       is_preview: parsed.data.is_preview ?? false,
       metadata: {},
@@ -76,6 +84,9 @@ export async function POST(req: NextRequest) {
       .select('*')
       .single();
     if (error) {
+      if ((error as { code?: string }).code === '23503') {
+        throw new ApiError(409, 'tutor_not_found', 'Tutor not found.');
+      }
       logger.error('Failed to create session', { error: error.message, payload: insertPayload });
       throw new ApiError(500, 'session_create_failed', 'Could not create session.', { reason: error.message });
     }

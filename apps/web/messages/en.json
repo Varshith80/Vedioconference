@@ -642,12 +642,16 @@
   "Dashboard": {
     "loading": "Loading your space…",
     "labels": {
+      "dashboard": "Dashboard",
+      "bookings": "My bookings",
+      "resources": "Resources",
+      "profile": "Profile",
       "start": "Start",
       "end": "End",
       "duration": "Duration",
-      "paid": "Paid",
       "cancelledNotice": "This session was cancelled.",
-      "linkPendingNotice": "The Zoom link will be available a few minutes before the session starts."
+      "linkPendingNotice": "The video link will be available here shortly before the session starts.",
+      "paid": "Paid"
     },
     "layout": {
       "loading": "Loading your space…"
@@ -798,18 +802,15 @@
       "signOut": "Sign out",
       "signOutAria": "Sign out"
     },
-    "labels": {
-      "dashboard": "Dashboard",
-      "bookings": "My bookings",
-      "resources": "Resources",
-      "profile": "Profile"
-    },
     "module": {
       "title": "Modules",
       "bookCta": "Book",
+      "book": "Book",
       "bookAgainCta": "Book again",
       "joinCta": "Join the session",
       "viewCta": "View",
+      "completed": "Completed",
+      "locked": "Locked",
       "status": {
         "not_started": "Not started",
         "in_progress": "In progress",
@@ -1166,7 +1167,8 @@
         "grade": "grade",
         "course": "course",
         "chapter": "chapter",
-        "session": "session"
+        "session": "session",
+        "tutor": "tutor"
       }
     },
     "import": {
@@ -1383,6 +1385,7 @@
         "currency": "Currency",
         "calendlyUri": "Calendly event URI",
         "assignedTutor": "Assigned tutor (optional)",
+        "description": "Description",
         "isPublished": "Published",
         "isPreview": "Free preview"
       },
@@ -1393,6 +1396,28 @@
       "empty": {
         "chapters": "No chapters yet — create one first.",
         "tutors": "No tutors yet."
+      }
+    },
+    "tutorCreate": {
+      "title": "Create tutor",
+      "subline": "Add a new tutor to the directory. Tutors carry only the fields needed for session assignment and Zoom link sharing — there is no tutor dashboard.",
+      "submit": "Create tutor",
+      "resource": "tutor",
+      "errors": {
+        "required": "Name and email are required."
+      },
+      "fields": {
+        "fullName": "Full name",
+        "email": "Email",
+        "headline": "Headline",
+        "bio": "Short bio",
+        "zoomUserId": "Zoom user ID",
+        "calendlyEventUri": "Calendly event URI",
+        "isPublished": "Published"
+      },
+      "placeholders": {
+        "zoom": "e.g. abc123XYZ from Zoom S2S",
+        "calendly": "https://api.calendly.com/event_types/…"
       }
     },
     "tutors": {
@@ -1480,6 +1505,7 @@
       "title": "Complete your purchase",
       "description": "You're one step away from owning this session. Secure payment is handled by Stripe — your card never touches our servers.",
       "payButton": "Pay with Stripe",
+      "cancel": "Cancel",
       "secureNote": "Payments are secured by Stripe. Cards are tokenised; we never store them.",
       "backToSession": "Back to the session",
       "alreadyPaidDescription": "This session is already yours. You can book a slot from your dashboard.",
@@ -1493,12 +1519,57 @@
       "goToDashboard": "Go to my courses",
       "browseMore": "Browse more courses"
     },
+    "tutors": {
+      "title": "Tutors",
+      "subline": "Standalone reference records. The Admin maintains this list for session assignment only — tutors are not application users.",
+      "empty": "No tutors yet. Use the + button to add one.",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "activeSessions": "Active sessions",
+        "totalAssigned": "Total assigned",
+        "status": "Status",
+        "joinedAt": "Joined",
+        "notes": "Notes"
+      },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "detail": {
+        "title": "Tutor detail",
+        "back": "Back to tutors",
+        "sessionsSubline": "Sessions assigned to this tutor",
+        "noSessions": "No sessions are currently assigned to this tutor.",
+        "viewSession": "View session"
+      }
+    },
+    "tutorCreate": {
+      "title": "Add a tutor",
+      "subline": "Create a standalone reference record. No login, no profile, no auth account is created.",
+      "fields": {
+        "fullName": "Full name",
+        "email": "Email",
+        "phone": "Phone (optional)",
+        "status": "Status",
+        "notes": "Notes (optional)"
+      },
+      "placeholders": {
+        "phone": "+33 6 …"
+      },
+      "statusOptions": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "submit": "Add tutor"
+    },
     "cancel": {
       "title": "Payment cancelled",
       "description": "Your card was not charged. You can resume the payment from your dashboard, or browse other courses.",
       "goToDashboard": "Go to my dashboard",
       "browseMore": "Browse courses",
-      "retry": "Retry payment"
+      "retry": "Retry payment",
+      "enrollmentId": "Enrollment ID"
     }
   },
   "Emails": {

@@ -1,30 +1,45 @@
 import * as React from 'react';
 import Link from 'next/link';
-import { Star, BookOpen, Clock } from 'lucide-react';
+import { Mail, Phone, BookOpen, Clock } from 'lucide-react';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { formatCents } from '@/lib/utils/format';
-import { JsonLd } from '@/components/marketing/jsonld';
 import type { PublicTutor } from '@/services/tutors';
 import type { Course } from '@/types/domain';
+
+// =====================================================================
+// Sprint 3.8 — Public tutor detail page.
+//
+// Tutors are now standalone reference records. The persona chrome
+// (avatar, headline, bio, rating, years_experience) is gone. The
+// page now shows the operational contact surface (name, email,
+// phone, status) and the list of assigned courses if any.
+//
+// There is no "book a session" CTA at the public level — booking
+// happens inside the course detail page where the assigned tutor
+// is shown alongside the chapter list.
+// =====================================================================
 
 interface TutorDetailProps {
   tutor: PublicTutor;
   courses: Course[];
 }
 
-export function TutorDetail({ tutor, courses }: TutorDetailProps) {
+export function TutorDetail({ tutor, courses }: TutorDetailProps): React.JSX.Element {
   return (
     <>
       <PageHeader
         title={tutor.full_name}
-        description={tutor.headline || 'Tuteur vérifié sur Vedioconference'}
+        description={
+          tutor.status === 'active'
+            ? 'Tuteur actif sur Vedioconference'
+            : 'Tuteur inactif sur Vedioconference'
+        }
         breadcrumbs={[
           { label: 'Accueil', href: '/' },
           { label: 'Tuteurs', href: '/tutors' },
@@ -36,46 +51,71 @@ export function TutorDetail({ tutor, courses }: TutorDetailProps) {
         <Container>
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
             <div className="lg:col-span-8">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
-                  {tutor.avatar_url ? <AvatarImage src={tutor.avatar_url} alt="" /> : null}
-                  <AvatarFallback>
-                    {tutor.full_name
-                      .split(' ')
-                      .map((w) => w[0])
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+              <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
-                  <div className="inline-flex items-center gap-1 text-sm font-medium text-foreground">
-                    <Star className="h-4 w-4 fill-warning text-warning" aria-hidden="true" />
-                    {tutor.rating.toFixed(1)} / 5
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Nom
+                  </dt>
+                  <dd className="mt-1 font-medium text-foreground">{tutor.full_name}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Statut
+                  </dt>
+                  <dd className="mt-1">
+                    <Badge variant={tutor.status === 'active' ? 'secondary' : 'outline'}>
+                      {tutor.status}
+                    </Badge>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Email
+                  </dt>
+                  <dd className="mt-1 inline-flex items-center gap-1.5 text-foreground">
+                    <Mail className="h-3 w-3" aria-hidden="true" />
+                    <a href={`mailto:${tutor.email}`} className="hover:underline">
+                      {tutor.email}
+                    </a>
+                  </dd>
+                </div>
+                {tutor.phone ? (
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Téléphone
+                    </dt>
+                    <dd className="mt-1 inline-flex items-center gap-1.5 text-foreground">
+                      <Phone className="h-3 w-3" aria-hidden="true" />
+                      <a href={`tel:${tutor.phone}`} className="hover:underline">
+                        {tutor.phone}
+                      </a>
+                    </dd>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {tutor.years_experience} an{tutor.years_experience > 1 ? 's' : ''} d’expérience
+                ) : null}
+              </dl>
+
+              {tutor.notes ? (
+                <div className="mt-8">
+                  <Heading level="h2" className="text-2xl sm:text-3xl">
+                    Notes internes
+                  </Heading>
+                  <p className="mt-3 max-w-prose whitespace-pre-line text-base text-muted-foreground">
+                    {tutor.notes}
                   </p>
                 </div>
-              </div>
-
-              <Heading level="h2" className="mt-8 text-2xl sm:text-3xl">
-                Présentation
-              </Heading>
-              <p className="mt-3 max-w-prose text-base text-muted-foreground">
-                {tutor.bio || 'Présentation à venir.'}
-              </p>
+              ) : null}
             </div>
 
             <aside className="lg:col-span-4">
               <div className="rounded-xl border bg-muted/30 p-6">
-                <h2 className="text-base font-semibold text-foreground">Réserver une séance</h2>
+                <h2 className="text-base font-semibold text-foreground">
+                  Réserver une séance
+                </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Les réservations seront disponibles en Phase 3.
+                  Choisissez un cours enseigné par ce tuteur pour réserver une séance.
                 </p>
-                <Button className="mt-4 w-full" disabled aria-disabled>
-                  Réserver
+                <Button className="mt-4 w-full" asChild>
+                  <a href="#tutor-courses-title">Voir les cours</a>
                 </Button>
               </div>
             </aside>
@@ -138,22 +178,6 @@ export function TutorDetail({ tutor, courses }: TutorDetailProps) {
           )}
         </Container>
       </Section>
-
-      <JsonLd
-        id="person-jsonld"
-        data={{
-          '@context': 'https://schema.org',
-          '@type': 'Person',
-          name: tutor.full_name,
-          description: tutor.bio,
-          jobTitle: tutor.headline,
-          image: tutor.avatar_url ?? undefined,
-          worksFor: {
-            '@type': 'Organization',
-            name: 'Vedioconference',
-          },
-        }}
-      />
     </>
   );
 }

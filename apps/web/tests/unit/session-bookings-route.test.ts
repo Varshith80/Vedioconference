@@ -48,11 +48,17 @@ function tableQueue(responses: Row[]) {
   };
 }
 
+// Sprint 3.8 — the route now reads `sessions.tutor_id`
+// directly (no more `course_tutors` lookup). The session
+// row fixture carries `tutor_id` on the session itself.
 const SESSION_ROW = {
   id: '11111111-1111-1111-1111-111111111111',
-  chapter: { course_id: 'c1' },
+  tutor_id: 't1',
 };
-const CT_ROW = { tutor_id: 't1' };
+const SESSION_ROW_NO_TUTOR = {
+  id: '11111111-1111-1111-1111-111111111111',
+  tutor_id: null,
+};
 const BOOKING_ROW = {
   id: '33333333-3333-3333-3333-333333333333',
   student_id: 'u1',
@@ -120,28 +126,24 @@ describe('POST /api/session-bookings', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 409 no_tutor_for_course when no tutor is assigned to the course', async () => {
+  it('returns 409 session_has_no_tutor when the session has no assigned tutor', async () => {
     mockAuthUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
+    // Sprint 3.8 — the route does ONE query (the session row
+    // carries `tutor_id` directly).
     await loadServerMockMocked(
-      tableQueue([
-        { data: SESSION_ROW, error: null },
-        { data: null, error: null },
-      ]),
+      tableQueue([{ data: SESSION_ROW_NO_TUTOR, error: null }]),
     );
     const res = await POST(makeReq(VALID_BODY));
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: { code: string } };
-    expect(body.error.code).toBe('no_tutor_for_course');
+    expect(body.error.code).toBe('session_has_no_tutor');
   });
 
   it('returns 409 grant_inactive when the service reports the grant is not active', async () => {
     mockAuthUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
     mockCreateBooking.mockResolvedValue({ kind: 'grant_not_active' });
     await loadServerMockMocked(
-      tableQueue([
-        { data: SESSION_ROW, error: null },
-        { data: CT_ROW, error: null },
-      ]),
+      tableQueue([{ data: SESSION_ROW, error: null }]),
     );
     const res = await POST(makeReq(VALID_BODY));
     expect(res.status).toBe(409);
@@ -153,10 +155,7 @@ describe('POST /api/session-bookings', () => {
     mockAuthUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
     mockCreateBooking.mockResolvedValue({ kind: 'ok', booking: BOOKING_ROW });
     await loadServerMockMocked(
-      tableQueue([
-        { data: SESSION_ROW, error: null },
-        { data: CT_ROW, error: null },
-      ]),
+      tableQueue([{ data: SESSION_ROW, error: null }]),
     );
     const res = await POST(makeReq(VALID_BODY));
     expect(res.status).toBe(201);

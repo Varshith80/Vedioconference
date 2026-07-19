@@ -1,36 +1,53 @@
 -- =====================================================================
 -- Migration: 20260707000003_tutors_courses.sql
--- Description: Tutors and courses (with the course <-> tutor mapping).
+-- Description: Standalone Tutors (no auth dependency) + courses +
+--              the v2 curriculum links.
+--
+-- Sprint 3.8 — Tutor Architecture Refactor.
+-- Tutors are NO LONGER 1:1 with auth.users / public.profiles.
+-- They are STANDALONE reference records managed only by the
+-- Admin. They exist for three purposes:
+--   1. Assigning a tutor to a session (`sessions.tutor_id`).
+--   2. Showing the assigned tutor in the admin Bookings page.
+--   3. Letting the admin know who should receive the Zoom
+--      meeting details for a given session.
+--
+-- There is NO tutor auth account, NO tutor profile, NO tutor
+-- session, NO tutor JWT. The `profile_id` FK and the
+-- `course_tutors` join table that tied tutors to a user's
+-- profile are removed; sessions inherit the assigned tutor
+-- directly (FK on `sessions.tutor_id`).
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- tutors – a teacher profile, linked 1:1 to a public.profiles row
+-- tutors – standalone reference records (no auth dependency)
 -- ---------------------------------------------------------------------
 create table if not exists public.tutors (
-    id              uuid primary key default gen_random_uuid(),
-    profile_id      uuid unique not null references public.profiles(id) on delete cascade,
-    bio             text,
-    headline        text,                                  -- e.g. "Agrégé de Mathématiques"
-    years_experience integer default 0,
-    hourly_rate     numeric(10, 2) not null,               -- in EUR
-    currency        char(3) not null default 'EUR',
-    calendly_event_uri text,                               -- e.g. https://api.calendly.com/event_types/AAA
-    zoom_user_id    text,                                  -- Zoom user id
-    is_published    boolean not null default false,
-    rating_avg      numeric(3, 2) default 0,               -- 0.00 – 5.00
-    rating_count    integer not null default 0,
-    metadata        jsonb not null default '{}'::jsonb,
-    created_at      timestamptz not null default now(),
-    updated_at      timestamptz not null default now()
+    id          uuid primary key default gen_random_uuid(),
+    full_name   text not null,
+    email       text not null,
+    phone       text,
+    -- 'active' = currently teaching on the platform,
+    -- 'inactive' = paused but kept for history.
+    status      text not null default 'active'
+                  check (status in ('active', 'inactive')),
+    notes       text,
+    created_at  timestamptz not null default now(),
+    updated_at  timestamptz not null default now()
 );
 
-create index if not exists idx_tutors_profile_id   on public.tutors(profile_id);
-create index if not exists idx_tutors_is_published on public.tutors(is_published);
+create unique index if not exists uq_tutors_email
+    on public.tutors (lower(email));
+create index if not exists idx_tutors_status
+    on public.tutors (status);
 
 drop trigger if exists trg_tutors_updated_at on public.tutors;
 create trigger trg_tutors_updated_at
     before update on public.tutors
     for each row execute function public.set_updated_at();
+
+comment on table public.tutors is
+    'Standalone tutor reference records. NOT users. Admin-managed only. Used for session assignment and Zoom meeting ownership.';
 
 -- ---------------------------------------------------------------------
 -- courses – tutoring offerings (subject, level, price)
@@ -66,14 +83,19 @@ create trigger trg_courses_updated_at
     for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------
--- course_tutors – many-to-many join between courses and tutors
+-- NOTE on `course_tutors`
 -- ---------------------------------------------------------------------
-create table if not exists public.course_tutors (
-    course_id   uuid not null references public.courses(id) on delete cascade,
-    tutor_id    uuid not null references public.tutors(id)  on delete cascade,
-    is_primary  boolean not null default false,
-    created_at  timestamptz not null default now(),
-    primary key (course_id, tutor_id)
-);
-
-create index if not exists idx_course_tutors_tutor_id on public.course_tutors(tutor_id);
+-- The v1 many-to-many `course_tutors` table is DROPPED in this
+-- migration (down from the previous 1:1 with `tutors.profile_id`).
+-- Tutors are now assigned to SESSIONS (the atomic unit of the
+-- v2 curriculum), not to whole courses. The `sessions.tutor_id`
+-- column is the new single point of assignment (migration
+-- 20260719000001). A course can be taught by N different tutors,
+-- one per session.
+--
+-- We do not need to DROP an old `course_tutors` table here
+-- because the v2 migrations that follow this one never reference
+-- it again — the v2 RLS for `session_grants` and
+-- `session_bookings` no longer joins through `course_tutors`
+-- (see migration 20260714000002 / 20260714000003 / 20260714000007
+-- for the rewritten policies).

@@ -5,12 +5,16 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- resources – study material uploaded by tutors / admins
+-- resources – study material uploaded by admins
 -- ---------------------------------------------------------------------
+-- Sprint 3.8 — `tutor_id` column removed. Tutors are standalone
+-- reference records in the new architecture; they have no
+-- authorship role. The `uploaded_by` FK (pointing at
+-- `public.profiles`) records which admin user uploaded the
+-- file. Resources are admin-managed only in this MVP.
 create table if not exists public.resources (
     id              uuid primary key default gen_random_uuid(),
     course_id       uuid references public.courses(id) on delete cascade,
-    tutor_id        uuid references public.tutors(id)  on delete set null,
     title           text not null,
     description     text,
     file_path       text not null,                        -- relative to the storage bucket
@@ -26,7 +30,6 @@ create table if not exists public.resources (
 );
 
 create index if not exists idx_resources_course_id  on public.resources(course_id);
-create index if not exists idx_resources_tutor_id   on public.resources(tutor_id);
 create index if not exists idx_resources_visibility on public.resources(visibility);
 
 drop trigger if exists trg_resources_updated_at on public.resources;

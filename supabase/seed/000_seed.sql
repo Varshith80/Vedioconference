@@ -4,7 +4,15 @@
 --              DO NOT run in production.
 -- =====================================================================
 
--- Demo admin (idempotent)
+-- Single administrator (idempotent).
+--
+-- This is the ONLY administrator provisioned by the seed. The
+-- UUID below is the canonical admin id; re-running the seed
+-- keeps the same row and re-asserts `role = 'super_admin'`.
+-- `super_admin` is the strictest role in `public.user_role`; it
+-- satisfies both `is_admin()` and `is_super_admin()` so this
+-- account has every admin permission currently in the codebase
+-- (Admin Dashboard, every admin API, every admin page).
 insert into auth.users (
     instance_id, id, aud, role, email,
     encrypted_password, email_confirmed_at,
@@ -13,10 +21,10 @@ insert into auth.users (
 )
 values (
     '00000000-0000-0000-0000-000000000000',
-    '11111111-1111-1111-1111-111111111111',
+    '191a7a66-3bdc-4bba-8461-7d349ca9c04d',
     'authenticated', 'authenticated',
-    'admin@example.com',
-    crypt('Admin#1234', gen_salt('bf')),
+    'webvedioconference@gmail.com',
+    crypt('WebVedio@999', gen_salt('bf')),
     now(),
     jsonb_build_object('provider','email','providers', array['email']),
     jsonb_build_object('full_name','Site Admin'),
@@ -25,8 +33,11 @@ values (
 on conflict (id) do nothing;
 
 insert into public.profiles (id, email, full_name, role)
-values ('11111111-1111-1111-1111-111111111111', 'admin@example.com', 'Site Admin', 'super_admin')
-on conflict (id) do update set role = excluded.role;
+values ('191a7a66-3bdc-4bba-8461-7d349ca9c04d', 'webvedioconference@gmail.com', 'Site Admin', 'super_admin')
+on conflict (id) do update set
+    role      = excluded.role,
+    email     = excluded.email,
+    full_name = excluded.full_name;
 
 -- Demo student
 insert into auth.users (
@@ -60,17 +71,12 @@ values
     ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'francais-lycee',  'Français – Lycée',          'Méthodologie, dissertation, commentaire.',          'Aide au bac de français.',       'Français',      'Lycée',     'high_school',   4000, 60, true)
 on conflict (id) do nothing;
 
--- Demo tutor
-insert into public.profiles (id, email, full_name, role)
-values ('33333333-3333-3333-3333-333333333333', 'tutor@example.com', 'Demo Tutor', 'student')
+-- Demo tutor (standalone — no auth.users, no profiles row)
+insert into public.tutors (id, full_name, email, status, phone, notes)
+values ('cccccccc-cccc-cccc-cccc-cccccccccc01',
+        'Demo Tutor',
+        'tutor@example.com',
+        'active',
+        null,
+        'Seeded demo tutor for development & manual smoke tests.')
 on conflict (id) do nothing;
-
-insert into public.tutors (id, profile_id, bio, headline, years_experience, hourly_rate, is_published)
-values ('cccccccc-cccc-cccc-cccc-cccccccccc01', '33333333-3333-3333-3333-333333333333',
-        'Professeur certifié, 8 ans d''expérience.', 'Agrégé de Mathématiques', 8, 60.00, true)
-on conflict (id) do nothing;
-
--- Course / tutor mapping
-insert into public.course_tutors (course_id, tutor_id, is_primary)
-values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccc01', true)
-on conflict do nothing;

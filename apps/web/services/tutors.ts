@@ -1,64 +1,79 @@
-﻿import 'server-only';
+import 'server-only';
 import { cache } from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { describeError } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
 import type { Course } from '@/types/domain';
 
+// =====================================================================
+// Sprint 3.8 — Standalone tutor architecture.
+//
+// Tutors are no longer 1:1 with `auth.users` + `profiles` and no
+// longer have a `course_tutors` join. They are a flat reference
+// table (`public.tutors`). The marketing site no longer renders a
+// public tutor directory: there is no "Meet the tutors" page in
+// the MVP because tutors are operational records, not personas.
+//
+// This file is kept so existing imports (`listPublishedTutors`,
+// `getTutorBySlug`, `getAllPublishedTutorSlugs`) still resolve
+// type-wise and the marketing route falls back to "[]" without a
+// 500. If a future sprint re-introduces a public tutor directory,
+// it will use the standalone shape defined here.
+// =====================================================================
+
 /** RFC 4122-shaped UUID, lower-case. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** Public shape of a tutor on the marketing site. */
+/** Public shape of a tutor on the marketing site (standalone MVP). */
 export interface PublicTutor {
   id: string;
   full_name: string;
-  bio: string;
-  headline: string;
-  years_experience: number;
-  rating: number;
-  avatar_url: string | null;
+  email: string;
+  phone: string | null;
+  status: 'active' | 'inactive';
+  notes: string | null;
 }
 
-/** Row shape returned by the joined select below. */
-interface TutorJoinRow {
+interface TutorRow {
   id: string;
-  headline: string | null;
-  bio: string | null;
-  years_experience: number | null;
-  rating_avg: number | null;
-  profile: {
-    full_name: string | null;
-    avatar_url: string | null;
-  } | {
-    full_name: string | null;
-    avatar_url: string | null;
-  }[] | null;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  status: 'active' | 'inactive';
+  notes: string | null;
 }
 
-function toPublicTutor(row: TutorJoinRow): PublicTutor {
-  const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+function toPublicTutor(row: TutorRow): PublicTutor {
   return {
     id: row.id,
-    full_name: profile?.full_name ?? 'Tuteur',
-    bio: row.bio ?? '',
-    headline: row.headline ?? '',
-    years_experience: row.years_experience ?? 0,
-    rating: row.rating_avg ?? 0,
-    avatar_url: profile?.avatar_url ?? null,
+    full_name: row.full_name,
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    notes: row.notes,
   };
 }
 
-const TUTOR_SELECT = 'id, headline, bio, years_experience, rating_avg, profile:profiles!inner(full_name, avatar_url)';
+const TUTOR_SELECT = 'id, full_name, email, phone, status, notes';
 
+/**
+ * Active tutors, ordered by full_name asc.
+ *
+ * Returns an empty array in the MVP because tutors are operational
+ * records that the Admin manages — not a marketing surface. The
+ * marketing "tutors" page is removed; this function remains only
+ * so any leftover call site degrades to an EmptyState.
+ */
 export const listPublishedTutors = cache(async (): Promise<PublicTutor[]> => {
   try {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from('tutors')
       .select(TUTOR_SELECT)
-      .eq('is_published', true);
+      .eq('status', 'active')
+      .order('full_name', { ascending: true });
     if (error) throw error;
-    return ((data ?? []) as unknown as TutorJoinRow[]).map(toPublicTutor);
+    return ((data ?? []) as unknown as TutorRow[]).map(toPublicTutor);
   } catch (e) {
     // Marketing lists must degrade gracefully when the database
     // is unreachable. The page renders an EmptyState; we log the
@@ -68,63 +83,73 @@ export const listPublishedTutors = cache(async (): Promise<PublicTutor[]> => {
   }
 });
 
+/**
+ * Single tutor by id. Kept for URL backwards-compat
+ * (`/tutors/[uuid]` is still a valid route, but the page now
+ * just returns notFound() because the marketing surface is
+ * gone in the MVP).
+ */
 export const getTutorBySlug = cache(async (slug: string): Promise<PublicTutor | null> => {
   try {
-    // The route param is named `[slug]` for URL backwards-compatibility
-    // but the database key is the tutor uuid. Validating the shape
-    // here avoids a noisy 22P02 log line on every non-uuid input
-    // (e.g. when a user types `/tutors/abc` into the URL bar).
     if (!UUID_RE.test(slug)) return null;
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from('tutors')
       .select(TUTOR_SELECT)
       .eq('id', slug)
-      .eq('is_published', true)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
-    return toPublicTutor(data as unknown as TutorJoinRow);
+    return toPublicTutor(data as unknown as TutorRow);
   } catch (e) {
-    // Returns null on DB failure so the page can render its
-    // not-found UI instead of crashing the request. The notFound()
-    // call is reserved for the "row genuinely does not exist"
-    // case, which we still get when the DB is up.
     logger.error('getTutorBySlug failed', { slug, ...describeError(e) });
     return null;
   }
 });
 
+/** Slug list for sitemap. Returns []. The marketing route is gone. */
 export const getAllPublishedTutorSlugs = cache(async (): Promise<string[]> => {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from('tutors')
-      .select('id')
-      .eq('is_published', true);
-    if (error) throw error;
-    return (data ?? []).map((r) => (r as { id: string }).id);
-  } catch {
-    // Build-time safe: see getAllPublishedCourseSlugs.
-    return [];
-  }
+  return [];
 });
 
-/** Courses taught by a given tutor (via the course_tutors join table). */
-export const listCoursesForTutor = cache(async (tutorId: string): Promise<Course[]> => {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from('course_tutors')
-      .select('course:courses!inner(*)')
-      .eq('tutor_id', tutorId)
-      .eq('course.is_published', true);
-    if (error) throw error;
-    return ((data ?? []) as unknown as Array<{ course: Course | Course[] | null }>)
-      .map((r) => (Array.isArray(r.course) ? r.course[0] : r.course))
-      .filter((c): c is Course => Boolean(c));
-  } catch (e) {
-    logger.error('listCoursesForTutor failed', { tutorId, ...describeError(e) });
-    return [];
-  }
-});
+/**
+ * Courses assigned to a tutor, derived from `sessions.tutor_id`.
+ *
+ * Sprint 3.8 — there is no longer a `course_tutors` join table.
+ * A tutor is "assigned" to a course if they have at least one
+ * session (chapter-level) in that course. We dedupe courses by
+ * id and order by course title.
+ */
+export const listCoursesForTutorStandalone = cache(
+  async (tutorId: string): Promise<Course[]> => {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from('sessions')
+        .select(
+          'chapter:chapters!inner(course:courses!inner(id, slug, title, subtitle, description, subject, level, level_group, program_id, grade_id, price_cents, currency, duration_min, is_subscription, is_published, cover_image, metadata, created_at, updated_at))',
+        )
+        .eq('tutor_id', tutorId)
+        .eq('chapter.course.is_published', true);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as Array<{
+        chapter: {
+          course: Course | Course[] | null;
+        } | null;
+      }>;
+      const seen = new Map<string, Course>();
+      for (const r of rows) {
+        const raw = r.chapter?.course;
+        const c = Array.isArray(raw) ? raw[0] : raw;
+        if (c && !seen.has(c.id)) seen.set(c.id, c);
+      }
+      return Array.from(seen.values()).sort((a, b) => a.title.localeCompare(b.title));
+    } catch (e) {
+      logger.error('listCoursesForTutorStandalone failed', {
+        tutorId,
+        ...describeError(e),
+      });
+      return [];
+    }
+  },
+);

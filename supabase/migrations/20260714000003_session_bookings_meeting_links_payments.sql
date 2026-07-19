@@ -116,19 +116,15 @@ create index if not exists idx_payments_session_grant_id on public.payments(sess
 -- ---------------------------------------------------------------------
 alter table public.session_bookings enable row level security;
 
--- 5.1  Read policy: owner student, assigned tutor, or admin.
+-- 5.1  Read policy: owner student or admin. (Tutors are no
+--      longer auth users in Sprint 3.8, so the tutor-self-read
+--      branch is gone — tutors are reference records.)
 drop policy if exists session_bookings_select_owner_tutor_admin on public.session_bookings;
-create policy session_bookings_select_owner_tutor_admin
+create policy session_bookings_select_owner_admin
     on public.session_bookings for select
     using (
         student_id = auth.uid()
         or public.is_admin()
-        or exists (
-            select 1
-            from public.tutors t
-            where t.id = session_bookings.tutor_id
-              and t.profile_id = auth.uid()
-        )
     );
 
 -- 5.2  Student self-cancel: status flip from 'scheduled' or

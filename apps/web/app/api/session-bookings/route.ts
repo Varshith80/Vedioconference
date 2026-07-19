@@ -52,30 +52,28 @@ export async function POST(req: NextRequest) {
       throw BadRequest('Invalid request body.', { issues: parsed.error.issues });
     }
 
-    // Resolve the tutor for the session. The booking always
-    // carries a tutor_id (denormalised for the new flow). For
-    // Sprint 3.5 the first tutor linked to the parent course
-    // is used; the Phase 4 tutor-picker UI will let the
-    // student pick one explicitly.
+    // Resolve the tutor for the session. Sprint 3.8 — the
+    // tutor is now carried directly on the session row
+    // (`sessions.tutor_id`). The booking inherits it; the
+    // student no longer picks a tutor in the MVP (no tutor
+    // picker UI). A NULL session.tutor_id means the session
+    // is unassigned → 409 so the student knows to choose
+    // another session or wait for the admin to assign one.
     const { data: session, error: sErr } = await supabase
       .from('sessions')
-      .select('id, chapter:chapters(course_id)')
+      .select('id, tutor_id')
       .eq('id', parsed.data.session_id)
       .maybeSingle();
     if (sErr) throw sErr;
     if (!session) throw NotFound('Session not found.');
-    const sessRow = session as unknown as { chapter: { course_id: string } | null };
-
-    const { data: ct, error: ctErr } = await supabase
-      .from('course_tutors')
-      .select('tutor_id')
-      .eq('course_id', sessRow.chapter?.course_id ?? '')
-      .limit(1)
-      .maybeSingle();
-    if (ctErr) throw ctErr;
-    const tutorId = (ct as unknown as { tutor_id: string } | null)?.tutor_id;
+    const sessRow = session as unknown as { tutor_id: string | null };
+    const tutorId = sessRow.tutor_id ?? null;
     if (!tutorId) {
-      throw new ApiError(409, 'no_tutor_for_course', 'No tutor is currently assigned to this course.');
+      throw new ApiError(
+        409,
+        'session_has_no_tutor',
+        'No tutor is currently assigned to this session. Please choose another session or contact support.',
+      );
     }
 
     // Create the session booking row. This is the source of

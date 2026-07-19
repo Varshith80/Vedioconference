@@ -6,14 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Asserts:
 //   - 401 for anonymous
 //   - 200 for admins
-//   - 200 body includes tutors that are NOT published (the admin
-//     variant of `getAllTutors()` returns every tutor including
-//     unpublished / archived — the directory surface in
-//     /admin/tutors must see them all).
+//   - 200 body includes BOTH active and inactive tutors (the admin
+//     directory shows every row regardless of `status`).
 //
-// The route delegates entirely to `getAllTutors()` from
-// `services/admin/tutors.ts`. The mock for that call is the
-// `from('tutors').select(…).order(…)` chain.
+// Tutors are now standalone reference records (no profile join,
+// no headline/bio/years_experience, no is_published). The row
+// shape is `{ id, full_name, email, phone, status, notes,
+// created_at, updated_at }`.
 // =====================================================================
 
 // Mocks must come before the route import.
@@ -58,12 +57,12 @@ describe('GET /api/admin/tutors', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 200 with the full tutor directory (including unpublished)', async () => {
+  it('returns 200 with the full tutor directory (active + inactive)', async () => {
     mockRequireAdminRoute.mockResolvedValue({
       supabase: { from: mockFrom },
     });
-    // Two tutors: one published, one NOT published. The admin
-    // variant must return BOTH.
+    // Two tutors: one active, one inactive. The admin variant
+    // returns BOTH regardless of `status`.
     mockFrom.mockImplementation((table: string) => {
       if (table !== 'tutors') {
         throw new Error(`Unexpected table in test: ${table}`);
@@ -72,33 +71,23 @@ describe('GET /api/admin/tutors', () => {
         data: [
           {
             id: 'tutor-1',
-            headline: 'Maths',
-            bio: null,
-            years_experience: 5,
-            rating_avg: 4.5,
-            is_published: true,
+            full_name: 'Alice Martin',
+            email: 'alice@example.com',
+            phone: '+33600000001',
+            status: 'active',
+            notes: null,
             created_at: '2026-01-01T00:00:00Z',
-            profile: {
-              id: 'profile-1',
-              full_name: 'Alice Martin',
-              email: 'alice@example.com',
-              avatar_url: null,
-            },
+            updated_at: '2026-01-01T00:00:00Z',
           },
           {
             id: 'tutor-2',
-            headline: 'Physique',
-            bio: null,
-            years_experience: 2,
-            rating_avg: null,
-            is_published: false, // <-- the admin must see this one too
+            full_name: 'Bob Dupont',
+            email: 'bob@example.com',
+            phone: null,
+            status: 'inactive', // <-- the admin must see this one too
+            notes: 'On leave until 2026-08.',
             created_at: '2026-02-01T00:00:00Z',
-            profile: {
-              id: 'profile-2',
-              full_name: 'Bob Dupont',
-              email: 'bob@example.com',
-              avatar_url: null,
-            },
+            updated_at: '2026-02-01T00:00:00Z',
           },
         ],
       });
@@ -111,17 +100,17 @@ describe('GET /api/admin/tutors', () => {
       data: ReadonlyArray<{
         id: string;
         full_name: string;
-        email: string | null;
-        is_published: boolean;
+        email: string;
+        status: 'active' | 'inactive';
       }>;
     };
     expect(body.ok).toBe(true);
     expect(body.data).toHaveLength(2);
     const ids = body.data.map((t) => t.id);
     expect(ids).toEqual(['tutor-1', 'tutor-2']);
-    const unpublished = body.data.find((t) => t.id === 'tutor-2');
-    expect(unpublished?.is_published).toBe(false);
-    expect(unpublished?.full_name).toBe('Bob Dupont');
+    const inactive = body.data.find((t) => t.id === 'tutor-2');
+    expect(inactive?.status).toBe('inactive');
+    expect(inactive?.full_name).toBe('Bob Dupont');
   });
 
   it('returns 200 with an empty list when the directory has no tutors', async () => {

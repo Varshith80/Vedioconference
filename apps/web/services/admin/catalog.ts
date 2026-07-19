@@ -201,3 +201,112 @@ export const getSessionById = cache(
     }
   },
 );
+
+// =====================================================================
+// Sprint 3.8 — single-row lookups for the Admin Manual CRUD plan
+// (§7). Each helper is cache()-wrapped, returns null on miss or
+// read failure, and is the parent-row loader for the new edit
+// pages. The boundary cast is applied here, not in the RSC, so the
+// page gets a strongly-typed row (CLAUDE.md §3.9).
+// =====================================================================
+
+export const getProgramById = cache(
+  async (id: string): Promise<Record<string, unknown> | null> => {
+    try {
+      const supabase = await createSupabaseServerClientUntyped();
+      const { data, error } = await supabase
+        .from('programs')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as Record<string, unknown> | null;
+    } catch (e) {
+      logger.error('admin.getProgramById failed', { id, ...describeError(e) });
+      return null;
+    }
+  },
+);
+
+export const getGradeById = cache(
+  async (id: string): Promise<Record<string, unknown> | null> => {
+    try {
+      const supabase = await createSupabaseServerClientUntyped();
+      const { data, error } = await supabase
+        .from('grades')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as Record<string, unknown> | null;
+    } catch (e) {
+      logger.error('admin.getGradeById failed', { id, ...describeError(e) });
+      return null;
+    }
+  },
+);
+
+export const getCourseById = cache(
+  async (id: string): Promise<Record<string, unknown> | null> => {
+    try {
+      const supabase = await createSupabaseServerClientUntyped();
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as Record<string, unknown> | null;
+    } catch (e) {
+      logger.error('admin.getCourseById failed', { id, ...describeError(e) });
+      return null;
+    }
+  },
+);
+
+export const getChapterById = cache(
+  async (id: string): Promise<Record<string, unknown> | null> => {
+    try {
+      const supabase = await createSupabaseServerClientUntyped();
+      const { data, error } = await supabase
+        .from('chapters')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as Record<string, unknown> | null;
+    } catch (e) {
+      logger.error('admin.getChapterById failed', { id, ...describeError(e) });
+      return null;
+    }
+  },
+);
+
+// Pre-fill `position` in the session-create form. Returns
+// max(position)+1 for the chapter, or 1 when the chapter has no
+// sessions yet. The admin can override the value; collisions
+// surface as 409 from POST /api/sessions (the existing unique
+// constraint on (chapter_id, position)).
+export const getNextSessionPosition = cache(
+  async (chapterId: string): Promise<number> => {
+    try {
+      const supabase = await createSupabaseServerClientUntyped();
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('position')
+        .eq('chapter_id', chapterId)
+        .order('position', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      const row = data as { position: number } | null;
+      return (row?.position ?? 0) + 1;
+    } catch (e) {
+      logger.error('admin.getNextSessionPosition failed', {
+        chapterId,
+        ...describeError(e),
+      });
+      return 1;
+    }
+  },
+);

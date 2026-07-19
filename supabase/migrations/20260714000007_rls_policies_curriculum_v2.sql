@@ -117,39 +117,23 @@ create policy sessions_admin_write
     using (public.is_admin() or public.is_super_admin())
     with check (public.is_admin() or public.is_super_admin());
 
--- 2.5  `session_grants` — owner / tutor / admin read; deny writes
+-- 2.5  `session_grants` — owner / admin read; deny writes
 drop policy if exists session_grants_select_owner_tutor_admin on public.session_grants;
-create policy session_grants_select_owner_tutor_admin
+create policy session_grants_select_owner_admin
     on public.session_grants for select
     using (
         student_id = auth.uid()
         or public.is_admin()
-        or exists (
-            select 1
-            from public.sessions s
-            join public.chapters ch on ch.id = s.chapter_id
-            join public.tutors t
-              join public.course_tutors ct on ct.tutor_id = t.id
-              on ct.course_id = ch.course_id
-            where s.id = session_grants.session_id
-              and t.profile_id = auth.uid()
-        )
     );
 
--- 2.6  `session_bookings` — owner / tutor / admin read;
+-- 2.6  `session_bookings` — owner / admin read;
 --      student self-cancel write (status flip only)
 drop policy if exists session_bookings_select_owner_tutor_admin on public.session_bookings;
-create policy session_bookings_select_owner_tutor_admin
+create policy session_bookings_select_owner_admin
     on public.session_bookings for select
     using (
         student_id = auth.uid()
         or public.is_admin()
-        or exists (
-            select 1
-            from public.tutors t
-            where t.id = session_bookings.tutor_id
-              and t.profile_id = auth.uid()
-        )
     );
 
 drop policy if exists session_bookings_student_update_cancel on public.session_bookings;

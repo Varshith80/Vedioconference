@@ -27,6 +27,11 @@ const patchSchema = z.object({
   price_cents: z.number().int().nonnegative().nullable().optional(),
   currency: z.string().length(3).optional(),
   calendly_event_uri: z.string().url().nullable().optional(),
+  // Sprint 3.8 — assigned-tutor FK. Sending `null` clears the
+  // assignment. Sending a UUID re-assigns. The new value
+  // applies to FUTURE bookings only — historical
+  // `session_bookings.tutor_id` rows are immutable.
+  tutor_id: z.string().uuid().nullable().optional(),
   is_published: z.boolean().optional(),
   is_preview: z.boolean().optional(),
 });
@@ -59,6 +64,9 @@ export async function PATCH(
       if ((error as { code?: string }).code === 'PGRST116') {
         throw NotFound(`Session not found: ${id}`);
       }
+      if ((error as { code?: string }).code === '23503') {
+        throw new ApiError(409, 'tutor_not_found', 'Tutor not found.');
+      }
       logger.error('Failed to update session', { error: error.message, id, updates });
       throw new ApiError(500, 'session_update_failed', 'Could not update session.', {
         reason: error.message,
@@ -66,6 +74,39 @@ export async function PATCH(
     }
 
     return jsonResponse({ ok: true as const, data });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+// =====================================================================
+// Sprint 3.8 — DELETE /api/sessions/[id] (admin). Hard delete.
+// FK CASCADE on `session_bookings.session_id` cleans up child
+// bookings automatically; 23503 (a still-referenced FK we did not
+// anticipate) maps to 409.
+// =====================================================================
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { supabase } = await requireAdminRoute();
+    const { id } = await params;
+
+    const { error } = await supabase.from('sessions').delete().eq('id', id);
+    if (error) {
+      if ((error as { code?: string }).code === 'PGRST116') {
+        throw NotFound(`Session not found: ${id}`);
+      }
+      if ((error as { code?: string }).code === '23503') {
+        throw new ApiError(409, 'session_in_use', 'Session is still referenced.');
+      }
+      logger.error('Failed to delete session', { error: error.message, id });
+      throw new ApiError(500, 'session_delete_failed', 'Could not delete session.', {
+        reason: error.message,
+      });
+    }
+    return jsonResponse({ ok: true as const, data: { id } });
   } catch (e) {
     return errorResponse(e);
   }

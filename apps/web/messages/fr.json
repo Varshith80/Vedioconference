@@ -642,12 +642,16 @@
   "Dashboard": {
     "loading": "Chargement de votre espace…",
     "labels": {
+      "dashboard": "Tableau de bord",
+      "bookings": "Mes réservations",
+      "resources": "Ressources",
+      "profile": "Profil",
       "start": "Début",
       "end": "Fin",
       "duration": "Durée",
-      "paid": "Payé",
-      "cancelledNotice": "Cette séance a été annulée.",
-      "linkPendingNotice": "Le lien Zoom sera disponible quelques minutes avant le début de la séance."
+      "cancelledNotice": "Cette session a été annulée.",
+      "linkPendingNotice": "Le lien vidéo sera disponible ici peu avant le début de la session.",
+      "paid": "Payé"
     },
     "layout": {
       "loading": "Chargement de votre espace…"
@@ -798,18 +802,15 @@
       "signOut": "Se déconnecter",
       "signOutAria": "Se déconnecter"
     },
-    "labels": {
-      "dashboard": "Tableau de bord",
-      "bookings": "Mes réservations",
-      "resources": "Ressources",
-      "profile": "Profil"
-    },
     "module": {
       "title": "Modules",
       "bookCta": "Réserver",
+      "book": "Réserver",
       "bookAgainCta": "Réserver à nouveau",
       "joinCta": "Rejoindre la session",
       "viewCta": "Voir",
+      "completed": "Terminé",
+      "locked": "Verrouillé",
       "status": {
         "not_started": "Non commencé",
         "in_progress": "En cours",
@@ -1166,7 +1167,8 @@
         "grade": "niveau",
         "course": "cours",
         "chapter": "chapitre",
-        "session": "séance"
+        "session": "séance",
+        "tutor": "tuteur"
       }
     },
     "import": {
@@ -1226,28 +1228,63 @@
       "subline": "Ajoutez un nouveau programme au cursus. Le slug devient l'identifiant URL.",
       "submit": "Créer le programme",
       "saved": "Programme créé.",
-      "resource": "programme"
+      "resource": "programme",
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "description": "Description",
+        "sortOrder": "Ordre",
+        "isPublished": "Publié"
+      }
     },
     "programEdit": {
       "title": "Modifier le programme",
       "subline": "Mettez à jour le programme. Les renommages de slug sont conservés — relancer l'import Excel ne réécrira pas le slug.",
       "submit": "Enregistrer",
       "saved": "Programme mis à jour.",
-      "resource": "programme"
+      "resource": "programme",
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "description": "Description",
+        "sortOrder": "Ordre",
+        "isPublished": "Publié"
+      }
     },
     "gradeCreate": {
       "title": "Créer un niveau",
       "subline": "Ajoutez un niveau sous un programme. Un niveau représente l'année d'études (Seconde, Première, Terminale…).",
       "submit": "Créer le niveau",
       "saved": "Niveau créé.",
-      "resource": "niveau"
+      "resource": "niveau",
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "program": "Programme parent",
+        "sortOrder": "Ordre"
+      },
+      "placeholders": {
+        "program": "Choisir un programme…"
+      },
+      "empty": {
+        "programs": "Aucun programme disponible — créez-en un d'abord."
+      },
+      "errors": {
+        "programRequired": "Sélectionnez d'abord un programme parent."
+      }
     },
     "gradeEdit": {
       "title": "Modifier le niveau",
       "subline": "Mettez à jour le niveau. Les renommages de slug sont conservés.",
       "submit": "Enregistrer",
       "saved": "Niveau mis à jour.",
-      "resource": "niveau"
+      "resource": "niveau",
+      "fields": {
+        "title": "Titre",
+        "slug": "Slug",
+        "programSlug": "Slug du programme parent",
+        "sortOrder": "Ordre"
+      }
     },
     "courseCreate": {
       "title": "Créer un cours",
@@ -1360,6 +1397,7 @@
         "currency": "Devise",
         "calendlyUri": "URI de l'événement Calendly",
         "assignedTutor": "Tuteur assigné (optionnel)",
+        "description": "Description",
         "isPublished": "Publiée",
         "isPreview": "Aperçu gratuit"
       },
@@ -1372,25 +1410,49 @@
         "tutors": "Aucun tuteur pour le moment."
       }
     },
+    "tutorCreate": {
+      "title": "Créer un tuteur",
+      "subline": "Ajoutez un nouveau tuteur de référence. Les tuteurs sont des fiches administratives : ils permettent d'assigner une séance et d'identifier qui reçoit le lien Zoom. Il n'y a pas de compte ni d'espace tuteur.",
+      "submit": "Créer le tuteur",
+      "resource": "tuteur",
+      "errors": {
+        "required": "Le nom et l'e-mail sont requis.",
+        "emailInvalid": "Adresse e-mail invalide."
+      },
+      "fields": {
+        "fullName": "Nom complet",
+        "email": "E-mail",
+        "phone": "Téléphone",
+        "status": "Statut",
+        "notes": "Notes internes"
+      },
+      "placeholders": {
+        "phone": "ex. +33 6 12 34 56 78"
+      },
+      "statusOptions": {
+        "active": "Actif",
+        "inactive": "Inactif"
+      }
+    },
     "tutors": {
       "title": "Tuteurs",
-      "subline": "Annuaire complet de tous les tuteurs. Les tuteurs sont en lecture seule ici ; leur profil est géré ailleurs.",
+      "subline": "Annuaire complet de tous les tuteurs (actifs et inactifs). Tuteurs de référence — utilisés uniquement pour l'assignation des séances et le partage du lien Zoom.",
       "empty": "Aucun tuteur pour le moment.",
       "columns": {
         "name": "Nom",
         "email": "E-mail",
-        "headline": "Titre",
         "activeSessions": "Séances actives",
         "totalAssigned": "Total assigné",
         "status": "Statut",
-        "joinedAt": "Inscrit le"
+        "joinedAt": "Inscrit le",
+        "notes": "Notes"
       },
       "status": {
         "active": "Actif",
         "inactive": "Inactif"
       },
       "detail": {
-        "title": "Profil du tuteur",
+        "title": "Fiche tuteur",
         "back": "Retour aux tuteurs",
         "sessionsSubline": "Séances assignées à ce tuteur.",
         "noSessions": "Aucune séance assignée à ce tuteur.",
@@ -1458,6 +1520,7 @@
       "title": "Finaliser votre achat",
       "description": "Vous êtes à une étape d'accéder à cette session. Le paiement sécurisé est géré par Stripe — votre carte ne touche jamais nos serveurs.",
       "payButton": "Payer avec Stripe",
+      "cancel": "Annuler",
       "secureNote": "Les paiements sont sécurisés par Stripe. Les cartes sont tokenisées ; nous ne les stockons jamais.",
       "backToSession": "Retour à la session",
       "alreadyPaidDescription": "Cette session vous appartient déjà. Vous pouvez réserver un créneau depuis votre espace.",
@@ -1476,7 +1539,8 @@
       "description": "Votre carte n'a pas été débitée. Vous pouvez reprendre le paiement depuis votre espace, ou découvrir d'autres cours.",
       "goToDashboard": "Accéder à mon espace",
       "browseMore": "Voir les cours",
-      "retry": "Reprendre le paiement"
+      "retry": "Reprendre le paiement",
+      "enrollmentId": "ID d'inscription"
     }
   },
   "Emails": {

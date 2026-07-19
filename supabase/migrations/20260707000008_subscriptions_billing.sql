@@ -223,26 +223,6 @@ create trigger trg_profiles_block_role_escalation
     before update on public.profiles
     for each row execute function public.fn_block_role_self_escalation();
 
--- Lock tutor.profile_id after creation (a tutor cannot be reassigned
--- to a different profile).
-create or replace function public.fn_lock_tutor_profile_id()
-returns trigger
-language plpgsql
-as $$
-begin
-    if tg_op = 'UPDATE' and new.profile_id is distinct from old.profile_id then
-        raise exception 'tutor.profile_id is immutable'
-            using errcode = '42501';
-    end if;
-    return new;
-end;
-$$;
-
-drop trigger if exists trg_tutors_lock_profile on public.tutors;
-create trigger trg_tutors_lock_profile
-    before update on public.tutors
-    for each row execute function public.fn_lock_tutor_profile_id();
-
 -- Prevent cancellation after the meeting has started.
 create or replace function public.fn_block_late_cancel()
 returns trigger
@@ -333,9 +313,6 @@ create policy "invoices_write_admin_only"
     using (public.is_admin())
     with check (public.is_admin());
 
--- Tighten course_tutors (was previously 'public read' with no write policy)
-drop policy if exists "course_tutors_write_admin_only" on public.course_tutors;
-create policy "course_tutors_write_admin_only"
-    on public.course_tutors for all
-    using (public.is_admin())
-    with check (public.is_admin());
+-- Tighten the v2 RLS surfaces already introduced in
+-- 20260714000007_rls_policies_curriculum_v2.sql.
+-- (course_tutors is dropped in migration 03.)

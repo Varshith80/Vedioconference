@@ -3,13 +3,22 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getAllPublishedCourseSlugs } from '@/services/courses';
 import { getCourseWithChapters } from '@/services/curriculum/courses';
-import { listCoursesForTutor, listPublishedTutors } from '@/services/tutors';
 import { CourseDetail } from '@/components/marketing/course-detail';
 import { ChapterList } from '@/components/marketing/chapter-list';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { localizedTitle } from '@/lib/i18n/localized-title';
+
+// =====================================================================
+// Sprint 3.8 — Tutors are now standalone operational reference records
+// (no profile, no auth, no marketing persona). The public course
+// detail page no longer renders a "Tutors who teach this course"
+// block — the Admin is the only surface that needs to know which
+// tutor is assigned to which session. The `listPublishedTutors` /
+// `listCoursesForTutor` marketing lookups are gone with the rest of
+// the persona surface.
+// =====================================================================
 
 export const revalidate = 60;
 export const dynamic = 'force-dynamic';
@@ -54,27 +63,10 @@ export default async function CourseDetailPage(
   // import is keyed on the EN canonical slug, and the FR
   // title lives in `course.metadata.titles.fr`.
   const courseTitle = localizedTitle(course, locale as 'en' | 'fr');
-  // Tutors who teach this course. We fetch all published tutors
-  // (small set) and filter by course membership on the server.
-  const courseId = course.id;
-  const tutors = await (async () => {
-    const all = await listPublishedTutors();
-    const withCourses = await Promise.all(
-      all.map(async (t) => ({ tutor: t, courses: await listCoursesForTutor(t.id) })),
-    );
-    return withCourses
-      .filter(({ courses }) => courses.some((c) => c.id === courseId))
-      .map(({ tutor }) => ({
-        id: tutor.id,
-        full_name: tutor.full_name,
-        avatar_url: tutor.avatar_url,
-        rating: tutor.rating,
-      }));
-  })();
 
   return (
     <>
-      <CourseDetail course={course} displayTitle={courseTitle} tutors={tutors} />
+      <CourseDetail course={course} displayTitle={courseTitle} />
       {course.chapters.length > 0 ? (
         <Section spacing="default" tone="muted" aria-labelledby="course-chapters-title">
           <Container>

@@ -15,7 +15,6 @@
 alter table public.profiles    enable row level security;
 alter table public.tutors      enable row level security;
 alter table public.courses     enable row level security;
-alter table public.course_tutors enable row level security;
 alter table public.bookings    enable row level security;
 alter table public.payments    enable row level security;
 alter table public.meeting_links enable row level security;
@@ -49,15 +48,14 @@ create policy "profiles_delete_admin_only"
     using (public.is_super_admin());
 
 -- ---------------------------------------------------------------------
--- tutors – public can read published tutors
+-- tutors – admin-only access (standalone reference records)
 -- ---------------------------------------------------------------------
+-- Tutors are NOT users and are not exposed to the public
+-- marketing site. They are managed by the admin only. There
+-- is no public read, no self-read, no student-readable join.
 drop policy if exists "tutors_select_public_published" on public.tutors;
-create policy "tutors_select_public_published"
-    on public.tutors for select
-    using (is_published = true or public.is_admin());
-
 drop policy if exists "tutors_write_admin_only" on public.tutors;
-create policy "tutors_write_admin_only"
+create policy "tutors_admin_all"
     on public.tutors for all
     using (public.is_admin())
     with check (public.is_admin());
@@ -73,20 +71,6 @@ create policy "courses_select_public_published"
 drop policy if exists "courses_write_admin_only" on public.courses;
 create policy "courses_write_admin_only"
     on public.courses for all
-    using (public.is_admin())
-    with check (public.is_admin());
-
--- ---------------------------------------------------------------------
--- course_tutors
--- ---------------------------------------------------------------------
-drop policy if exists "course_tutors_select_public" on public.course_tutors;
-create policy "course_tutors_select_public"
-    on public.course_tutors for select
-    using (true);
-
-drop policy if exists "course_tutors_write_admin_only" on public.course_tutors;
-create policy "course_tutors_write_admin_only"
-    on public.course_tutors for all
     using (public.is_admin())
     with check (public.is_admin());
 

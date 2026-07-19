@@ -91,24 +91,15 @@ create trigger trg_session_grants_audit
 -- ---------------------------------------------------------------------
 alter table public.session_grants enable row level security;
 
--- 3.1  Read policy: owner, tutor (any tutor who teaches the session's
---      course, via course_tutors), or admin.
+-- 3.1  Read policy: owner or admin. (Tutors are no longer
+--      auth users in Sprint 3.8, so the tutor-self-read
+--      branch is gone — tutors are reference records.)
 drop policy if exists session_grants_select_owner_tutor_admin on public.session_grants;
-create policy session_grants_select_owner_tutor_admin
+create policy session_grants_select_owner_admin
     on public.session_grants for select
     using (
         student_id = auth.uid()
         or public.is_admin()
-        or exists (
-            select 1
-            from public.sessions s
-            join public.chapters ch on ch.id = s.chapter_id
-            join public.tutors t
-              join public.course_tutors ct on ct.tutor_id = t.id
-              on ct.course_id = ch.course_id
-            where s.id = session_grants.session_id
-              and t.profile_id = auth.uid()
-        )
     );
 
 -- 3.2  Writes are deny-by-default. The only writer is the Stripe

@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { isLocale } from '@/i18n';
 import { requireAdmin } from '@/hooks/use-require-user';
 import { getSessionById } from '@/services/admin/catalog';
+import { getAllTutors } from '@/services/admin/tutors';
 import { SessionEditForm } from '@/components/admin/session-edit-form';
 
 // =====================================================================
@@ -39,7 +40,10 @@ export default async function AdminSessionEditPage({
 
   await requireAdmin();
 
-  const row = await getSessionById(id);
+  // Sprint 3.8 — the assigned-tutor picker needs the full
+  // tutor directory. The list is small (admin reference
+  // data) and cache()-wrapped on the server.
+  const [row, tutors] = await Promise.all([getSessionById(id), getAllTutors()]);
   if (!row) notFound();
 
   const initial = {
@@ -56,11 +60,20 @@ export default async function AdminSessionEditPage({
         : null,
     is_published: Boolean(row.is_published),
     is_preview: Boolean(row.is_preview),
+    tutor_id:
+      typeof row.tutor_id === 'string' && row.tutor_id.length > 0
+        ? (row.tutor_id as string)
+        : null,
   };
+
+  const tutorOptions = tutors.map((t) => ({
+    value: t.id,
+    label: t.full_name,
+  }));
 
   return (
     <div className="container py-8 sm:py-12">
-      <SessionEditForm sessionId={id} initial={initial} />
+      <SessionEditForm sessionId={id} initial={initial} tutors={tutorOptions} />
     </div>
   );
 }

@@ -14,8 +14,7 @@ import { logger } from '@/lib/utils/logger';
 //
 //   session_bookings          — the booking row itself
 //     ├─ student_id   → profiles        (Student)
-//     ├─ tutor_id     → tutors          (Tutor)
-//     │                  └─ profile_id → profiles  (Tutor's user record)
+//     ├─ tutor_id     → tutors          (Tutor — standalone ref; Sprint 3.8)
 //     ├─ session_id   → sessions        (Session, the curriculum atom)
 //     │                  └─ chapter_id → chapters → courses → programs
 //     │                                          └─ grade_id   → grades
@@ -106,11 +105,13 @@ export interface BookingWithDetails {
     email: string | null;
   } | null;
 
-  // -- tutor (tutors + profiles) -----------------------------------
+  // -- tutor (standalone, no profile join — Sprint 3.8) -----------
   tutor: {
     id: string;
     full_name: string | null;
     email: string | null;
+    phone: string | null;
+    status: 'active' | 'inactive';
   } | null;
 
   // -- curriculum chain: session → chapter → course → program + grade
@@ -170,10 +171,7 @@ const BOOKINGS_SELECT = `
     id, full_name, email
   ),
   tutor:tutors!session_bookings_tutor_id_fkey (
-    id,
-    profile:profiles!tutors_profile_id_fkey (
-      full_name, email
-    )
+    id, full_name, email, phone, status
   ),
   session:sessions!session_bookings_session_id_fkey (
     id, title,
@@ -219,7 +217,10 @@ interface RawBookingRow {
   student: { id: string; full_name: string | null; email: string | null } | null;
   tutor: {
     id: string;
-    profile: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
+    full_name: string | null;
+    email: string | null;
+    phone: string | null;
+    status: 'active' | 'inactive';
   } | null;
   session: {
     id: string;
@@ -267,7 +268,6 @@ function toBookingWithDetails(
   row: RawBookingRow,
   paymentByGrant: ReadonlyMap<string, RawPaymentRow>,
 ): BookingWithDetails {
-  const tutorProfile = first(row.tutor?.profile);
   const course = row.session?.chapter?.course ?? null;
   const program = first(course?.program);
   const grade = first(course?.grade);
@@ -297,8 +297,10 @@ function toBookingWithDetails(
     tutor: row.tutor
       ? {
           id: row.tutor.id,
-          full_name: tutorProfile?.full_name ?? null,
-          email: tutorProfile?.email ?? null,
+          full_name: row.tutor.full_name,
+          email: row.tutor.email,
+          phone: row.tutor.phone,
+          status: row.tutor.status,
         }
       : null,
     curriculum: row.session

@@ -115,9 +115,15 @@ describe('getAllBookingsWithDetails', () => {
       created_at: '2026-07-15T08:00:00Z',
       updated_at: '2026-07-15T08:00:00Z',
       student: { id: 'stu1', full_name: 'Alice Liddell', email: 'alice@example.com' },
+      // Sprint 3.8 — Tutors are standalone reference records.
+      // No `profile` sub-join; the name/email live on the
+      // tutors row directly.
       tutor: {
         id: 'tut1',
-        profile: { full_name: 'Bob Tutor', email: 'bob@example.com' },
+        full_name: 'Bob Tutor',
+        email: 'bob@example.com',
+        phone: null,
+        status: 'active',
       },
       session: {
         id: 'sess1',
@@ -236,9 +242,13 @@ describe('getAllBookingsWithDetails', () => {
       created_at: '2026-07-18T08:00:00Z',
       updated_at: '2026-07-18T08:00:00Z',
       student: { id: 'stu1', full_name: 'Alice', email: 'a@example.com' },
+      // Sprint 3.8 — array shape (the raw tutor row).
       tutor: {
         id: 'tut1',
-        profile: [{ full_name: 'Bob', email: 'b@example.com' }], // array shape
+        full_name: 'Bob',
+        email: 'b@example.com',
+        phone: null,
+        status: 'active',
       },
       session: {
         id: 'sess1',
@@ -396,7 +406,8 @@ describe('getBookingByIdWithDetails', () => {
       created_at: '2026-05-15T08:00:00Z',
       updated_at: '2026-06-01T11:00:00Z',
       student: { id: 'stu1', full_name: 'Alice', email: 'a@example.com' },
-      tutor: { id: 'tut1', profile: { full_name: 'Bob', email: 'b@example.com' } },
+      // Sprint 3.8 — flat tutor shape.
+      tutor: { id: 'tut1', full_name: 'Bob', email: 'b@example.com', phone: null, status: 'active' },
       session: {
         id: 'sess1',
         title: 'Algebra',

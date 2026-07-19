@@ -3,8 +3,11 @@ import { CalendarRange } from 'lucide-react';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { isLocale } from '@/i18n';
 import { requireAdmin } from '@/hooks/use-require-user';
-import { getAllSessions, getAllChapters } from '@/services/admin/catalog';
+import { getAllSessions, getAllChapters, getAllCourses } from '@/services/admin/catalog';
+import { getAllTutors } from '@/services/admin/tutors';
 import { AdminListPage } from '@/components/admin/admin-list-page';
+import { SessionCreateTrigger } from '@/components/admin/session-create-trigger';
+import { SessionRowActions } from '@/components/admin/session-row-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +26,7 @@ export async function generateMetadata({
 }
 
 // Format an integer cents amount as "12,34" (en-US style
-// with 2 fraction digits). The page is read-only — a future
-// sprint will add the edit form.
+// with 2 fraction digits).
 function formatCents(cents: number | null): string {
   if (cents == null) return '';
   return (cents / 100).toLocaleString('en-US', {
@@ -45,12 +47,31 @@ export default async function AdminSessionsPage({
 
   const t = await getTranslations('Admin.sessions');
   const tCommon = await getTranslations('Admin.common');
-  const [sessions, chapters] = await Promise.all([
+  const [sessions, chapters, courses, tutors] = await Promise.all([
     getAllSessions(),
     getAllChapters(),
+    getAllCourses(),
+    getAllTutors(),
   ]);
 
   const chapterById = new Map(chapters.map((ch) => [ch.id, ch.title]));
+  const courseById = new Map(courses.map((c) => [c.id, c.title]));
+  const tutorById = new Map(tutors.map((tu) => [tu.id, tu.full_name]));
+
+  // Build the parent-picker options for the create dialog:
+  // "Course — Chapter" labels, keyed by chapter uuid.
+  const chapterOptions = chapters.map((ch) => ({
+    value: ch.id,
+    label: `${courseById.get(ch.course_id) ?? '—'} — ${ch.title}`,
+    courseId: ch.course_id,
+  }));
+  // Tutor options for the create dialog (and the "Unassigned"
+  // option is rendered by SearchableSelect when value=null).
+  // Sprint 3.8 — tutors are standalone; no headline field.
+  const tutorOptions = tutors.map((tu) => ({
+    value: tu.id,
+    label: tu.full_name,
+  }));
 
   return (
     <AdminListPage
@@ -60,6 +81,16 @@ export default async function AdminSessionsPage({
       emptyIcon={<CalendarRange className="h-6 w-6" aria-hidden={true} />}
       items={sessions}
       getKey={(s) => s.id}
+      interactiveActions
+      headerAction={
+        <SessionCreateTrigger
+          chapters={chapterOptions}
+          tutors={tutorOptions}
+        />
+      }
+      actions={(s) => (
+        <SessionRowActions sessionId={s.id} slug={s.slug} title={s.title} />
+      )}
       columns={[
         { key: 'title',  label: t('columns.title') },
         { key: 'slug',   label: t('columns.slug') },
@@ -67,6 +98,7 @@ export default async function AdminSessionsPage({
         { key: 'pos',    label: t('columns.position') },
         { key: 'dur',    label: t('columns.duration') },
         { key: 'price',  label: t('columns.price') },
+        { key: 'tutor',  label: t('columns.assignedTutor') },
         { key: 'pub',    label: t('columns.published') },
         { key: 'prev',   label: t('columns.preview') },
       ]}
@@ -87,6 +119,11 @@ export default async function AdminSessionsPage({
             ) : (
               formatCents(s.price_cents)
             )}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {s.tutor_id
+              ? (tutorById.get(s.tutor_id) ?? tCommon('na'))
+              : <span className="italic">{tCommon('na')}</span>}
           </span>
           <span className="text-xs">
             {s.is_published ? (
