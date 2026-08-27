@@ -22,15 +22,27 @@ import { DashboardHeader } from '@/components/dashboard/header';
  * every request. B2 will flip this back to a server-side check
  * that reads the Supabase session cookie.
  */
-export function DashboardClientLayout({ children }: { children: React.ReactNode }) {
+export interface DashboardClientLayoutProps {
+  children: React.ReactNode;
+  /** Optional notification-bell slot (server-rendered). Sprint 7 — M5.2. */
+  bell?: React.ReactNode;
+}
+
+export function DashboardClientLayout({ children, bell }: DashboardClientLayoutProps) {
   return (
     <AuthProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell bell={bell}>{children}</DashboardShell>
     </AuthProvider>
   );
 }
 
-function DashboardShell({ children }: { children: React.ReactNode }) {
+function DashboardShell({
+  children,
+  bell,
+}: {
+  children: React.ReactNode;
+  bell?: React.ReactNode;
+}) {
   const auth = useAuth();
   const router = useRouter();
   const locale = useLocale();
@@ -61,7 +73,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <DashboardHeader />
+        <DashboardHeader bell={bell} />
         <DashboardTopNav />
         <main id="main" className="flex-1">
           {children}

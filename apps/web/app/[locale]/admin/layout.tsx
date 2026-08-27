@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { requireAdmin } from '@/hooks/use-require-user';
 import { isLocale } from '@/i18n';
 import { AdminClientLayout } from '@/components/admin/admin-client-layout';
+import { AdminHeaderBell } from '@/components/admin/admin-header-bell';
 
 // Sprint 3.6: the admin layout reads the auth context
 // (requireAdmin -> Supabase session cookie) which is
@@ -56,7 +57,9 @@ export default async function AdminLayout({
 
   return (
     <Suspense fallback={null}>
-      <AdminClientLayout>{children}</AdminClientLayout>
+      <AdminClientLayout bell={<AdminHeaderBell />}>
+        {children}
+      </AdminClientLayout>
     </Suspense>
   );
 }

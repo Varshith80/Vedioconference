@@ -16,15 +16,27 @@ import { AdminHeader } from '@/components/admin/admin-header';
 // role check itself runs server-side in the `admin/layout.tsx`
 // via `requireAdmin()`; this client wrapper is the visual
 // shell (Sprint 3.6 §4.3).
-export function AdminClientLayout({ children }: { children: React.ReactNode }) {
+export interface AdminClientLayoutProps {
+  children: React.ReactNode;
+  /** Optional notification-bell slot (server-rendered). Sprint 7 — M5.2. */
+  bell?: React.ReactNode;
+}
+
+export function AdminClientLayout({ children, bell }: AdminClientLayoutProps) {
   return (
     <AuthProvider>
-      <AdminShell>{children}</AdminShell>
+      <AdminShell bell={bell}>{children}</AdminShell>
     </AuthProvider>
   );
 }
 
-function AdminShell({ children }: { children: React.ReactNode }) {
+function AdminShell({
+  children,
+  bell,
+}: {
+  children: React.ReactNode;
+  bell?: React.ReactNode;
+}) {
   const auth = useAuth();
   const router = useRouter();
   const locale = useLocale();
@@ -55,7 +67,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminHeader />
+        <AdminHeader bell={bell} />
         <AdminTopNav />
         <main id="main" className="flex-1">
           {children}

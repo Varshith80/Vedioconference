@@ -4,6 +4,124 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0-phase2-sprint-7] — 2026-08-27
+
+### Added — Sprint 7 (In-app Notification Feed — M5.2)
+
+The platform's `public.notifications` table — populated since
+Sprint 5 (booking reminders) and Sprint 6 (tutor-change SLA
+breaches) — is now consumed by the UI. Every authenticated user
+(student + admin) sees a bell in the header with an unread
+count badge, a popover preview of the 5 most recent
+notifications, and a "See all" link to the full feed at
+`/dashboard/notifications` (or `/admin/notifications` for admins).
+Per-row "mark as read" + bulk "Mark all as read" are wired
+through three new endpoints. The slice is intentionally narrow:
+no new SaaS, no new table, no new migration, no new env var, no
+change to the session-based payment model. E-1 / E-2 / E-3 / P1.2
+/ P1.4 / P1.6 / P3.3 / D-7 remain BLOCKED on user instruction.
+
+#### API
+- `GET /api/notifications` (NEW) — list the signed-in user's own
+  notifications, RLS-scoped, with `?limit=` (1..100, default 20),
+  `?unread_only=true|false`, `?before=ISO 8601` (cursor on
+  `sent_at`).
+- `POST /api/notifications/[id]/read` (NEW) — mark a single
+  notification as read. RLS scopes the UPDATE to
+  `auth.uid() = user_id or is_admin()`.
+- `POST /api/notifications/read-all` (NEW) — bulk mark every
+  unread notification for the signed-in user as read.
+
+#### Service
+- `apps/web/services/notifications.ts` (NEW) —
+  `listMyNotifications` (cache()-wrapped reads), `getMyUnreadCount`
+  (cache()-wrapped head+count), `markAsRead` (with explicit
+  ownership re-check via `auth.uid()`), `markAllAsRead` (bulk
+  UPDATE scoped by RLS). Pure helper `formatRelativeTime` for
+  SSR-consistent locale-aware rendering.
+
+#### Zod contracts
+- `apps/web/lib/validations/notifications.ts` (NEW) —
+  `listNotificationsQuerySchema`, `markAsReadBodySchema`,
+  `markAllAsReadBodySchema` (passthrough), `notificationIdParamSchema`.
+
+#### RSC surfaces
+- `app/[locale]/dashboard/notifications/page.tsx` (NEW) — student
+  full feed (SSR pre-fetch + client island for optimistic
+  updates).
+- `app/[locale]/admin/notifications/page.tsx` (NEW) — admin's
+  OWN notification feed (mirrors the student page; gated by
+  `requireAdmin()`).
+
+#### Client components
+- `apps/web/components/shared/notification-item.tsx` (NEW) —
+  single feed row (icon per type, unread accent border,
+  relative time, optional click handler).
+- `apps/web/components/dashboard/notification-bell.tsx` (NEW) —
+  header bell: dropdown popover with last 5, mark-all-as-read,
+  "see all" link, 60 s refresh + visibility-aware re-poll.
+- `apps/web/components/dashboard/notifications-list.tsx` (NEW) —
+  full feed client island (SSR pre-fetch + optimistic
+  mark-as-read / mark-all-as-read).
+- `apps/web/components/dashboard/dashboard-header-bell.tsx` (NEW)
+  — RSC wrapper that reads the unread count + preview via
+  `requireProfile()` + service and renders the bell.
+- `apps/web/components/admin/admin-header-bell.tsx` (NEW) — RSC
+  wrapper for the admin header; same shape but gated by
+  `requireAdmin()`.
+
+#### Shell wiring (non-breaking)
+- `components/dashboard/header.tsx` + `dashboard-client-layout.tsx`:
+  added an optional `bell?: ReactNode` slot; the dashboard layout
+  mounts `<DashboardHeaderBell />` into the slot.
+- `components/admin/admin-header.tsx` + `admin-client-layout.tsx`:
+  same pattern; the admin layout mounts `<AdminHeaderBell />`.
+- The slot is optional; existing callers that omit it render
+  unchanged.
+
+#### i18n
+- `apps/web/messages/en.json` + `fr.json` — new top-level
+  `Notifications` namespace with `bell.{aria,unreadAria,popoverTitle}`,
+  `feed.{title, subline (ICU plural)}`, `actions.{markAll,
+  markAllPending, seeAll}`, `empty`, and
+  `types.{booking_reminder, tutor_change_sla_breach, system}`.
+
+#### Tests
+- `tests/unit/notifications-validation.test.ts` (NEW) — 11 Zod
+  contract tests.
+- `tests/unit/notifications-service.test.ts` (NEW) — 11 pure-
+  helper tests for `formatRelativeTime`.
+- `tests/unit/notifications-routes.test.ts` (NEW) — 8 route-
+  handler tests.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `pnpm type-check` | ✅ exit 0 |
+| `pnpm lint` | ✅ exit 0 (one pre-existing `lib/utils/logger.ts` warning unrelated to this slice) |
+| `pnpm test` | ✅ exit 0 — 46 files / **393 tests** all passing (+38 since Sprint 6) |
+| `pnpm build` | ✅ exit 0 — 5 new routes registered |
+
+### Out of scope (deliberately not invented)
+
+- E-1 / E-2 / E-3 (refund policy on tutor change).
+- P1.2 / P1.4 / P1.6 (unrelated profiles / sessions work).
+- P3.3 (subscription pack interactions with tutor change).
+- D-7 (breach notification audience).
+- Notification preferences / mute.
+- Email mirror of any in-app notification (still owned by n8n).
+- Admin-broadcast notifications (the admin surface shows the
+  admin's OWN notifications, same as the student surface).
+- UI pagination on the full feed (the API supports a `?before=`
+  cursor; the UI shows the first 50 rows).
+
+If the client later wants any of these, they should ship as a
+separate slice — none of them are required to call M5.2 done.
+
+---
+
+
 ## [1.5.0-phase2-sprint-3.8] — 2026-07-19
 
 ### Added — Admin Manual CRUD (Sprint 3.5..3.8)
@@ -1346,3 +1464,4 @@ student purchases and attends **sessions**, not courses.
 [1.5.0-phase2-sprint-3.6]: 2026-07-15
 [1.5.0-phase2-sprint-3.8]: 2026-07-19
 [1.5.1-phase2-sprint-3.8-debug]: 2026-07-19
+

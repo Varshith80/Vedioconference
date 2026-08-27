@@ -901,9 +901,36 @@ Sprint 3.5 = +8%, Sprint 3.6 = +9%).
 
 ## Last updated
 
-**2026-07-19** by Sprint 3.8 (Admin Manual CRUD) + post-sprint
-debug + i18n audit + Create-tutor flow + **standalone-tutor
-refactor** close-out.
+**2026-08-27** by Sprint 7 close-out — In-app Notification Feed
+(M5.2). Full close-out:
+`docs/review/PHASE2_SPRINT_7_SUMMARY.md`. Tag
+`v1.8.0-phase2-sprint-7` pending user approval.
+
+---
+
+> **Sprint 7 (In-app Notification Feed — M5.2) is complete.**
+> The `notifications` table is now consumed by the platform UI:
+> every authenticated user (student + admin) sees a bell in the
+> header with an unread count badge, a popover preview of the 5
+> most recent notifications, and a "See all" link to the full
+> feed at `/dashboard/notifications` (or `/admin/notifications`
+> for admins). Per-row "mark as read" + bulk "Mark all as read"
+> are wired through three new endpoints — `GET /api/notifications`,
+> `POST /api/notifications/[id]/read`,
+> `POST /api/notifications/read-all` — all backed by the existing
+> RLS-respecting Supabase client. The service layer
+> (`apps/web/services/notifications.ts`) re-checks ownership at
+> the boundary so a future RLS regression does not leak
+> ownership logic to the route layer. **No new SaaS, no new
+> table, no new migration, no new env var, no change to the
+> session-based payment model.** EN + FR translations are
+> complete with an ICU-plural subline. E-1 / E-2 / E-3 / P1.2 /
+> P1.4 / P1.6 / P3.3 / D-7 remain BLOCKED. All four quality gates
+> are green: `pnpm type-check` ✓, `pnpm lint` ✓ (only pre-existing
+> logger warning), `pnpm test` ✓ (46 files / **393 tests**, +38
+> since Sprint 6 close-out), `pnpm build` ✓ (5 new routes
+> registered). The next sprint is gated on explicit user
+> approval.
 
 > **Standalone-tutor refactor (2026-07-19) — final tutor
 > architecture.** The Tutor model is now a flat reference table
@@ -989,3 +1016,6 @@ refactor** close-out.
 > `docs/review/PHASE2_SPRINT_3_6_SUMMARY.md` for the full
 > close-out. **The next sprint is gated on explicit user
 > approval.**
+
+
+

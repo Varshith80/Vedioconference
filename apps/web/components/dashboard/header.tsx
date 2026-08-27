@@ -14,7 +14,15 @@ import { useAuth } from '@/services/auth/use-auth';
  * calls `useAuth().signOut()` and redirects to the locale-aware
  * marketing home.
  */
-export function DashboardHeader() {
+export interface DashboardHeaderProps {
+  /** Optional notification-bell slot. Renders between the
+   *  language switcher and the sign-out button. The slot is a
+   *  server component so it can fetch the unread count + preview
+   *  with the SSR client. Sprint 7 — M5.2. */
+  bell?: React.ReactNode;
+}
+
+export function DashboardHeader({ bell }: DashboardHeaderProps = {}) {
   const router = useRouter();
   const auth = useAuth();
   const locale = useLocale();
@@ -42,6 +50,7 @@ export function DashboardHeader() {
       </div>
       <div className="flex items-center gap-2">
         <LanguageSwitcher />
+        {bell}
         <Button
           type="button"
           variant="outline"

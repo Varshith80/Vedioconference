@@ -11,7 +11,13 @@ import { useAuth } from '@/services/auth/use-auth';
 // Top header of the admin console. Mirrors DashboardHeader;
 // the i18n namespace is `Admin.header` and the subtitle is
 // "Admin console" instead of "Personal space".
-export function AdminHeader() {
+export interface AdminHeaderProps {
+  /** Optional notification-bell slot. Renders between the
+   *  language switcher and the sign-out button. Sprint 7 — M5.2. */
+  bell?: React.ReactNode;
+}
+
+export function AdminHeader({ bell }: AdminHeaderProps = {}) {
   const router = useRouter();
   const auth = useAuth();
   const locale = useLocale();
@@ -39,6 +45,7 @@ export function AdminHeader() {
       </div>
       <div className="flex items-center gap-2">
         <LanguageSwitcher />
+        {bell}
         <Button
           type="button"
           variant="outline"

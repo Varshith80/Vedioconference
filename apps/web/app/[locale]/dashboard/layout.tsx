@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { setRequestLocale } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { DashboardClientLayout } from '@/components/dashboard/dashboard-client-layout';
+import { DashboardHeaderBell } from '@/components/dashboard/dashboard-header-bell';
 import { requireProfile } from '@/hooks/use-require-user';
 import { isLocale } from '@/i18n';
 
@@ -74,7 +75,9 @@ export default async function DashboardLayout({
 
   return (
     <Suspense fallback={null}>
-      <DashboardClientLayout>{children}</DashboardClientLayout>
+      <DashboardClientLayout bell={<DashboardHeaderBell />}>
+        {children}
+      </DashboardClientLayout>
     </Suspense>
   );
 }

@@ -1620,4 +1620,27 @@
       "errorLabel": "Error"
     }
   }
+,
+  "Notifications": {
+    "bell": {
+      "aria": "Notifications",
+      "unreadAria": "Notifications, {count} unread",
+      "popoverTitle": "Notifications"
+    },
+    "feed": {
+      "title": "Notifications",
+      "subline": "{unread, plural, =0 {No unread notifications.} =1 {1 unread notification.} other {# unread notifications.}}"
+    },
+    "actions": {
+      "markAll": "Mark all as read",
+      "markAllPending": "Marking…",
+      "seeAll": "See all notifications"
+    },
+    "empty": "No notifications yet.",
+    "types": {
+      "booking_reminder": "Booking reminder",
+      "tutor_change_sla_breach": "Tutor change response overdue",
+      "system": "Notification"
+    }
+  }
 }

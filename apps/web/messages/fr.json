@@ -1591,4 +1591,27 @@
       "errorLabel": "Erreur"
     }
   }
+,
+  "Notifications": {
+    "bell": {
+      "aria": "Notifications",
+      "unreadAria": "Notifications, {count} non lues",
+      "popoverTitle": "Notifications"
+    },
+    "feed": {
+      "title": "Notifications",
+      "subline": "{unread, plural, =0 {Aucune notification non lue.} =1 {1 notification non lue.} other {# notifications non lues.}}"
+    },
+    "actions": {
+      "markAll": "Tout marquer comme lu",
+      "markAllPending": "Marquage…",
+      "seeAll": "Voir toutes les notifications"
+    },
+    "empty": "Aucune notification pour le moment.",
+    "types": {
+      "booking_reminder": "Rappel de réservation",
+      "tutor_change_sla_breach": "Délai de réponse changement de tuteur dépassé",
+      "system": "Notification"
+    }
+  }
 }
