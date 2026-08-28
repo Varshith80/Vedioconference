@@ -715,7 +715,13 @@
       "title": "Ressources",
       "subline": "Les supports partagés par vos profs apparaîtront ici.",
       "emptyTitle": "Aucune ressource pour l’instant",
-      "emptyDescription": "Les PDF, fiches d’exercices et notes de cours partagés pendant vos séances seront listés ici."
+      "emptyDescription": "Les PDF, fiches d’exercices et notes de cours partagés pendant vos séances seront listés ici.",
+      "download": "Télécharger",
+      "visibility": {
+        "public": "Public",
+        "enrolled": "Inscrits",
+        "private": "Privé"
+      }
     },
     "profile": {
       "title": "Mon profil",
@@ -888,6 +894,16 @@
           "href": "/admin/bookings"
         },
         {
+          "id": "resources",
+          "label": "Ressources",
+          "href": "/admin/resources"
+        },
+        {
+          "id": "session-bookings",
+          "label": "Réservations de séances",
+          "href": "/admin/session-bookings"
+        },
+        {
           "id": "tutors",
           "label": "Tuteurs",
           "href": "/admin/tutors"
@@ -941,6 +957,16 @@
           "id": "bookings",
           "label": "Réservations",
           "href": "/admin/bookings"
+        },
+        {
+          "id": "resources",
+          "label": "Ressources",
+          "href": "/admin/resources"
+        },
+        {
+          "id": "session-bookings",
+          "label": "Réservations de séances",
+          "href": "/admin/session-bookings"
         },
         {
           "id": "tutors",
@@ -1168,7 +1194,8 @@
         "course": "cours",
         "chapter": "chapitre",
         "session": "séance",
-        "tutor": "tuteur"
+        "tutor": "tuteur",
+        "resource": "ressource"
       }
     },
     "import": {
@@ -1458,6 +1485,68 @@
         "noSessions": "Aucune séance assignée à ce tuteur.",
         "viewSession": "Voir la séance"
       }
+    },
+    "resources": {
+      "title": "Ressources",
+      "subline": "Tous les supports ajoutés pour les étudiants. Utilisez le bouton + pour en ajouter. La visibilité contrôle qui peut voir chaque fichier.",
+      "empty": "Aucune ressource. Utilisez le bouton + pour en ajouter une.",
+      "columns": {
+        "title": "Titre",
+        "fileName": "Fichier",
+        "visibility": "Visibilité",
+        "createdAt": "Créée le"
+      },
+      "visibility": {
+        "public": "Public",
+        "enrolled": "Inscrits",
+        "private": "Privé"
+      },
+      "delete": {
+        "title": "Supprimer cette ressource ?",
+        "body": "Cette action supprime définitivement la ressource. Les étudiants ne pourront plus la télécharger.",
+        "confirmCta": "Supprimer la ressource",
+        "success": "Ressource supprimée."
+      }
+    },
+    "resourceCreate": {
+      "title": "Ajouter une ressource",
+      "subline": "Renseignez les métadonnées d'un nouveau support. Le rôle admin vous permet de définir n'importe quelle visibilité.",
+      "resource": "ressource",
+      "fields": {
+        "title": "Titre",
+        "description": "Description (facultatif)",
+        "fileName": "Nom du fichier",
+        "filePath": "Chemin du fichier / URL",
+        "mimeType": "Type MIME (facultatif)",
+        "sizeBytes": "Taille en octets (facultatif)",
+        "visibility": "Visibilité"
+      },
+      "placeholders": {
+        "mimeType": "application/pdf"
+      },
+      "visibilityOptions": {
+        "public": "Public (tout le monde)",
+        "enrolled": "Inscrits (cours acheté)",
+        "private": "Privé (auteur uniquement)"
+      },
+      "submit": "Ajouter la ressource"
+    },
+    "sessionBookings": {
+      "title": "Réservations de séances",
+      "subline": "Réservations non terminées (scheduled, confirmed). Marquez-les manuellement comme terminées si le flux Calendly/n8n a échoué.",
+      "empty": "Aucune réservation non terminée.",
+      "columns": {
+        "student": "Étudiant",
+        "session": "Séance",
+        "scheduledStart": "Début prévu",
+        "status": "Statut"
+      }
+    },
+    "manualComplete": {
+      "cta": "Marquer terminée",
+      "success": "Réservation marquée terminée.",
+      "alreadyTerminal": "Réservation déjà dans un état terminal.",
+      "notFound": "Réservation introuvable."
     }
   },
   "SiteHeader": {
@@ -1590,8 +1679,7 @@
       "body": "Le workflow n8n {workflow} a échoué et l'événement a été mis en file d'attente. Le payload d'origine se trouve ci-dessous.",
       "errorLabel": "Erreur"
     }
-  }
-,
+  },
   "Notifications": {
     "bell": {
       "aria": "Notifications",

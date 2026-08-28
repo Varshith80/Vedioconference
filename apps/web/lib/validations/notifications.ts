@@ -1,15 +1,17 @@
 import { z } from 'zod';
+import { cursorQuerySchema } from '@/lib/validations/cursor';
 
 // =====================================================================
-// Sprint 7 — M5.2 (In-app Notification Feed) Zod schemas.
+// Sprint 7 (M5.2) + Sprint 8 (N-3 cursor pagination) Zod schemas.
 //
 // Body contracts
 // --------------
 // GET /api/notifications
 //   ?limit=number (default 20, max 100)
 //   &unread_only=boolean
-//   &before=ISO 8601 timestamp (cursor — items strictly older than
-//    `sent_at < before`)
+//   &cursor=<opaque> (preferred — base64-url `{ts,id}` tuple)
+//   &before=<ISO 8601> (DEPRECATED — kept for one release for
+//    Sprint 7 callers; new clients SHOULD use `cursor`).
 //
 // POST /api/notifications/[id]/read
 //   empty body — id is in the path.
@@ -20,11 +22,12 @@ import { z } from 'zod';
 // Notes
 // -----
 // - `limit` is bounded to keep the SSR payload bounded.
-// - `before` is a cursor on `sent_at` (matches the ordering used by
-//   `listMyNotifications` in services/notifications.ts). We accept
-//   `Date.parse`-able ISO strings only.
-// - `unread_only` is a boolean flag — `true` filters out anything
-//   with a non-null `read_at`. We do not require it to be present.
+// - `cursor` is the opaque cursor returned by the previous
+//   page (`response.nextCursor`). When both `cursor` and
+//   `before` are sent, `cursor` wins; the service normalises
+//   them to the same `{ ts, id }` shape internally.
+// - `unread_only` is a boolean flag — `true` filters out
+//   anything with a non-null `read_at`.
 // - Read endpoints take no body. The route handler still parses
 //   JSON defensively (in case the client sends a stray payload) —
 //   the schema accepts anything and discards it.
@@ -45,6 +48,7 @@ export const listNotificationsQuerySchema = z.object({
       if (v === 'false' || v === false || v === '0' || v === 0) return false;
       return v;
     }, z.boolean().optional()),
+  cursor: cursorQuerySchema,
   before: z
     .preprocess((v) => {
       if (v === undefined || v === null || v === '') return undefined;

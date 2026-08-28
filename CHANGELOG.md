@@ -4,6 +4,125 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0-phase2-sprint-8] — 2026-08-27
+
+### Added — Sprint 8 (Resources + Manual-Complete + Cursor Pagination)
+
+Three sub-sprints landed; one was dropped pending schema-change
+authorisation. All work reuses existing tables, columns, RLS
+policies, and the `booking_status` enum — **no migration, no
+new SaaS, no new env var**.
+
+#### S8-A — Resources delivery surface (R-1 + R-2)
+
+The `public.resources` table (with `resources_select_visible`
++ `resources_write_admin_or_tutor` RLS policies) is now
+consumed end-to-end by the admin surface and the student
+dashboard.
+
+- `GET /api/admin/resources` (NEW) — list every resource;
+  admin-only via `requireAdminRoute()`.
+- `POST /api/admin/resources` (NEW) — create a new resource
+  row; admin-only.
+- `PATCH /api/admin/resources/[id]` (NEW) — partial update.
+- `DELETE /api/admin/resources/[id]` (NEW) — hard delete.
+- `apps/web/services/resources.ts` (NEW) — `listResourcesForCurrentUser`
+  (RLS-scoped to public / enrolled / uploader-or-admin),
+  `listAllResources`, `getResourceById`, `createResource`,
+  `updateResource`, `deleteResource`.
+- `apps/web/app/[locale]/admin/resources/page.tsx` (NEW) —
+  admin list page with create-dialog + delete-button.
+- `apps/web/app/[locale]/dashboard/resources/page.tsx` —
+  rewritten to call `listResourcesForCurrentUser()` and render
+  the new `ResourceList` component.
+- Zod schemas (`resourceVisibilitySchema`,
+  `adminResourceCreateSchema`, `adminResourceEditSchema`) added
+  to `apps/web/lib/validations/admin-catalog.ts`.
+
+#### S8-B — Manual-complete session booking (B-19)
+
+Admins can transition any non-terminal session booking to
+`completed` via a dedicated page + endpoint.
+
+- `POST /api/admin/session-bookings/[id]/complete` (NEW) —
+  idempotent. Returns 200 + `{ transitioned: true | false }`,
+  404, or 409. Reuses the existing `booking_status` enum
+  value `'completed'` — no new value introduced.
+- `services/curriculum/session-bookings.ts` — extended with
+  `manualCompleteSessionBooking()` returning a discriminated
+  union `{ kind: 'ok' | 'already_terminal' | 'not_found', booking }`.
+- `apps/web/services/admin/session-bookings.ts` (NEW) — read-
+  only admin service that filters to non-terminal statuses.
+- `apps/web/app/[locale]/admin/session-bookings/page.tsx` (NEW)
+  — admin list with per-row "Mark complete" button (renders
+  `null` for terminal bookings — no destructive confirm
+  because the operation is idempotent).
+
+#### S8-C — Cursor-based pagination (N-3)
+
+Both the notifications feed and the new admin audit-logs
+surface now use a strict total-order `(ts, id)` cursor. The
+Sprint 7 `?before=` parameter is preserved as deprecated for
+one release; new clients should use `?cursor=`.
+
+- `apps/web/lib/validations/cursor.ts` (NEW) — opaque base64-
+  url cursor codec, Zod schema, `resolveCursor()` helper.
+- `services/notifications.ts` — `listMyNotifications` now
+  returns `{ data, nextCursor }`. Uses `limit + 1` lookahead
+  and emits the `(sent_at < ts) OR (sent_at = ts AND id < id)`
+  predicate when a cursor is supplied. Falls back to
+  `sent_at < ts` when only `?before=` is provided (back-compat).
+- `GET /api/notifications` — response now includes
+  `nextCursor: string | null`. Rejects malformed cursors with
+  400.
+- `apps/web/services/admin/audit-logs.ts` (NEW) —
+  `listAuditLogs({ limit, cursor, before, tableName, action })`
+  admin-gated reader; degrades to `{ data: [], nextCursor: null }`
+  on read failure so the page does not 500.
+- `GET /api/admin/audit-logs` (NEW) — paginated audit-log
+  reader for the admin surface. `requireAdminRoute()` +
+  `audit_logs_select_admin` RLS.
+- `lib/utils/api.ts` — `jsonResponse()` now accepts an optional
+  `nextCursor` field (top-level, alongside `data`).
+
+### Changed
+
+- Bell-component consumers (`dashboard-header-bell`,
+  `admin-header-bell`, the notifications RSC pages) now
+  destructure `{ data, nextCursor }` from the service.
+- `admin-sidebar` + `admin-top-nav` gained two new entries:
+  `resources` (FileText icon) and `session-bookings`
+  (CalendarCheck icon).
+- `messages/{en,fr}.json` — new keys: `Admin.resources.*`,
+  `Admin.resourceCreate.*`, `Admin.sessionBookings.*`,
+  `Admin.manualComplete.*`, `Dashboard.resources.*`,
+  plus sidebar / top-nav strings.
+
+### Quality gates
+
+- `pnpm type-check` — exit 0
+- `pnpm lint` — exit 0 (one pre-existing warning in
+  `lib/utils/logger.ts`, unrelated)
+- `pnpm test` — 454 / 454 passed across 53 files
+- `pnpm build` — exit 0; new routes present:
+  `ƒ /api/admin/resources`, `ƒ /api/admin/resources/[id]`,
+  `ƒ /api/admin/session-bookings/[id]/complete`,
+  `ƒ /api/admin/audit-logs`, `● /[locale]/admin/resources`,
+  `● /[locale]/admin/session-bookings`
+
+### Schema-change gate encountered
+
+- **S8-D (R-3 Recordings read-path) — DROPPED from Sprint 8.**
+  `public.meeting_links` does not have a `recording_url`
+  column (verified against the defining migration). Per
+  CLAUDE §3.2 (forward-only schema changes require explicit
+  user authorisation), Sprint 8 did **not** author the
+  migration. Plan remains documented in `PROJECT_STATE.md`
+  for a future sprint, paired with the Zoom
+  `recording.completed` → n8n → `meeting_links.recording_url`
+  write-back workflow.
+- S8-A / S8-B / S8-C — **no schema change** required.
+
 ## [1.8.0-phase2-sprint-7] — 2026-08-27
 
 ### Added — Sprint 7 (In-app Notification Feed — M5.2)

@@ -57,7 +57,7 @@ export default async function DashboardNotificationsPage({
   const t = await getTranslations('Notifications');
   const tNav = await getTranslations('Nav');
 
-  const items = await listMyNotifications({ limit: PAGE_SIZE });
+  const { data: items } = await listMyNotifications({ limit: PAGE_SIZE });
   const preview = items.map((n) => ({
     id: n.id,
     type: n.type,

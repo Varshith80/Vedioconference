@@ -9,7 +9,10 @@ import {
   CalendarCheck,
   CalendarRange,
   CreditCard,
+  FileText,
+  GraduationCap,
   LayoutDashboard,
+  Repeat,
   School,
   Upload,
   Users,
@@ -35,6 +38,10 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   payments: CreditCard,
   students: Users,
   bookings: CalendarCheck,
+  tutors: GraduationCap,
+  resources: FileText,
+  'session-bookings': CalendarCheck,
+  'tutor-change-requests': Repeat,
   import: Upload,
 };
 

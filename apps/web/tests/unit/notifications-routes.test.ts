@@ -3,11 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // =====================================================================
 // Sprint 7 — M5.2 Notification feed route tests.
 //
+// Sprint 8 — N-3: the GET handler now accepts an opaque `cursor`
+// parameter and forwards `{data, nextCursor}` from the service.
+// The existing `before` parameter is preserved for back-compat.
+//
 // Coverage:
 //   GET  /api/notifications
 //     - 401 when no signed-in user
-//     - 200 forwards limit/unread_only/before to the service
+//     - 200 forwards limit/unread_only/before/cursor to the service
 //     - 422 on invalid query (limit out of range, bad before)
+//     - 200 wraps service payload in { ok, data, nextCursor }
 //   POST /api/notifications/[id]/read
 //     - 401 when no signed-in user
 //     - 422 when path id is not a UUID
@@ -80,7 +85,7 @@ describe('GET /api/notifications', () => {
 
   it('forwards parsed query to the service on a valid request', async () => {
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_UUID } } });
-    mockListMyNotifications.mockResolvedValue([]);
+    mockListMyNotifications.mockResolvedValue({ data: [], nextCursor: null });
     const res = await GET(
       asNextRequest(
         buildGet(
@@ -93,12 +98,32 @@ describe('GET /api/notifications', () => {
       limit: 5,
       unreadOnly: true,
       before: '2026-08-27T00:00:00.000Z',
+      cursor: undefined,
+    });
+  });
+
+  it('forwards an opaque cursor when supplied', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_UUID } } });
+    mockListMyNotifications.mockResolvedValue({ data: [], nextCursor: null });
+    await GET(
+      asNextRequest(
+        buildGet(
+          'http://localhost/api/notifications?limit=5&cursor=eyJ0cyI6IjIwMjYtMDgtMjVUMDA6MDA6MDAuMDAwWiIsImlkIjoiYWJjIn0',
+        ),
+      ) as never,
+    );
+    expect(mockListMyNotifications).toHaveBeenCalledWith({
+      limit: 5,
+      unreadOnly: undefined,
+      before: undefined,
+      cursor:
+        'eyJ0cyI6IjIwMjYtMDgtMjVUMDA6MDA6MDAuMDAwWiIsImlkIjoiYWJjIn0',
     });
   });
 
   it('returns 200 with empty list when nothing is provided', async () => {
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_UUID } } });
-    mockListMyNotifications.mockResolvedValue([]);
+    mockListMyNotifications.mockResolvedValue({ data: [], nextCursor: null });
     const res = await GET(
       asNextRequest(buildGet('http://localhost/api/notifications')) as never,
     );
@@ -107,6 +132,7 @@ describe('GET /api/notifications', () => {
       limit: undefined,
       unreadOnly: undefined,
       before: undefined,
+      cursor: undefined,
     });
   });
 
@@ -132,21 +158,24 @@ describe('GET /api/notifications', () => {
 
   it('returns 200 with the service payload', async () => {
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_UUID } } });
-    mockListMyNotifications.mockResolvedValue([
-      {
-        id: NOTIF_UUID,
-        user_id: USER_UUID,
-        type: 'booking_reminder',
-        channel: 'in_app',
-        subject: null,
-        body: null,
-        payload: {},
-        read_at: null,
-        sent_at: '2026-08-27T10:00:00.000Z',
-        created_at: '2026-08-27T10:00:00.000Z',
-        unread: true,
-      },
-    ]);
+    mockListMyNotifications.mockResolvedValue({
+      data: [
+        {
+          id: NOTIF_UUID,
+          user_id: USER_UUID,
+          type: 'booking_reminder',
+          channel: 'in_app',
+          subject: null,
+          body: null,
+          payload: {},
+          read_at: null,
+          sent_at: '2026-08-27T10:00:00.000Z',
+          created_at: '2026-08-27T10:00:00.000Z',
+          unread: true,
+        },
+      ],
+      nextCursor: 'eyJ0cyI6IjIwMjYtMDgtMjVUMDA6MDA6MDAuMDAwWiIsImlkIjoibm90aWYtMSJ9',
+    });
     const res = await GET(
       asNextRequest(buildGet('http://localhost/api/notifications')) as never,
     );
@@ -154,11 +183,35 @@ describe('GET /api/notifications', () => {
     const body = (await res.json()) as {
       ok: boolean;
       data: ReadonlyArray<{ id: string; unread: boolean }>;
+      nextCursor: string | null;
     };
     expect(body.ok).toBe(true);
     expect(body.data).toHaveLength(1);
     expect(body.data[0]?.id).toBe(NOTIF_UUID);
     expect(body.data[0]?.unread).toBe(true);
+    expect(body.nextCursor).not.toBeNull();
+  });
+
+  it('returns 200 with null nextCursor when no more pages', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_UUID } } });
+    mockListMyNotifications.mockResolvedValue({ data: [], nextCursor: null });
+    const res = await GET(
+      asNextRequest(buildGet('http://localhost/api/notifications')) as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { nextCursor: string | null };
+    expect(body.nextCursor).toBeNull();
+  });
+
+  it('returns 400 on a malformed cursor', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_UUID } } });
+    const res = await GET(
+      asNextRequest(
+        buildGet('http://localhost/api/notifications?cursor=!!not-base64!!'),
+      ) as never,
+    );
+    expect(res.status).toBe(400);
+    expect(mockListMyNotifications).not.toHaveBeenCalled();
   });
 });
 

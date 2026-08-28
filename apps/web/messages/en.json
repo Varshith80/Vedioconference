@@ -715,7 +715,13 @@
       "title": "Resources",
       "subline": "Materials shared by your tutors will appear here.",
       "emptyTitle": "No resources yet",
-      "emptyDescription": "PDFs, exercise sheets and course notes shared during your sessions will be listed here."
+      "emptyDescription": "PDFs, exercise sheets and course notes shared during your sessions will be listed here.",
+      "download": "Download",
+      "visibility": {
+        "public": "Public",
+        "enrolled": "Enrolled",
+        "private": "Private"
+      }
     },
     "profile": {
       "title": "My profile",
@@ -888,6 +894,16 @@
           "href": "/admin/bookings"
         },
         {
+          "id": "resources",
+          "label": "Resources",
+          "href": "/admin/resources"
+        },
+        {
+          "id": "session-bookings",
+          "label": "Session bookings",
+          "href": "/admin/session-bookings"
+        },
+        {
           "id": "tutors",
           "label": "Tutors",
           "href": "/admin/tutors"
@@ -941,6 +957,16 @@
           "id": "bookings",
           "label": "Bookings",
           "href": "/admin/bookings"
+        },
+        {
+          "id": "resources",
+          "label": "Resources",
+          "href": "/admin/resources"
+        },
+        {
+          "id": "session-bookings",
+          "label": "Session bookings",
+          "href": "/admin/session-bookings"
         },
         {
           "id": "tutors",
@@ -1168,7 +1194,8 @@
         "course": "course",
         "chapter": "chapter",
         "session": "session",
-        "tutor": "tutor"
+        "tutor": "tutor",
+        "resource": "resource"
       }
     },
     "import": {
@@ -1443,6 +1470,68 @@
         "noSessions": "No sessions are currently assigned to this tutor.",
         "viewSession": "View session"
       }
+    },
+    "resources": {
+      "title": "Resources",
+      "subline": "All study materials uploaded for students. Use the + button to add a new resource. Visibility controls who can see each file.",
+      "empty": "No resources yet. Use the + button to add one.",
+      "columns": {
+        "title": "Title",
+        "fileName": "File",
+        "visibility": "Visibility",
+        "createdAt": "Created"
+      },
+      "visibility": {
+        "public": "Public",
+        "enrolled": "Enrolled",
+        "private": "Private"
+      },
+      "delete": {
+        "title": "Delete this resource?",
+        "body": "This permanently removes the resource. Students will no longer be able to download it.",
+        "confirmCta": "Delete resource",
+        "success": "Resource deleted."
+      }
+    },
+    "resourceCreate": {
+      "title": "Add a resource",
+      "subline": "Upload metadata for a new study material. The admin role lets you set any visibility.",
+      "resource": "resource",
+      "fields": {
+        "title": "Title",
+        "description": "Description (optional)",
+        "fileName": "File name",
+        "filePath": "File path / URL",
+        "mimeType": "MIME type (optional)",
+        "sizeBytes": "Size in bytes (optional)",
+        "visibility": "Visibility"
+      },
+      "placeholders": {
+        "mimeType": "application/pdf"
+      },
+      "visibilityOptions": {
+        "public": "Public (everyone)",
+        "enrolled": "Enrolled (purchased this course)",
+        "private": "Private (uploader only)"
+      },
+      "submit": "Add resource"
+    },
+    "sessionBookings": {
+      "title": "Session bookings",
+      "subline": "Non-terminal session bookings (scheduled, confirmed). Mark them complete manually if Calendly/n8n failed to confirm.",
+      "empty": "No non-terminal bookings.",
+      "columns": {
+        "student": "Student",
+        "session": "Session",
+        "scheduledStart": "Scheduled start",
+        "status": "Status"
+      }
+    },
+    "manualComplete": {
+      "cta": "Mark complete",
+      "success": "Booking marked complete.",
+      "alreadyTerminal": "Booking is already in a terminal state.",
+      "notFound": "Booking not found."
     }
   },
   "SiteHeader": {
@@ -1619,8 +1708,7 @@
       "body": "The n8n workflow {workflow} failed and the event was dead-lettered. The original payload is below.",
       "errorLabel": "Error"
     }
-  }
-,
+  },
   "Notifications": {
     "bell": {
       "aria": "Notifications",

@@ -49,11 +49,12 @@ export async function DashboardHeaderBell() {
     getMyUnreadCount(),
     listMyNotifications({ limit: PREVIEW_LIMIT }),
   ]);
+  const previewItems = preview.data;
   return (
     <NotificationBell
       locale={locale}
       initialUnreadCount={unread}
-      initialPreview={preview.map((n) => ({
+      initialPreview={previewItems.map((n) => ({
         id: n.id,
         type: n.type,
         subject: n.subject,

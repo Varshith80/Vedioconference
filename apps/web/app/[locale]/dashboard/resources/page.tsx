@@ -5,8 +5,22 @@ import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ResourceList } from '@/components/dashboard/resource-list';
 import { BookOpen } from 'lucide-react';
 import { BRAND } from '@/lib/constants/brand';
+import { listResourcesForCurrentUser } from '@/services/resources';
+
+// =====================================================================
+// Sprint 8 — R-1 student-facing resources page.
+//
+// Reads through `listResourcesForCurrentUser()` (which runs the
+// `resources_select_visible` RLS policy server-side). The list
+// of cards is rendered by the client component `ResourceList`,
+// which keeps the page itself a server component.
+//
+// Visibility is shown verbatim on each card so the student can
+// tell at a glance why a file is/isn't downloadable.
+// =====================================================================
 
 export async function generateMetadata({
   params,
@@ -34,6 +48,7 @@ export default async function DashboardResourcesPage({
   setRequestLocale(locale);
   const t = await getTranslations('Dashboard.resources');
   const tNav = await getTranslations('Nav');
+  const resources = await listResourcesForCurrentUser();
   return (
     <Section spacing="default" aria-labelledby="resources-title">
       <Container>
@@ -54,11 +69,15 @@ export default async function DashboardResourcesPage({
         </div>
 
         <div className="mt-10">
-          <EmptyState
-            icon={<BookOpen className="h-6 w-6" aria-hidden={true} />}
-            title={t('emptyTitle')}
-            description={t('emptyDescription')}
-          />
+          {resources.length === 0 ? (
+            <EmptyState
+              icon={<BookOpen className="h-6 w-6" aria-hidden={true} />}
+              title={t('emptyTitle')}
+              description={t('emptyDescription')}
+            />
+          ) : (
+            <ResourceList resources={resources} />
+          )}
         </div>
       </Container>
     </Section>

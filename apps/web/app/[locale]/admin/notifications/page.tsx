@@ -56,7 +56,7 @@ export default async function AdminNotificationsPage({
   // non-admins; this is defence-in-depth.
   await requireAdmin();
 
-  const items = await listMyNotifications({ limit: PAGE_SIZE });
+  const { data: items } = await listMyNotifications({ limit: PAGE_SIZE });
   const preview = items.map((n) => ({
     id: n.id,
     type: n.type,

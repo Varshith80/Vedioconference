@@ -10,6 +10,11 @@ import {
 } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
 import type { ListNotificationsQuery } from '@/lib/validations/notifications';
+import {
+  decodeCursor,
+  encodeCursor,
+  resolveCursor,
+} from '@/lib/validations/cursor';
 
 // =====================================================================
 // Sprint 7 — M5.2 In-app Notification Feed — service layer.
@@ -211,38 +216,74 @@ function formatUnit(
 export interface ListNotificationsOptions {
   limit?: number;
   unreadOnly?: boolean;
+  /** Preferred — opaque base64-url cursor from `nextCursor` of
+   *  the previous page. */
+  cursor?: string;
+  /** DEPRECATED — kept for one release (Sprint 7 → 8).
+   *  Ignored when `cursor` is also supplied. */
   before?: string;
+}
+
+export interface ListNotificationsResult {
+  data: ReadonlyArray<Notification>;
+  nextCursor: string | null;
 }
 
 /** List the signed-in user's own notifications, newest first. */
 export const listMyNotifications = cache(
   async (
     opts: ListNotificationsOptions = {},
-  ): Promise<ReadonlyArray<Notification>> => {
+  ): Promise<ListNotificationsResult> => {
     try {
       const supabase = await createSupabaseServerClientUntyped();
       const limit = clampLimit(opts.limit ?? DEFAULT_LIMIT);
+      const resolved = resolveCursor(
+        { cursor: opts.cursor, before: opts.before },
+      );
       let query = supabase
         .from('notifications')
         .select(NOTIFICATION_SELECT)
         .order('sent_at', { ascending: false })
-        .limit(limit);
+        .order('id', { ascending: false })
+        .limit(limit + 1); // +1 to detect whether a next page exists
       if (opts.unreadOnly === true) {
         query = query.is('read_at', null);
       }
-      if (opts.before) {
-        query = query.lt('sent_at', opts.before);
+      if (resolved) {
+        // Cursor predicate: strictly older than (ts, id). We use
+        // PostgREST's `.or(...)` to express
+        //   (sent_at < ts) OR (sent_at = ts AND id < id)
+        // which gives strict total order on (ts, id). When the
+        // cursor was a legacy `before` (no id), we fall back to
+        // the original `sent_at < ts` predicate — the page may
+        // miss rows that share the same microsecond, which is
+        // the documented Sprint 7 behaviour we explicitly do
+        // NOT break.
+        if (opts.cursor) {
+          query = query.or(
+            `sent_at.lt.${resolved.ts},and(sent_at.eq.${resolved.ts},id.lt.${resolved.id})`,
+          );
+        } else if (opts.before) {
+          query = query.lt('sent_at', resolved.ts);
+        }
       }
       const { data, error } = await query;
       if (error) {
         logger.warn('listMyNotifications failed', { error: describeError(error) });
-        return [];
+        return { data: [], nextCursor: null };
       }
-      const rows = (data ?? []) as ReadonlyArray<NotificationRow>;
-      return rows.map(rowToNotification);
+      const rows = ((data ?? []) as ReadonlyArray<NotificationRow>).slice(0, limit);
+      const data_ = rows.map(rowToNotification);
+      const hasMore = ((data ?? []) as ReadonlyArray<NotificationRow>).length > limit;
+      const last = rows[rows.length - 1];
+      const nextCursor =
+        hasMore && last
+          ? encodeCursor({ ts: last.sent_at, id: last.id })
+          : null;
+      return { data: data_, nextCursor };
     } catch (e) {
       logger.warn('listMyNotifications threw', { error: describeError(e) });
-      return [];
+      return { data: [], nextCursor: null };
     }
   },
 );

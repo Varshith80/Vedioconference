@@ -37,7 +37,10 @@ export const adminChapterCreateSchema = z.object({
   description: z.string().max(5000).optional(),
   default_duration_min: z.coerce.number().int().positive().nullable().optional(),
   is_published: z.boolean().optional(),
-  sort_order: z.coerce.number().int().nonnegative().optional(),
+  // v2 `chapters.position` (NOT NULL CHECK position > 0). The
+  // API defaults this server-side to `getNextChapterPosition`
+  // when omitted, so the form does not have to send it.
+  position: z.coerce.number().int().positive().optional(),
 });
 export type AdminChapterCreateInput = z.infer<typeof adminChapterCreateSchema>;
 
@@ -108,7 +111,7 @@ export const adminChapterEditSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(5000).optional(),
   default_duration_min: z.coerce.number().int().positive().nullable().optional(),
-  sort_order: z.coerce.number().int().nonnegative().optional(),
+  position: z.coerce.number().int().positive().optional(),
   is_published: z.boolean().optional(),
 });
 export type AdminChapterEditInput = z.infer<typeof adminChapterEditSchema>;
@@ -148,3 +151,34 @@ export type AdminTutorCreateInput = z.infer<typeof adminTutorCreateSchema>;
 // Tutors (edit). Mirrors the create schema, all fields optional.
 export const adminTutorEditSchema = adminTutorCreateSchema.partial();
 export type AdminTutorEditInput = z.infer<typeof adminTutorEditSchema>;
+
+// =====================================================================
+// Sprint 8 — Resources admin schema (R-1 / R-2 surface).
+//
+// Models the `public.resources` table (Sprint B2 migration
+// 20260707000005). The visibility enum mirrors the CHECK constraint
+// in the migration:
+//   visibility IN ('public', 'enrolled', 'private')
+// `course_id` and `tutor_id` are nullable (resources can be
+// course-agnostic or tutor-agnostic). `uploaded_by` is set by the
+// service layer from auth.uid() — clients never send it.
+// =====================================================================
+
+export const resourceVisibilitySchema = z.enum(['public', 'enrolled', 'private']);
+export type ResourceVisibility = z.infer<typeof resourceVisibilitySchema>;
+
+export const adminResourceCreateSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional().nullable(),
+  file_name: z.string().min(1).max(500),
+  file_path: z.string().min(1).max(2000),
+  mime_type: z.string().min(1).max(200).optional().nullable(),
+  size_bytes: z.coerce.number().int().nonnegative().optional().nullable(),
+  course_id: z.string().uuid().optional().nullable(),
+  tutor_id: z.string().uuid().optional().nullable(),
+  visibility: resourceVisibilitySchema.optional(),
+});
+export type AdminResourceCreateInput = z.infer<typeof adminResourceCreateSchema>;
+
+export const adminResourceEditSchema = adminResourceCreateSchema.partial();
+export type AdminResourceEditInput = z.infer<typeof adminResourceEditSchema>;

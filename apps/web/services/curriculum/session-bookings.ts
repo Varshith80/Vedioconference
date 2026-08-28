@@ -227,6 +227,87 @@ export async function cancelSessionBooking(
 }
 
 /**
+ * Sprint 8 — B-19 manual-complete. Move a session booking to
+ * `completed` from any non-terminal status. The route layer
+ * must enforce the admin role (manual-complete is a back-office
+ * tool, not a user-facing action). The transition is allowed
+ * from `scheduled` / `confirmed` only — moving from a
+ * terminal state (`completed`, `cancelled`, `no_show`,
+ * `rescheduled`) is a 409 to prevent the admin from
+ * accidentally rewriting history.
+ *
+ * We intentionally do NOT auto-mark `no_show` — when the
+ * admin does not attend the call, that is a separate
+ * client-owned decision (the booking stays in its current
+ * status until the admin either completes or no-shows it).
+ *
+ * Returns the updated booking, or `null` when the row did
+ * not transition (idempotent: if already `completed`, returns
+ * the row as-is; if in a terminal non-completed state,
+ * returns `null` to signal "no transition happened").
+ */
+export type ManualCompleteResult =
+  | { kind: 'ok'; booking: SessionBooking }
+  | { kind: 'already_terminal'; booking: SessionBooking }
+  | { kind: 'not_found' };
+
+export async function manualCompleteSessionBooking(
+  bookingId: string,
+  supabase?: Awaited<ReturnType<typeof createSupabaseServerClientUntyped>>,
+): Promise<ManualCompleteResult> {
+  const client =
+    supabase ?? (await createSupabaseServerClientUntyped());
+
+  // Load first to detect terminal state and report a clean 409.
+  const { data: existing, error: loadErr } = await client
+    .from('session_bookings')
+    .select('*')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (loadErr) {
+    logger.error('manualComplete load failed', {
+      bookingId,
+      ...describeError(loadErr),
+    });
+    throw loadErr;
+  }
+  if (!existing) return { kind: 'not_found' };
+  const row = existing as unknown as SessionBooking;
+
+  if (row.status === 'completed') {
+    return { kind: 'already_terminal', booking: row };
+  }
+  // Other terminal states cannot be silently rewritten.
+  if (
+    row.status === 'cancelled' ||
+    row.status === 'no_show' ||
+    row.status === 'rescheduled'
+  ) {
+    return { kind: 'already_terminal', booking: row };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('session_bookings')
+      .update({
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq('id', bookingId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return { kind: 'ok', booking: data as unknown as SessionBooking };
+  } catch (e) {
+    logger.error('manualComplete update failed', {
+      bookingId,
+      ...describeError(e),
+    });
+    throw e;
+  }
+}
+
+/**
  * Type re-export for callers that need the `MeetingLink`
  * shape. Keeps the import surface narrow.
  */

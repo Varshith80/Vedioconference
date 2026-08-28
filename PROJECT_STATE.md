@@ -899,12 +899,197 @@ Sprint 3.5 = +8%, Sprint 3.6 = +9%).
 > original estimate). The total project weight is unchanged at
 > ~6.5 weeks.
 
+## Sprint 8 plan
+
+> **Read alongside `docs/review/PHASE2_SPRINT_8_SUMMARY.md`.**
+> This section is the planning record; the summary file is the
+> close-out record. Both live in the same project so the
+> planning intent is preserved next to the actual result.
+
+Sprint 8 is a **client-feature focused, low-risk completion
+slice** that finishes three Phase-5 roadmap milestones (M5.1,
+M5.3 read-path, M5.4) plus one notification-scale follow-on,
+without touching any blocked business decision, any new SaaS,
+or any client-owned legal process.
+
+### S8-A — R-1 + R-2 Resources delivery surface
+
+- **Goal.** Students see resources they are entitled to; admins
+  manage resources.
+- **Reuse.** `resources` + `resource_grants` schema (v2;
+  `resource_grants.session_grant_id` FK is already in place per
+  Sprint 3.6). The v2 `resources_select_visible` RLS policy
+  joins `resource_grants.session_grant_id → session_grants
+  → student_id = auth.uid()`. Existing `/api/resources` GET
+  handles admin-all. Existing `/dashboard/resources/page.tsx`
+  is the student page (currently shows only EmptyState — to be
+  re-wired to fetch + render).
+- **Add.** (1) `apps/web/services/resources.ts` — pure service
+  layer with `listResourcesForCurrentUser()` (student scope) +
+  `listAllResources()` (admin scope) + `createResource()` +
+  `updateResource()` + `deleteResource()`. (2) `POST /api/admin
+/resources` route (admin-only) and `PATCH /api/admin/resources
+/[id]` + `DELETE /api/admin/resources/[id]`. (3) Re-wire
+  `/dashboard/resources/page.tsx` to call the service and
+  render the resource list (no schema change). (4) Add admin
+  `/admin/resources/page.tsx` reusing `admin-list-page.tsx`.
+- **No schema change. No new SaaS. No new env var.**
+
+### S8-B — B-19 Manual-complete session
+
+- **Goal.** Admins can mark a session booking as `completed`
+  when Zoom misses `meeting.ended` (R-06 mitigation).
+- **Reuse.** The `booking_status` enum already contains
+  `completed`. `cancelSessionBooking` (services/curriculum
+/session-bookings.ts) is the model for an update-with-status-
+flip. The existing RSC pages for booking detail are dirty and
+  out of scope for Sprint 8 — we add a dedicated
+  `/admin/session-bookings` listing that exposes the manual-
+  complete button, avoiding the dirty detail pages.
+- **Add.** (1) `manualCompleteSessionBooking(id)` in services
+/curriculum/session-bookings.ts — admin-only UPDATE that flips
+  status from `scheduled`/`confirmed` to `completed`. (2)
+  `POST /api/admin/session-bookings/[id]/complete` route with
+  `requireAdminRoute()`. (3) Client component
+  `manual-complete-button.tsx` that POSTs and refreshes. (4)
+  A new admin RSC page `/admin/session-bookings/page.tsx` that
+  lists bookings in `scheduled`/`confirmed` status with the
+  manual-complete action.
+- **No new status value. No schema change.**
+
+### S8-C — N-3 Cursor-based pagination
+
+- **Goal.** Add cursor pagination to `notifications` and
+  `audit_logs` endpoints without breaking existing callers.
+- **Reuse.** Sprint 7 already accepts `?before=<iso>` as a
+  cursor on `/api/notifications`. We add an opaque
+  base64-encoded `cursor` query parameter (preferred) AND
+  keep the existing `before` parameter as a deprecated alias
+  for backward compatibility. The cursor encodes the last
+  seen `(sent_at, id)` tuple — `(id, created_at)` for
+  audit_logs — so the page boundary is stable even when two
+  rows share the same timestamp.
+- **Add.** (1) New Zod schemas in `lib/validations/cursor.ts`
+  for `cursorQuery` (base64-encoded JSON `{ts, id}` shape).
+  (2) New helper functions `encodeCursor()` / `decodeCursor()`
+  with strict size + shape checks. (3) Update
+  `listMyNotifications` to accept `cursor` (preferred) and
+  `before` (deprecated). (4) Add a new
+  `listAuditLogs({ cursor, limit })` service in
+  `services/admin/audit-logs.ts` plus
+  `GET /api/admin/audit-logs`. (5) The GET `/api/notifications`
+  response includes a `nextCursor: string | null` field;
+  existing clients that ignore it keep working.
+- **No schema change. No new SaaS. No new env var.**
+
+### S8-D — R-3 Recordings dashboard read-path
+
+- **Status.** **BLOCKED pending schema-change authorisation.**
+  The current `meeting_links` table does NOT have a
+  `recording_url` column (verified against
+  `apps/web/types/database.generated.ts`). The Sprint 8 plan
+  is to add one nullable column via a forward-only migration
+  IF the user approves.
+- **What will ship in S8-D (if the column is approved).** (1)
+  A nullable column `meeting_links.recording_url text`. (2)
+  Update `database.generated.ts` (regenerated via the project
+  `pnpm db:types` flow; not via Sprint 8). (3) Read-path UI on
+  the student session-detail page and (separately) on the
+  admin session-booking-detail page — display the recording
+  URL when present, "Recording not available yet" when null.
+- **What is explicitly NOT in S8-D.** The Zoom
+  `recording.completed` → n8n → `meeting_links.recording_url`
+  write-back workflow. That work is deferred to a Phase 3
+  sprint; we do NOT author n8n workflow JSON in Sprint 8.
+- **STOP condition.** If the schema change is NOT authorised,
+  S8-D is dropped from Sprint 8 entirely and the close-out
+  reports it as deferred.
+
+### Sprint 8 explicit non-goals (gated on prior decisions)
+
+Per the Sprint 8 reconciliation report §B:
+
+- No Upstash rate limiting (TD-004) — hardening, not client-
+  facing, and requires a §2.4 SaaS exception.
+- No `.env.example` key rotation (B2 §7.1 follow-up) —
+  project-lead owned, not Sprint 8 scope.
+- No `pnpm db:types` in CI — CI hygiene, not client delivery.
+- No MFA, account-lockout, PII redaction, ClamAV, GDPR
+  export, Vitest coverage project, Playwright suite, k6 load
+  test — deferred to hardening sprints.
+- No rebrand, no Tuteurs index/detail, no Tarifs page, no
+  About page, no legal pages — all blocked on P0.x / P1.x /
+  P2.x client decisions.
+- No Pack 10 / Suivi mensuel / Stage / first-trial-free /
+  discovery call / at-home — blocked on P1.x decisions.
+- No breach-notification email mirror (D-7) and no late-cancel
+  / no-show handling (E-1 / E-2 / E-3).
+- No tutor-intake form (P3.2).
+- No "Become a tutor" page.
+- No n8n workflow JSON authoring for the deferred Phase 3
+  items.
+- No Sprint 9 work begins in Sprint 8.
+
+### Schema-change gate encountered
+
+- **S8-D recording_url column.** The migration is NOT written
+  or applied in Sprint 8 without explicit user authorisation
+  in this session. The close-out will document the gate.
+- **S8-A / S8-B / S8-C.** No schema change required; all use
+  existing tables, columns, and RLS policies.
+
+---
+
 ## Last updated
 
-**2026-08-27** by Sprint 7 close-out — In-app Notification Feed
-(M5.2). Full close-out:
-`docs/review/PHASE2_SPRINT_7_SUMMARY.md`. Tag
-`v1.8.0-phase2-sprint-7` pending user approval.
+**2026-08-27** by Sprint 8 close-out — Resources delivery
+surface (R-1 + R-2), Manual-complete session booking (B-19),
+and Cursor-based pagination for notifications + audit_logs
+(N-3). **S8-D (R-3 Recordings read-path) was DROPPED from
+Sprint 8** — it requires a `meeting_links.recording_url`
+column addition that needs explicit user authorisation per
+CLAUDE §3.2 (forward-only schema changes). The gate is
+documented in §Schema-change gate below and re-stated in the
+close-out. Full close-out:
+`docs/review/PHASE2_SPRINT_8_SUMMARY.md`. Tag
+`v1.9.0-phase2-sprint-8` pending user approval.
+
+### Sprint 8 — what landed (close-out summary)
+
+- **S8-A — Resources delivery surface (R-1 + R-2).** New
+  `services/resources.ts` with `listResourcesForCurrentUser()`,
+  `listAllResources()`, `createResource()`, `updateResource()`,
+  `deleteResource()`. New admin API: `GET/POST /api/admin/resources`,
+  `PATCH/DELETE /api/admin/resources/[id]`. New admin pages:
+  `/admin/resources` (list) + create dialog. Student-facing
+  `/dashboard/resources` page lists all visibility tiers the
+  current user is entitled to (public + their own session-grant
+  joins + admin).
+- **S8-B — Manual-complete session booking (B-19).** New
+  `manualCompleteSessionBooking()` in
+  `services/curriculum/session-bookings.ts` returns a tagged
+  union (`ok | already_terminal | not_found`). Idempotent —
+  re-running on a completed booking is a no-op (`already_terminal`).
+  New API: `POST /api/admin/session-bookings/[id]/complete`.
+  New admin page: `/admin/session-bookings` lists non-terminal
+  bookings (pending_payment/scheduled/confirmed) with a
+  per-row "Mark complete" button.
+- **S8-C — Cursor-based pagination (N-3).** New
+  `lib/validations/cursor.ts` with base64-url opaque cursor
+  encoding of `{ts, id}` tuples. Service layer emits the
+  strict total-order predicate
+  `(created_at < ts) OR (created_at = ts AND id < id)` to
+  handle same-microsecond rows. Sprint 7's `?before=`
+  parameter is preserved as deprecated (one release).
+  Notifications + admin audit-logs surfaces return
+  `{data, nextCursor}`. New admin API:
+  `GET /api/admin/audit-logs` (admin-only, paginated, with
+  optional `table_name` / `action` filters).
+- **S8-D — Recordings dashboard read-path.** **NOT
+  implemented in Sprint 8.** The schema column does not
+  exist; per CLAUDE §3.2 the user must explicitly authorise
+  a new migration. Plan remains documented at §S8-D above
+  for a future sprint.
 
 ---
 

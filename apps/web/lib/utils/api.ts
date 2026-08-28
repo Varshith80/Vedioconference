@@ -14,9 +14,15 @@ import { logger } from './logger';
  * on `body.ok` for every route. Returns a `NextResponse` so
  * route handlers can also set cookies or headers on the
  * returned object.
+ *
+ * Sprint 8 — N-3: optionally accept a `nextCursor` field for
+ * cursor-paginated endpoints (notifications feed, admin
+ * audit-logs surface). When provided it sits at the top level
+ * alongside `data` so clients can request the next page
+ * without parsing the body.
  */
 export function jsonResponse<T>(
-  body: { ok: true; data: T },
+  body: { ok: true; data: T; nextCursor?: string | null },
   init?: ResponseInit,
 ): NextResponse {
   return NextResponse.json(body, init);
