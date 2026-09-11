@@ -1,66 +1,73 @@
 /**
- * Static pricing tiers for Phase 2. The source of truth is the DB
- * (`courses.price_cents`) in Phase 3 once the catalog is editable.
- * Three plans: à la carte, 5-pack, mentorat continu.
+ * Static pricing tiers for Phase 2. Sprint 5 (Slice A) updated
+ * the pack to "Pack 10 sessions" (10 credits, 6-month expiry)
+ * and the per-session price to €35. The source of truth for
+ * the PAYG price is the DB (`sessions.price_cents`) once the
+ * curriculum is imported; this constant is the marketing-page
+ * fallback. All three tiers are localisable via the
+ * `Pricing` i18n namespace; the component receives the
+ * already-translated strings.
  */
 export interface PricingTier {
-  id: 'payg' | 'pack5' | 'mentor';
+  id: 'individual' | 'pack10' | 'monthly';
   name: string;
   description: string;
   /** Integer cents. */
   priceCents: number;
   currency: 'EUR';
-  billing: 'par séance' | 'par pack' | 'par mois';
-  features: string[];
+  billing: string;
+  features: ReadonlyArray<string>;
   cta: { label: string; href: string };
   highlight?: boolean;
+  badge?: string;
 }
 
 export const PRICING_TIERS: ReadonlyArray<PricingTier> = [
   {
-    id: 'payg',
-    name: 'À la carte',
-    description: 'Pour un besoin ponctuel (DM, bac blanc, contrôle).',
-    priceCents: 4500,
+    id: 'individual',
+    name: 'individualTitle',
+    description: 'individualDescription',
+    priceCents: 3500,
     currency: 'EUR',
-    billing: 'par séance',
+    billing: 'individualBilling',
     features: [
-      '1 séance de 60 minutes',
-      'Annulation jusqu’à 1h avant',
-      'Reçu et facture par e-mail',
-      'Accès aux notes de cours',
+      'individualFeature1',
+      'individualFeature2',
+      'individualFeature3',
+      'individualFeature4',
     ],
-    cta: { label: 'Commencer', href: '/auth/register' },
+    cta: { label: 'individualCta', href: '/sessions' },
   },
   {
-    id: 'pack5',
-    name: 'Pack 5 séances',
-    description: 'Pour un suivi régulier sur un mois.',
-    priceCents: 20000,
+    id: 'pack10',
+    name: 'pack10Title',
+    description: 'pack10Description',
+    priceCents: 29900,
     currency: 'EUR',
-    billing: 'par pack',
+    billing: 'pack10Billing',
     features: [
-      '5 séances de 60 minutes',
-      'Valable 90 jours',
-      'Priorité sur les créneaux',
-      'Bilan de progression inclus',
+      'pack10Feature1',
+      'pack10Feature2',
+      'pack10Feature3',
+      'pack10Feature4',
     ],
-    cta: { label: 'Choisir ce pack', href: '/auth/register' },
+    cta: { label: 'pack10Cta', href: '/api/session-grants' },
     highlight: true,
+    badge: 'pack10Badge',
   },
   {
-    id: 'mentor',
-    name: 'Mentorat continu',
-    description: 'Pour un accompagnement tout au long de l’année.',
-    priceCents: 32000,
+    id: 'monthly',
+    name: 'monthlyTitle',
+    description: 'monthlyDescription',
+    priceCents: 10900,
     currency: 'EUR',
-    billing: 'par mois',
+    billing: 'monthlyBilling',
     features: [
-      '4 séances / mois',
-      'Tuteur dédié',
-      'Bilan mensuel avec les parents',
-      'Accès aux ressources premium',
+      'monthlyFeature1',
+      'monthlyFeature2',
+      'monthlyFeature3',
+      'monthlyFeature4',
     ],
-    cta: { label: 'Nous contacter', href: '/contact' },
+    cta: { label: 'monthlyCta', href: '/contact' },
   },
 ];

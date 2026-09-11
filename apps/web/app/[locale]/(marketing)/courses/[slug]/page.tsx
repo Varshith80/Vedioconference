@@ -66,7 +66,7 @@ export default async function CourseDetailPage(
 
   return (
     <>
-      <CourseDetail course={course} displayTitle={courseTitle} />
+      <CourseDetail course={course} displayTitle={courseTitle} locale={locale as 'en' | 'fr'} />
       {course.chapters.length > 0 ? (
         <Section spacing="default" tone="muted" aria-labelledby="course-chapters-title">
           <Container>

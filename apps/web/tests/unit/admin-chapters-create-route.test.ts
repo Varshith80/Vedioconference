@@ -63,11 +63,25 @@ describe('POST /api/chapters', () => {
     mockFrom.mockImplementation(() => {
       callIdx++;
       if (callIdx === 1) {
+        // courses lookup by slug
         return {
           select() {
             const self: Record<string, unknown> = {};
             self.eq = () => self;
             self.maybeSingle = () => Promise.resolve({ data: { id: 'c1' }, error: null });
+            return self;
+          },
+        };
+      }
+      if (callIdx === 2) {
+        // getNextChapterPosition() — max(position)+1 query
+        return {
+          select() {
+            const self: Record<string, unknown> = {};
+            self.eq = () => self;
+            self.order = () => self;
+            self.limit = () => self;
+            self.maybeSingle = () => Promise.resolve({ data: null, error: null });
             return self;
           },
         };

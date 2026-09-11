@@ -62,6 +62,7 @@ export default async function GradePage(
   const courses = await getCoursesByProgram(program.id, { gradeId: grade.id });
   const tLevels = await getTranslations({ locale, namespace: 'Levels' });
   const tCta = await getTranslations({ locale, namespace: 'CtaBand' });
+  const tNav = await getTranslations({ locale, namespace: 'Nav' });
 
   // Pre-resolve the localized titles on the server. The
   // runtime app never reads the FR workbook's slug alias.
@@ -73,8 +74,8 @@ export default async function GradePage(
       <PageHeader
         title={`${gradeTitle} — ${programTitle}`}
         breadcrumbs={[
-          { label: 'Accueil', href: '/' },
-          { label: 'Programs', href: `/${locale}/levels` },
+          { label: tNav('breadcrumbs.home'), href: '/' },
+          { label: tNav('breadcrumbs.levels'), href: `/${locale}/levels` },
           { label: programTitle, href: `/${locale}/levels/${levelSlug}` },
           { label: gradeTitle },
         ]}

@@ -175,7 +175,7 @@ export default async function DashboardSessionDetailPage({
                   <p className="mt-2 text-xs text-muted-foreground">
                     {tLabels('paid')}:{' '}
                     <span className="font-semibold text-foreground">
-                      {formatCents(session.price_cents as number, session.currency)}
+                      {formatCents(session.price_cents as number, session.currency, locale as 'en' | 'fr')}
                     </span>
                   </p>
                 ) : null}

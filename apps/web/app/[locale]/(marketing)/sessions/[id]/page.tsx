@@ -99,6 +99,7 @@ export default async function SessionDetailPage(
   const t = await getTranslations({ locale, namespace: 'Sessions' });
   const tChapters = await getTranslations({ locale, namespace: 'Chapters' });
   const tCta = await getTranslations({ locale, namespace: 'CtaBand' });
+  const tNav = await getTranslations({ locale, namespace: 'Nav' });
 
   // Best-effort course lookup for the breadcrumb. The course
   // page already lists the chapters + sessions, so the
@@ -121,7 +122,7 @@ export default async function SessionDetailPage(
           session.description ?? t('liveOnlineSession')
         }
         breadcrumbs={[
-          { label: 'Accueil', href: '/' },
+          { label: tNav('breadcrumbs.home'), href: '/' },
           ...(course && courseTitle
             ? [
                 {
@@ -177,6 +178,7 @@ export default async function SessionDetailPage(
                           {formatCents(
                             session.price_cents as number,
                             session.currency,
+                            locale as 'en' | 'fr',
                           )}
                         </p>
                       ) : (
@@ -200,6 +202,7 @@ export default async function SessionDetailPage(
                     : `/${locale}/courses`
                 }
                 buyHref="#"
+                locale={locale as 'en' | 'fr'}
               />
             </aside>
           </div>

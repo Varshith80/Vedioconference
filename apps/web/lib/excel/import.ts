@@ -123,20 +123,17 @@ const DEFAULT_CURRENCY = 'EUR';
 // correctly in both locales.
 type LocalizedTitle = { title: string; slug: string };
 
-function buildTitlesField(
-  language: Language | null,
-  title: string,
-  slug: string,
-): Record<string, LocalizedTitle> {
-  if (!language) return {};
-  return { [language]: { title, slug } };
-}
-
-// Merge a per-locale title entry into an existing metadata object.
-// The existing metadata is preserved (block, source, etc.); only
-// `metadata.titles[language]` is added or replaced. The merge is
-// tolerant of legacy / foreign JSON shapes: a non-object input
-// is treated as `{}`.
+// Merge a per-locale title entry into an existing metadata
+// object. The existing metadata is preserved (block, source,
+// etc.); only `metadata.titles[language]` is added or
+// replaced. The merge is tolerant of legacy / foreign JSON
+// shapes: a non-object input is treated as `{}`. Legacy rows
+// from earlier importer versions may have the locale at the
+// metadata root (e.g. `metadata.fr`); those are preserved
+// too — the runtime helper reads from
+// `metadata.titles[locale]`, but the legacy `metadata.fr`
+// is kept for back-compat with the verifier and any other
+// reader that looks for it.
 function mergeSessionMetadata(
   existing: unknown,
   language: Language | null,
@@ -148,6 +145,7 @@ function mergeSessionMetadata(
       ? { ...(existing as Record<string, unknown>) }
       : {};
   if (!language) return base;
+  // Merge into the canonical `titles` sub-object.
   const titlesRaw = base.titles;
   const titles: Record<string, LocalizedTitle> =
     titlesRaw && typeof titlesRaw === 'object' && !Array.isArray(titlesRaw)
@@ -180,6 +178,18 @@ const newIdCache = (): IdCache => ({
 
 // Apply a single parsed Program via ON CONFLICT (slug) DO UPDATE.
 // Returns the row id. The cache is updated in place.
+//
+// **Re-import invariant:** when `language` is set and the row
+// already exists, the existing display fields (`title`,
+// `subtitle`) are preserved. Only `metadata.titles[language]`
+// is added. This is the rule that keeps the EN canonical
+// `row.title` intact across an FR re-import. The `row.title`
+// invariant is load-bearing: the runtime
+// `localizedTitle(row, 'en')` helper falls back to `row.title`
+// when `metadata.titles.en` is absent (which it is for any
+// pre-Sprint-3.6 row), so if the FR import were to overwrite
+// `row.title` with the FR title, the EN locale would render
+// the FR string instead of the EN string.
 async function upsertProgram(
   supabase: UntypedClient,
   cache: IdCache,
@@ -188,25 +198,46 @@ async function upsertProgram(
   errors: ParseError[],
   sheetLabel: string,
 ): Promise<string | null> {
+  // Pre-fetch: when a language is set, look up the existing
+  // row so we can preserve its display fields AND its
+  // existing metadata (so that re-importing in a second
+  // language does not erase the first language's
+  // `metadata.titles[first]`). On a fresh import (no
+  // existing row) we use the workbook's values.
+  let existing: { title: string; subtitle: string | null; metadata: unknown } | null = null;
+  if (language) {
+    const { data: ex } = await supabase
+      .from('programs')
+      .select('title, subtitle, metadata')
+      .eq('slug', p.slug)
+      .maybeSingle();
+    existing = (ex as { title: string; subtitle: string | null; metadata: unknown } | null) ?? null;
+  }
+  const titleToWrite = existing ? existing.title : p.title;
+  const subtitleToWrite = existing ? existing.subtitle : p.subtitle;
+  // Build the metadata: preserve the existing metadata
+  // (including any prior `metadata.titles[<other locale>]`)
+  // and merge the new locale in. The `source` and `sheet`
+  // are workbook-derived and stable.
+  const baseMetadata: Record<string, unknown> = existing && existing.metadata
+    ? { ...(existing.metadata as Record<string, unknown>), source: 'excel-import', sheet: p.sheetName }
+    : { source: 'excel-import', sheet: p.sheetName };
+  const metadata = mergeSessionMetadata(baseMetadata, language, p.title, p.slug);
   try {
     const { data, error } = await supabase
       .from('programs')
       .upsert(
         {
           slug: p.slug,
-          title: p.title,
-          subtitle: p.subtitle,
+          title: titleToWrite,
+          subtitle: subtitleToWrite,
           // description: the parser does not yet surface a
           // program-level description; default to null. The
           // future admin form will write the real value.
           description: null,
           is_published: true,
           sort_order: 0,
-          metadata: {
-            source: 'excel-import',
-            sheet: p.sheetName,
-            ...buildTitlesField(language, p.title, p.slug),
-          },
+          metadata,
         } as never,
         { onConflict: 'slug' },
       )
@@ -228,7 +259,9 @@ async function upsertProgram(
 }
 
 // Apply a single parsed Grade via ON CONFLICT (program_id, slug)
-// DO UPDATE.
+// DO UPDATE. Same re-import invariant as upsertProgram: when
+// `language` is set, the existing `title` is preserved and only
+// `metadata.titles[language]` is added.
 async function upsertGrade(
   supabase: UntypedClient,
   cache: IdCache,
@@ -246,6 +279,21 @@ async function upsertGrade(
     });
     return null;
   }
+  let existing: { title: string; metadata: unknown } | null = null;
+  if (language) {
+    const { data: ex } = await supabase
+      .from('grades')
+      .select('title, metadata')
+      .eq('program_id', programId)
+      .eq('slug', g.slug)
+      .maybeSingle();
+    existing = (ex as { title: string; metadata: unknown } | null) ?? null;
+  }
+  const titleToWrite = existing ? existing.title : g.title;
+  const baseMetadata: Record<string, unknown> = existing && existing.metadata
+    ? { ...(existing.metadata as Record<string, unknown>), source: 'excel-import' }
+    : { source: 'excel-import' };
+  const metadata = mergeSessionMetadata(baseMetadata, language, g.title, g.slug);
   try {
     const { data, error } = await supabase
       .from('grades')
@@ -253,12 +301,9 @@ async function upsertGrade(
         {
           program_id: programId,
           slug: g.slug,
-          title: g.title,
+          title: titleToWrite,
           sort_order: g.sortOrder,
-          metadata: {
-            source: 'excel-import',
-            ...buildTitlesField(language, g.title, g.slug),
-          },
+          metadata,
         } as never,
         { onConflict: 'program_id,slug' },
       )
@@ -284,7 +329,12 @@ async function upsertGrade(
 }
 
 // Apply a single parsed Course via ON CONFLICT (slug) DO UPDATE.
-// The v1 courses table has NOT NULL columns subject / level /
+// Same re-import invariant as upsertProgram: when `language`
+// is set, the existing `title` and `subject` are preserved
+// and only `metadata.titles[language]` is added. The `level`
+// and `level_group` columns are workbook-derived and stable
+// across languages, so they are always overwritten. The
+// v1 courses table has NOT NULL columns subject / level /
 // level_group / price_cents / duration_min that the workbook
 // does not provide as separate fields. We satisfy them with
 // values derived purely from the workbook's own strings:
@@ -329,16 +379,31 @@ async function upsertCourse(
     gradeId = cached;
   }
   const level = programTitles.get(c.programSlug) ?? c.programSlug;
+  let existing: { title: string; subject: string; metadata: unknown } | null = null;
+  if (language) {
+    const { data: ex } = await supabase
+      .from('courses')
+      .select('title, subject, metadata')
+      .eq('slug', c.slug)
+      .maybeSingle();
+    existing = (ex as { title: string; subject: string; metadata: unknown } | null) ?? null;
+  }
+  const titleToWrite = existing ? existing.title : c.title;
+  const subjectToWrite = existing ? existing.subject : c.title;
+  const baseMetadata: Record<string, unknown> = existing && existing.metadata
+    ? { ...(existing.metadata as Record<string, unknown>), source: 'excel-import' }
+    : { source: 'excel-import' };
+  const metadata = mergeSessionMetadata(baseMetadata, language, c.title, c.slug);
   try {
     const { data, error } = await supabase
       .from('courses')
       .upsert(
         {
           slug: c.slug,
-          title: c.title,
+          title: titleToWrite,
           program_id: programId,
           grade_id: gradeId,
-          subject: c.title,
+          subject: subjectToWrite,
           level,
           level_group: c.programSlug,
           price_cents: 0,
@@ -350,10 +415,7 @@ async function upsertCourse(
           // admin form will expose the per-course publish
           // toggle.
           is_published: true,
-          metadata: {
-            source: 'excel-import',
-            ...buildTitlesField(language, c.title, c.slug),
-          },
+          metadata,
         } as never,
         { onConflict: 'slug' },
       )
@@ -424,17 +486,17 @@ async function upsertChapter(
     return null;
   }
   if (existing) {
-    // Update in place: title + metadata. The slug is
-    // preserved as the canonical slug; only
-    // `metadata.titles[language]` is added.
+    // Update in place: metadata only when `language` is set;
+    // preserve the existing `title` as the EN canonical
+    // title. The slug is preserved as the canonical slug;
+    // only `metadata.titles[language]` is added.
     const row = existing as { id: string; slug: string; title: string; metadata: unknown };
     const merged = mergeSessionMetadata(row.metadata, language, ch.title, ch.slug);
+    const update: Record<string, unknown> = { metadata: merged };
+    if (!language) update.title = ch.title;
     const { error: updateErr } = await supabase
       .from('chapters')
-      .update({
-        title: ch.title,
-        metadata: merged,
-      } as never)
+      .update(update as never)
       .eq('id', row.id);
     if (updateErr) {
       logger.error('chapter update failed', {
@@ -456,11 +518,9 @@ async function upsertChapter(
   // No existing row at this position. This is a new chapter;
   // insert it. (Both unique constraints are satisfied because
   // position and slug are unique within the course.)
-  const metadata: Record<string, unknown> = {
-    source: 'excel-import',
-    ...buildTitlesField(language, ch.title, ch.slug),
-  };
-  if (ch.block !== null) metadata.block = ch.block;
+  const baseMetadata: Record<string, unknown> = { source: 'excel-import' };
+  if (ch.block !== null) baseMetadata.block = ch.block;
+  const metadata = mergeSessionMetadata(baseMetadata, language, ch.title, ch.slug);
   try {
     const { data, error } = await supabase
       .from('chapters')
@@ -585,10 +645,12 @@ async function bulkUpsertSessionsForChapter(
         currency: DEFAULT_CURRENCY,
         is_published: s.isPublished,
         is_preview: s.isPreview,
-        metadata: {
-          source: 'excel-import',
-          ...buildTitlesField(language, s.title, s.slug),
-        },
+        metadata: mergeSessionMetadata(
+          { source: 'excel-import' },
+          language,
+          s.title,
+          s.slug,
+        ),
       };
       const { error } = await supabase
         .from('sessions')
@@ -610,18 +672,17 @@ async function bulkUpsertSessionsForChapter(
       continue;
     }
     // Existing row matched (by position or by slug): update
-    // title + metadata in place. The slug is preserved as the
-    // existing canonical slug (which may be the EN slug if
-    // matched by position, or the parsed slug if matched by
-    // slug); only `metadata.titles[language]` is added. This
-    // is the idempotent localization path.
+    // metadata in place when `language` is set; preserve the
+    // existing `title` as the canonical (EN) title. The slug
+    // is preserved as the existing canonical slug; only
+    // `metadata.titles[language]` is added. This is the
+    // idempotent localization path.
     const merged = mergeSessionMetadata(match.metadata, language, s.title, s.slug);
+    const update: Record<string, unknown> = { metadata: merged };
+    if (!language) update.title = s.title;
     const { error: updateErr } = await supabase
       .from('sessions')
-      .update({
-        title: s.title,
-        metadata: merged,
-      } as never)
+      .update(update as never)
       .eq('id', match.id);
     if (updateErr) {
       logger.error('session update failed', {

@@ -1,0 +1,246 @@
+{
+  "name": "session-reminder-scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "session-reminder-dispatch",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "name": "Webhook: reminder dispatch",
+      "webhookId": "session-reminder-dispatch-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "if-hmac",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "={{ $env.N8N_WEBHOOK_SECRET }}",
+              "operator": {"type": "string", "operation": "equals"}
+            },
+            {
+              "id": "if-event-type",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "reminder_dispatch",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [460, 300],
+      "name": "Verify secret + event type"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",                "value": "reminder_dispatch"},
+            {"name": "session_booking_id",  "value": "={{ $json.body.session_booking_id }}"},
+            {"name": "window",              "value": "={{ $json.body.window }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 100],
+      "name": "Acknowledge dispatch (writes dedup row)",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "if-not-duplicate",
+              "leftValue": "={{ $json.duplicate }}",
+              "rightValue": true,
+              "operator": {"type": "string", "operation": "notEquals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 100],
+      "name": "Skip if duplicate"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sprint 5 Slice E — render the reminder email body.\n//\n// We render inline (no `react-dom/server` dependency on Next.js\n// and no `@react-email/components` in this workflow) because the\n// Next.js Route Handler in `app/api/cron/send-reminders` is\n// forbidden from importing `react-dom/server`. The HTML is a\n// simple, brand-aligned wrapper — same palette as the React\n// templates in `apps/web/lib/email/templates/`, kept here so the\n// reminder pipeline ships without an extra npm dep.\n//\n// Inputs (from the Webhook node):\n//   $json.body.to, $json.body.locale ('fr'|'en'),\n//   $json.body.student_name, $json.body.session_title,\n//   $json.body.scheduled_start, $json.body.join_url,\n//   $json.body.window ('24h' | '1h').\n\nconst brand = '#1f4e8a';      // bleuPlan\nconst bg    = '#f6f4ef';      // velin\nconst card  = '#ffffff';\nconst text  = '#1f2937';\nconst muted = '#6b7280';\nconst stack = \"-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif\";\n\nconst body = $json.body;\nconst locale = body.locale === 'en' ? 'en' : 'fr';\nconst isOneHour = body.window === '1h';\n\nconst subject = isOneHour\n  ? (locale === 'fr' ? 'Rappel : votre session commence dans 1 heure' : 'Reminder: your session starts in 1 hour')\n  : (locale === 'fr' ? 'Rappel : votre session est demain'            : 'Reminder: your session is tomorrow');\n\nconst greeting = locale === 'fr' ? `Bonjour ${body.student_name || ''},` : `Hi ${body.student_name || ''},`;\n\nconst leadText = isOneHour\n  ? (locale === 'fr'\n      ? \"Votre session commence dans environ 1 heure. Rejoignez le tuteur directement en utilisant le lien ci-dessous.\"\n      : \"Your session starts in about 1 hour. Join the tutor directly using the link below.\")\n  : (locale === 'fr'\n      ? \"Petit rappel : votre session est prévue demain. Vous trouverez ci-dessous le lien pour rejoindre votre tuteur.\"\n      : \"Quick reminder: your session is scheduled for tomorrow. Below is the link to join your tutor.\");\n\nconst ctaLabel = locale === 'fr' ? 'Rejoindre la session' : 'Join the session';\nconst footerLine = locale === 'fr'\n  ? \"Si vous avez un empêchement, merci d'annuler depuis votre tableau de bord.\"\n  : \"If you can't make it, please cancel from your dashboard.\";\n\nconst html = `<!doctype html><html lang=\"${locale}\"><head><meta charset=\"utf-8\"><title>${subject}</title></head>\n<body style=\"margin:0;padding:0;background:${bg};font-family:${stack};color:${text};\">\n<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background:${bg};padding:24px 0;\">\n  <tr><td align=\"center\">\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"560\" style=\"background:${card};border:1px solid ${bg};border-radius:8px;overflow:hidden;\">\n      <tr><td style=\"background:${brand};color:#ffffff;padding:20px 24px;font-family:${stack};font-size:18px;font-weight:600;\">Intégrale</td></tr>\n      <tr><td style=\"padding:24px;font-family:${stack};font-size:15px;line-height:1.55;\">\n        <p>${greeting}</p>\n        <p>${leadText}</p>\n        <p><strong>${locale === 'fr' ? 'Session' : 'Session'}:</strong> ${body.session_title || ''}</p>\n        <p><strong>${locale === 'fr' ? 'Date' : 'Date'}:</strong> ${body.scheduled_start || ''}</p>\n        <p style=\"margin:32px 0;\">\n          <a href=\"${body.join_url || '#'}\" style=\"background:${brand};color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-family:${stack};font-size:15px;font-weight:600;display:inline-block;\">${ctaLabel}</a>\n        </p>\n        <p style=\"color:${muted};font-size:13px;\">${footerLine}</p>\n      </td></tr>\n      <tr><td style=\"padding:16px 24px;border-top:1px solid ${bg};color:${muted};font-size:12px;font-family:${stack};\">© ${new Date().getFullYear()} Intégrale · contact@integrale.example</td></tr>\n    </table>\n  </td></tr>\n</table>\n</body></html>`;\n\nconst text = [\n  greeting,\n  leadText,\n  `${locale === 'fr' ? 'Session' : 'Session'}: ${body.session_title || ''}`,\n  `${locale === 'fr' ? 'Date' : 'Date'}: ${body.scheduled_start || ''}`,\n  `${ctaLabel}: ${body.join_url || ''}`,\n  footerLine,\n].join('\\n\\n');\n\nreturn [{ json: { ...body, subject, html, text } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 100],
+      "name": "Render reminder body"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "={{ 'Bearer ' + $env.RESEND_API_KEY }}"},
+            {"name": "Content-Type",  "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "from",    "value": "={{ $env.RESEND_FROM_EMAIL }}"},
+            {"name": "to",      "value": "={{ $json.to }}"},
+            {"name": "subject", "value": "={{ $json.subject }}"},
+            {"name": "html",    "value": "={{ $json.html }}"},
+            {"name": "text",    "value": "={{ $json.text }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 100],
+      "name": "Send via Resend"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",                "value": "reminder_sent"},
+            {"name": "session_booking_id",  "value": "={{ $json.body ? $json.body.session_booking_id : $('Webhook: reminder dispatch').first().json.body.session_booking_id }}"},
+            {"name": "channel",             "value": "email"},
+            {"name": "type_name",           "value": "={{ $json.body ? $json.body.template : $('Webhook: reminder dispatch').first().json.body.template }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 100],
+      "name": "Record reminder_sent (confirmation)",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type", "value": "email"},
+            {"name": "template", "value": "admin_dead_letter"},
+            {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
+            {"name": "locale", "value": "en"},
+            {"name": "props[workflow]",      "value": "session-reminder-scheduler"},
+            {"name": "props[errorMessage]",  "value": "={{ $json.error.message }}"},
+            {"name": "props[originalEvent]", "value": "={{ $('Webhook: reminder dispatch').first().json }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 500],
+      "name": "Dead-letter: notify admin",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1780, 100],
+      "name": "Respond OK"
+    }
+  ],
+  "connections": {
+    "Webhook: reminder dispatch": {
+      "main": [[{"node": "Verify secret + event type", "type": "main", "index": 0}]]
+    },
+    "Verify secret + event type": {
+      "main": [
+        [{"node": "Acknowledge dispatch (writes dedup row)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin",               "type": "main", "index": 0}]
+      ]
+    },
+    "Acknowledge dispatch (writes dedup row)": {
+      "main": [
+        [{"node": "Skip if duplicate", "type": "main", "index": 0}]
+      ]
+    },
+    "Skip if duplicate": {
+      "main": [
+        [{"node": "Render reminder body", "type": "main", "index": 0}],
+        [{"node": "Respond OK",           "type": "main", "index": 0}]
+      ]
+    },
+    "Render reminder body": {
+      "main": [
+        [{"node": "Send via Resend", "type": "main", "index": 0}]
+      ]
+    },
+    "Send via Resend": {
+      "main": [
+        [{"node": "Record reminder_sent (confirmation)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin",           "type": "main", "index": 0}]
+      ]
+    },
+    "Record reminder_sent (confirmation)": {
+      "main": [
+        [{"node": "Respond OK", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{"name": "phase-3"}, {"name": "sprint-5-slice-e"}],
+  "meta": {
+    "description": "Sprint 5 Slice E — v2 (session_bookings) reminder dispatcher. Triggered by Next.js cron (`POST /api/cron/send-reminders`) which posts a `reminder_dispatch` event to this workflow's webhook. Acknowledges by writing a dedup row via Next.js's `notifications` UNIQUE index, renders the email inline, calls Resend, then records `reminder_sent` confirmation. Documented in n8n/docs/WORKFLOWS.md §2.10."
+  }
+}

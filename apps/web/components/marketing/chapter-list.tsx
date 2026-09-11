@@ -165,7 +165,7 @@ function SessionRow({ session, fallbackDuration, basePath, chapterSlug, tSession
           ) : null}
           {priceKnown ? (
             <span className="font-semibold text-foreground">
-              {formatCents(session.price_cents as number, session.currency)}
+              {formatCents(session.price_cents as number, session.currency, locale as 'en' | 'fr')}
             </span>
           ) : (
             <Badge variant="outline" className="text-[10px]">{tSessions('priceTbd')}</Badge>

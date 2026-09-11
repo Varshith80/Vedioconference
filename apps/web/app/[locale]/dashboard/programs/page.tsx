@@ -112,6 +112,7 @@ export default async function DashboardProgramsPage({
                         <SessionGrantCard
                           grant={g}
                           viewHref={`/${locale}/dashboard/sessions/${g.session.id}`}
+                          locale={locale as 'en' | 'fr'}
                         />
                       </li>
                     ))}

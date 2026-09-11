@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   BookText,
   CalendarRange,
@@ -13,6 +13,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { formatCents as formatCentsShared } from '@/lib/utils/format';
+import type { Locale } from '@/i18n';
 import type { OverviewCounters } from '@/services/admin/overview';
 
 interface OverviewCountersProps {
@@ -26,7 +28,9 @@ interface CounterTile {
   // Localised label key (nested under Admin.overview.counters.*).
   labelKey: string;
   // Optional formatter for the raw value (default: identity).
-  format?: (value: number) => string;
+  // Receives the active route locale so currency formatters can
+  // pick the matching locale.
+  format?: (value: number, locale: string) => string;
 }
 
 const TILES: ReadonlyArray<CounterTile> = [
@@ -41,13 +45,13 @@ const TILES: ReadonlyArray<CounterTile> = [
 ];
 
 // Format an integer cents amount as a human-readable EUR
-// string. 12345 -> "123,45 €" in fr, "EUR 123.45" in en.
-function formatCents(cents: number): string {
-  const euros = cents / 100;
-  return euros.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+// string using the active route locale. 12345 -> "123 €" in
+// fr, "€123" in en (whole euros, no decimal zeroes — see
+// `lib/utils/format.ts`). Falls back to 'en' when the locale
+// is missing. Delegates to the shared formatter so the whole
+// app uses one canonical currency display.
+function formatCents(cents: number, locale: string): string {
+  return formatCentsShared(cents, 'EUR', (locale || 'en') as Locale);
 }
 
 // Grid of platform counters rendered on the admin overview
@@ -55,6 +59,7 @@ function formatCents(cents: number): string {
 // grid that goes from 1 col on mobile to 4 cols on lg.
 export function OverviewCounters({ counters }: OverviewCountersProps) {
   const t = useTranslations('Admin.overview.counters');
+  const locale = useLocale();
   return (
     <ul
       role="list"
@@ -63,7 +68,7 @@ export function OverviewCounters({ counters }: OverviewCountersProps) {
       {TILES.map((tile) => {
         const Icon = tile.icon;
         const raw = counters[tile.key];
-        const value = tile.format ? tile.format(raw) : String(raw);
+        const value = tile.format ? tile.format(raw, locale) : String(raw);
         return (
           <li
             key={tile.key}

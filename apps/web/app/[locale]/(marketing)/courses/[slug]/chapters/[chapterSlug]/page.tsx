@@ -64,6 +64,7 @@ export default async function ChapterPage(
 
   const t = await getTranslations({ locale, namespace: 'Chapters' });
   const tSessions = await getTranslations({ locale, namespace: 'Sessions' });
+  const tNav = await getTranslations({ locale, namespace: 'Nav' });
 
   // Pre-resolve the localized titles on the server and use
   // them for the page header + breadcrumbs + session list. The
@@ -79,8 +80,8 @@ export default async function ChapterPage(
           chapter.description ?? t('noSessionsHint')
         }
         breadcrumbs={[
-          { label: 'Accueil', href: '/' },
-          { label: 'Courses', href: `/${locale}/courses` },
+          { label: tNav('breadcrumbs.home'), href: '/' },
+          { label: tNav('breadcrumbs.courses'), href: `/${locale}/courses` },
           { label: courseTitle, href: `/${locale}/courses/${slug}` },
           { label: chapterTitle },
         ]}

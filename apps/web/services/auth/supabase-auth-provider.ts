@@ -235,10 +235,36 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   async signOut(): Promise<AuthResult<void>> {
-    const { error } = await this.client.auth.signOut();
-    if (error) {
-      const e = mapSupabaseError(error);
-      return { ok: false, error: authError(e.code, e.message, error) };
+    // Sprint 8 — fix: do NOT call `this.client.auth.signOut()` directly.
+    //
+    // The browser-side GoTrue client would POST to
+    // `${SUPABASE_URL}/auth/v1/logout?scope=global` to revoke the
+    // session server-side, but that URL is `http://127.0.0.1:54321`
+    // in local dev and `https://*.supabase.co` in production — and
+    // neither is permitted by the application's `connect-src`
+    // directive in `next.config.mjs`. The browser then blocks the
+    // fetch with "Refused to connect because it violates the
+    // document's Content Security Policy", the in-memory auth state
+    // never clears, and the user remains signed in even though the
+    // UI thinks it has signed out.
+    //
+    // Instead, sign out is delegated to the Next.js route handler
+    // `DELETE /api/auth`, which runs server-side (CSP does not
+    // apply), calls `supabase.auth.signOut()` from the SSR client,
+    // and clears the `sb-<ref>-auth-token` cookies via
+    // `Set-Cookie: ...; Max-Age=0`. The browser picks up the
+    // cookie clear on the next render and the UI is consistent.
+    const res = await fetch('/api/auth', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ scope: 'global' }),
+    });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      const message =
+        (detail && typeof detail.message === 'string' && detail.message) ||
+        'Sign-out failed.';
+      return { ok: false, error: authError('signout_failed', message) };
     }
     return { ok: true, data: undefined };
   }

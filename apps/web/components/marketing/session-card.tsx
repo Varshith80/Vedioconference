@@ -19,6 +19,9 @@ interface SessionCardProps {
   chapterHref: string;
   /** Locale-prefixed path the "Buy" button POSTs to. */
   buyHref: string;
+  /** Active application locale, used to render the price
+   *  with the correct symbol placement and decimal separator. */
+  locale: 'en' | 'fr';
 }
 
 /**
@@ -27,7 +30,7 @@ interface SessionCardProps {
  * button is disabled when `session.price_cents` is NULL
  * (Sprint 5 will populate prices from the Excel curriculum).
  */
-export function SessionCard({ session, displayTitle, chapterHref, buyHref }: SessionCardProps) {
+export function SessionCard({ session, displayTitle, chapterHref, buyHref, locale }: SessionCardProps) {
   const priceKnown = session.price_cents != null;
   const title = displayTitle ?? session.title;
   return (
@@ -58,7 +61,7 @@ export function SessionCard({ session, displayTitle, chapterHref, buyHref }: Ses
           <div className="flex flex-col items-end gap-2">
             {priceKnown ? (
               <p className="font-heading text-2xl font-bold text-foreground">
-                {formatCents(session.price_cents as number, session.currency)}
+                {formatCents(session.price_cents as number, session.currency, locale)}
               </p>
             ) : (
               <Badge variant="outline" className="text-xs">Price TBD</Badge>

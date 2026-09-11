@@ -28,6 +28,7 @@ import { serverEnv } from '@/lib/env';
  *       { type: "meeting_created",                  session_booking_id, meeting_id, ... }
  *       { type: "payment_succeeded",                payment_id, ... }
  *       { type: "payment_failed",                   payment_id }
+ *       { type: "reminder_dispatch",                session_booking_id, window, template, ... }
  *       { type: "reminder_sent",                    session_booking_id, channel, type }
  *       { type: "session_grant_checkout_created",   session_grant_id, stripe_session_id }
  *       { type: "session_booking_confirmed",        session_booking_id }
@@ -199,6 +200,52 @@ export async function POST(req: NextRequest) {
         const { payment_id } = body;
         const { error } = await admin.from('payments').update({ status: 'failed' } as never).eq('id', payment_id);
         if (error) throw error;
+        break;
+      }
+      case 'reminder_dispatch': {
+        // Sprint 5 Slice E — cron-side trigger that asks n8n to
+        // dispatch a reminder email. n8n owns the Resend call.
+        // The dedup is two-tiered:
+        //   1. `webhook_events.event_id` UNIQUE — the cron mints
+        //      `reminder-24h-<booking_id>` / `reminder-1h-<booking_id>`
+        //      so a second tick with the same id is rejected at line
+        //      51 with `{ duplicate: true }` before this case runs.
+        //   2. `notifications` UNIQUE(user_id, type,
+        //      payload->>'booking_id', channel) — a safety net in case
+        //      n8n calls back without `event_id` for some reason.
+        const {
+          session_booking_id,
+          window: reminderWindow = '24h',
+        } = body;
+        if (!session_booking_id) {
+          throw BadRequest('reminder_dispatch requires session_booking_id.');
+        }
+        const { data: sb } = await admin
+          .from('session_bookings')
+          .select('student_id')
+          .eq('id', session_booking_id)
+          .single();
+        const userId = (sb as { student_id?: string } | null)?.student_id ?? null;
+        if (!userId) {
+          throw BadRequest(
+            `reminder_dispatch could not resolve student_id for booking ${session_booking_id}.`,
+          );
+        }
+        const notifType =
+          reminderWindow === '1h' ? 'reminder_1h' : 'reminder_24h';
+        const { error: notifErr } = await admin.from('notifications').insert({
+          user_id: userId,
+          type: notifType,
+          channel: 'email',
+          payload: {
+            booking_id: session_booking_id,
+            window: reminderWindow,
+          },
+        } as never);
+        if (notifErr && (notifErr as { code?: string }).code === '23505') {
+          return NextResponse.json({ received: true, duplicate: true });
+        }
+        if (notifErr) throw notifErr;
         break;
       }
       case 'reminder_sent': {

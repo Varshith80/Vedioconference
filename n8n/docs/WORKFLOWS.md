@@ -70,7 +70,8 @@ resulting state back to Supabase.
 | 2 | module-booking-to-zoom            | Calendly `invitee.created`           | supabase `module_bookings`, `meeting_links` |
 | 3 | module-completed                  | Zoom `meeting.ended`                 | supabase `module_bookings` (completed), `module_progress` (completed), `enrollments` (completed if all modules done) |
 | 4 | module-confirmation-email         | n8n internal (chain from 2)          | resend, supabase `notifications`  |
-| 5 | module-reminder-scheduler         | n8n Cron (every 15 min)              | resend, supabase `notifications`  |
+| 5 | module-reminder-scheduler         | n8n Cron (every 15 min) [v1 only — see §2.10] | resend, supabase `notifications` (v1, broken post-Sprint 3.5) |
+| 10 | session-reminder-scheduler       | Webhook from Next.js cron (`POST /api/cron/send-reminders`) [Sprint 5 Slice E] | resend, supabase `notifications` |
 | 6 | module-reschedule                 | Calendly `invitee.updated`           | supabase `module_bookings`, void old Zoom, create new |
 | 7 | module-cancellation               | Calendly `invitee.canceled` / `POST /api/module-bookings/[id]/cancel` | supabase `module_bookings` (cancelled), void Zoom |
 | 8 | admin-notification                | n8n internal (1, 2, 3, 5, 6, 7)      | resend to admin                   |
@@ -335,6 +336,107 @@ replay is a no-op.
 1. **Send Resend email** to tutor with student name, course
    title, module title, scheduled time, and host `start_url`
    (host-only Zoom link).
+
+---
+
+### 2.10 session-reminder-scheduler  (`session-reminder-scheduler.json`) — Sprint 5 Slice E
+
+**Trigger:** n8n Webhook — `POST /webhook/session-reminder-dispatch`,
+called from Next.js's `POST /api/cron/send-reminders` (operator
+scheduler — Vercel Cron, an external cron service, GitHub
+Actions scheduled workflow, or `cron` + curl on the operator
+host).
+
+**Steps:**
+1. **Verify webhook secret.** The `x-webhook-secret` header must
+   match `N8N_WEBHOOK_SECRET`; the body's `type` must be
+   `reminder_dispatch`. Anything else → dead-letter.
+2. **Acknowledge dispatch.** POST
+   `${NEXT_PUBLIC_SITE_URL}/api/webhooks/n8n` with
+   `{ type: 'reminder_dispatch', session_booking_id, window }`.
+   Next.js looks up the booking's `student_id` and inserts a
+   row into `notifications` keyed by
+   `user_id, type, payload->>'booking_id', channel`. The
+   `uq_notifications_dedupe` UNIQUE index guarantees one row
+   per (student, window, booking). A 23505 from this index
+   returns `{ duplicate: true }` to n8n.
+3. **Skip if duplicate.** When the acknowledgement says the
+   dedup row already exists, the workflow short-circuits and
+   responds `{ ok: true }` without calling Resend. This is the
+   second line of defence against a duplicate cron tick (the
+   first is `webhook_events.event_id` UNIQUE, which is enforced
+   on the inbound cron → Next.js call).
+4. **Render reminder body.** A Code node renders the email
+   inline as a literal HTML string. We do NOT import
+   `react-dom/server` here because Next.js 15 forbids it in a
+   Route Handler module graph, and the React Email templates in
+   `apps/web/lib/email/templates/` live behind that import. The
+   inline renderer uses the same brand palette
+   (`#1f4e8a` / `#f6f4ef` / `#ffffff`) and produces both
+   `text/plain` and `text/html` parts.
+5. **Send via Resend.** `POST https://api.resend.com/emails`
+   with `Authorization: Bearer ${RESEND_API_KEY}`,
+   `from = ${RESEND_FROM_EMAIL}`, and the rendered body.
+6. **Record `reminder_sent`.** POST back to
+   `${NEXT_PUBLIC_SITE_URL}/api/webhooks/n8n` with
+   `{ type: 'reminder_sent', session_booking_id, channel,
+   type_name }` so the existing v1 `reminder_sent` case in the
+   Next.js webhook writes a second `notifications` row keyed on
+   `(user_id, 'reminder_24h'|'reminder_1h', booking_id,
+   'email')`. (This is the existing convention — the v1
+   workflow relied on it for observability.) The second
+   notifications row hits the same `uq_notifications_dedupe`
+   UNIQUE index; the `reminder_dispatch` step already inserted
+   one row at step 2, so the v2 cron-side dedup is what
+   actually gates the send. The `reminder_sent` insert is
+   `continueOnFail: true` so a duplicate row here does not
+   break the workflow.
+7. **Respond OK.**
+
+**Failure modes:**
+- Step 2 fails (network or 5xx) → workflow continues anyway
+  (the operator will see a `duplicate` outcome in the cron log
+  on the next tick).
+- Step 5 (Resend) fails → workflow dead-letters via the
+  `admin-notification` (workflow 8) with the original event.
+- The cron service can be invoked more frequently than the
+  reminder window (e.g. every 5 minutes) — the dedup layer
+  keeps the system safe.
+
+**Env vars on n8n:**
+- `N8N_WEBHOOK_SECRET` — shared with Next.js.
+- `NEXT_PUBLIC_SITE_URL` — the Next.js deployment origin.
+- `RESEND_API_KEY` — Resend credential (not the same as
+  Next.js's `RESEND_API_KEY`; n8n has its own).
+- `RESEND_FROM_EMAIL` — sender.
+- `ADMIN_NOTIFY_EMAIL` — destination for dead-letter.
+
+**Why this lives in n8n (and not in Next.js)**
+---------------------------------------------
+Per CLAUDE.md §2.3, "n8n is the only system that calls external
+APIs on the booking path." Next.js 15 also forbids importing
+`react-dom/server` into a Route Handler module graph, even via
+dynamic `await import()` — and the React Email templates in
+`apps/web/lib/email/templates/` depend on
+`renderToStaticMarkup` from `react-dom/server`. So the slice is
+split:
+
+- **Next.js cron** (`apps/web/services/admin/reminders.ts` +
+  `app/api/cron/send-reminders/route.ts`) — scans
+  `session_bookings`, mints a deterministic
+  `event_id = reminder-<window>-<booking_id>`, and POSTs a
+  `reminder_dispatch` event to n8n's webhook. No email
+  rendering.
+- **n8n workflow** (this file) — receives the dispatch,
+  acknowledges via the `notifications` UNIQUE index, renders
+  the email body inline, and calls Resend.
+
+The v1 `module-reminder-scheduler.json` (`§2.5`) is **deprecated
+after Sprint 3.5** — it scans `module_bookings`, which no
+longer exists post-Sprint-3.5 (the v2 table is
+`session_bookings`). The v1 workflow's `module_booking_id` and
+`/api/n8n/notify` paths are broken; this v2 workflow replaces
+them.
 
 ---
 

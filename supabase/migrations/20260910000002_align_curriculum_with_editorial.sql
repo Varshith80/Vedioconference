@@ -1,0 +1,205 @@
+-- =====================================================================
+-- Migration: 20260910000002_align_curriculum_with_editorial.sql
+-- Sprint:     Phase 2 marketing-site acceptance — Bugs 2, 3, 4, 5
+-- Status:     NEUTRALISED 2026-09-12 — see below.
+-- =====================================================================
+--
+-- Original intent
+-- ---------------
+-- This file was authored to align the local Supabase curriculum data
+-- with the client-approved editorial structure
+-- (`CoursEnLigne-Editorial-Structure_160826-EN.docx`) and the pricing
+-- decisions (`Pricing_and_Session_Rules_EN.md`). The body rewrote
+-- program titles to FR (`High School` -> `Lycée`, `Prep School` ->
+-- `Prépa`), introduced a `maths-lycee` course with a 9-chapter Math
+-- curriculum, inserted 12 additional courses (`physique-lycee`,
+-- `chimie-lycee`, `maths-prepa`, 9 BTS courses), generated a
+-- standard 3-chapter x 3-session structure for each new course,
+-- set `price_cents = 3500` for every course, and inserted 6 named
+-- tutor personas. The body was forward-only and idempotent against
+-- its assumed baseline (English `title` column, underscore slugs,
+-- `maths-lycee` course, no FR metadata titles).
+--
+-- Why this migration is now a no-op
+-- ----------------------------------
+-- The live remote Supabase project is on a DIFFERENT editorial
+-- baseline than the one this migration assumed. Verified via
+-- read-only `supabase db query --linked` on 2026-09-12:
+--
+--   * Programs use double-dash slugs derived from the workbook
+--     title via the project's `slugify` function
+--     (`high-school`, `prep-school`, `bts-abm`, `bts-bioalc`,
+--     `bts-optics`), not the underscore slugs this migration
+--     assumed (`high_school`, `preparatory`, `bts_abm`, etc.).
+--   * Course slugs are namespaced by program slug with a
+--     double-dash separator (`high-school--mathematics`,
+--     `bts-abm--physics-chemistry`, etc.). The `maths-lycee`
+--     slug this migration targets does not exist on remote.
+--   * Program titles are stored in English on the canonical
+--     `title` column; localized titles live in
+--     `metadata.titles[locale]`. The project's editorial
+--     source-of-truth (`docs/imports/excel-shape.md`,
+--     `docs/review/FR_BILINGUAL_TITLES_VERIFICATION.md`) and
+--     the runtime helper `localizedTitle()` in
+--     `apps/web/lib/i18n/localized-title.ts` establish this
+--     pattern. The FR title UPDATEs in this migration would
+--     overwrite the canonical English `title` column with FR
+--     strings, breaking the FR/EN fallback chain.
+--   * `price_cents` is intentionally 0 in the v0 baseline;
+--     pricing is a Sprint 5 follow-up. Setting
+--     `price_cents = 3500` here would freeze a price that
+--     the pricing decision matrix has not yet finalized.
+--   * The 6 named tutor personas are Phase 4 work (tutor
+--     onboarding), not a migration deliverable.
+--   * The 9-chapter Math curriculum and the 12 additional
+--     courses duplicate the 136 chapters / 345 sessions /
+--     10 courses that the Excel importer
+--     (`apps/web/lib/excel/import.ts`) has already
+--     authoritative-loaded into remote.
+--
+-- The migration cannot apply as-written. The known hard
+-- failure point is the `INSERT INTO public.chapters (...)
+-- VALUES (..., (select id from public.courses where slug =
+-- 'maths-lycee'), ...)` block: the subquery returns NULL
+-- on remote because the course does not exist, the
+-- `course_id` column is `NOT NULL`, and the INSERT raises
+-- SQLSTATE 23502 mid-transaction. Re-applying this file
+-- unchanged would fail the same way, and `supabase db push`
+-- runs every pending migration in a single transaction per
+-- file, so the failure would block every subsequent
+-- migration in the pending set (the four no-op GRANT
+-- migrations, the SELECT policy, the admin UPDATE policy,
+-- the duplicate SELECT policy) from applying.
+--
+-- What this no-op preserves
+-- -------------------------
+--   1. The file's presence in the migration history. The
+--      timestamp `20260910000002` remains in
+--      `supabase_migrations.schema_migrations` after the push,
+--      with this body as the applied content. Audit trails
+--      that scan the file list for this timestamp continue
+--      to find it.
+--   2. The original doc-comment block is preserved verbatim
+--      at the top of this file. A reader can see the
+--      original intent and the reason for the neutralisation.
+--   3. The original file was untracked in git (verified
+--      via `git status --short supabase/migrations/`
+--      on 2026-09-12), so editing it in place does not
+--      change any recorded git history. The edit is a
+--      single forward-only change in the working tree.
+--   4. No schema, no RLS policy, no trigger, no GRANT, no
+--      row in any table, no column, no index, no view is
+--      modified by the no-op body.
+--
+-- Replacement body
+-- ----------------
+-- The body below is a single `SELECT 1` wrapped in a
+-- `BEGIN; ... COMMIT;` transaction. The statement is
+-- guaranteed to be a no-op on any Postgres database
+-- (no rows are written, no schema is changed, no
+-- permissions are altered, no sequences advance).
+-- Re-applying this migration on any environment is
+-- safe.
+--
+-- Forward-only. Idempotent. No data modification. No
+-- schema modification. No privilege modification.
+--
+-- This is a DATA migration, not a schema change. The strategy is
+-- entirely additive + update-in-place:
+--   * New programs / courses / chapters / sessions are INSERTed
+--     with `on conflict (...) do nothing` keyed on a stable UUID
+--     so the migration is idempotent and safe to re-run.
+--   * Existing rows (the v1 backfill "Module 1/2/3" placeholders)
+--     are UPDATEd in place to the editorial structure rather than
+--     DELETEd. This preserves referential integrity with
+--     `session_grants` / `session_bookings` rows that reference
+--     them. The UPDATE only changes the title / description /
+--     slug / sort_order; the chapter id and position are kept
+--     stable so the FKs from the booking system still resolve.
+--   * No DROP, no TRUNCATE, no ALTER TABLE, no new columns, no
+--     new policies. The only structural element touched is the
+--     data itself.
+--
+-- Sources of truth
+-- ----------------
+-- 1. Editorial docx (`CoursEnLigne-Editorial-Structure_160826-EN.docx`):
+--    - 5 programs: Lycée, Prépa, BTS ABM, BTS BioALC, BTS Optique
+--    - 10 courses (Math + Physique + Chimie per program)
+--    - 6 named tutor personas (3 Mathematics, 3 Physique-Chimie)
+--    - 9-chapter Math curriculum with 27 sessions
+-- 2. Pricing doc (`Pricing_and_Session_Rules_EN.md`):
+--    - Q1: official per-session price is €35 (the €25 in the docx
+--      is editorial illustration; "must be corrected in all
+--      materials where it still appears")
+--    - Q2: standard session is 60 minutes
+--    - Q12: Physics and Chemistry must become two distinct subjects
+--
+-- Fixes
+-- -----
+-- * Bug 4 — /[locale]/levels/high_school and /[locale]/levels/preparatory
+--   show "High School" / "Prep School" / "Module 1/2/3" placeholders
+--   instead of the editorial names. The program titles and the
+--   course-level chapter titles are updated to the editorial spec.
+-- * Bug 5 — /[locale]/levels/bts_* pages show 0 chapters / 0 sessions
+--   because there are 0 courses under those programs. The migration
+--   adds Math + Physique + Chimie courses per BTS program (3 each,
+--   standard 3-chapter × 3-session shape).
+-- * Bug 2 — incomplete chapters on public pages. The Lycée Math
+--   course is expanded to the editorial 9-chapter / 27-session
+--   curriculum (chapters 4-9 are added; chapters 1-3 are
+--   rewritten in place).
+-- * Bug 3 — incomplete sessions on public pages. Each new chapter
+--   gets its editorial sessions, with the right titles, prices,
+--   and durations.
+--
+-- Idempotency
+-- -----------
+-- Re-running this migration is safe: every INSERT uses
+-- `on conflict (...) do nothing` and every UPDATE is a no-op if
+-- the row already has the target value.
+-- =====================================================================
+
+begin;
+
+-- Neutralised body. See doc-comment block above for the full
+-- rationale. The original data-migration statements (FR title
+-- UPDATEs, 9-chapter Math curriculum, 12 new courses, 6 named
+-- tutor personas, €35 pricing) have been removed because the
+-- live remote is on the v0 editorial baseline (5 programs,
+-- 4 grades, 10 courses, 136 chapters, 345 sessions, 1 active
+-- tutor) that matches the project's actual editorial
+-- source-of-truth (`docs/imports/excel-shape.md`,
+-- `docs/review/FR_BILINGUAL_TITLES_VERIFICATION.md`). The
+-- follow-up plan at the bottom of this file documents where
+-- the editorial work moves to.
+select 1;
+
+commit;
+
+-- =====================================================================
+-- Follow-up plan
+-- --------------
+-- The editorial alignment work that this migration was
+-- originally trying to do is a real piece of work, but it
+-- belongs in its own sprint (likely Sprint 9 or later).
+-- That sprint will:
+--
+--   1. Re-author the editorial data migration using the
+--      canonical double-dash slugs derived from the
+--      workbook titles (`high-school--mathematics`, etc.).
+--   2. Use `metadata.titles[locale]` for localized
+--      titles, never overwriting the canonical
+--      `title` column.
+--   3. Defer pricing until the pricing decision matrix
+--      in `Pricing_and_Session_Rules_EN.md` (or its
+--      successor) is finalized.
+--   4. Defer the 6 named tutor personas to the Phase 4
+--      tutor onboarding workstream.
+--   5. Verify the new migration on a fresh shadow DB
+--      before applying to remote.
+--
+-- Until that sprint, the remote stays on the v0 baseline
+-- (5 programs, 4 grades, 10 courses, 136 chapters,
+-- 345 sessions, 1 active tutor), which matches the
+-- project's actual editorial source-of-truth.
+-- =====================================================================

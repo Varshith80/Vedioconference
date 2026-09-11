@@ -17,6 +17,14 @@ type HeroProps = {
   secondaryLabel: string;
   /** Social proof line below the CTAs. */
   socialProof: string;
+  /**
+   * Optional replacement for the right-hand decorative visual.
+   * When provided, renders in place of `<HeroCurve />`. The
+   * homepage passes `<StudentProgressHeroCard />` for
+   * authenticated students; visitors leave the prop
+   * undefined so the existing curve keeps rendering.
+   */
+  progressCard?: React.ReactNode;
 };
 
 /**
@@ -25,7 +33,14 @@ type HeroProps = {
  * single column on mobile. Every string is a prop so the same
  * component serves both `/en` and `/fr`.
  */
-export function Hero({ headline, subheadline, primaryLabel, secondaryLabel, socialProof }: HeroProps) {
+export function Hero({
+  headline,
+  subheadline,
+  primaryLabel,
+  secondaryLabel,
+  socialProof,
+  progressCard,
+}: HeroProps) {
   return (
     <section
       aria-labelledby="hero-title"
@@ -64,7 +79,7 @@ export function Hero({ headline, subheadline, primaryLabel, secondaryLabel, soci
 
           <div className="md:col-span-5">
             <div className="mx-auto w-full max-w-md rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
-              <HeroCurve />
+              {progressCard ?? <HeroCurve />}
             </div>
           </div>
         </div>

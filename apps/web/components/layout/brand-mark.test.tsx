@@ -7,19 +7,17 @@ import { BRAND } from '@/lib/constants/brand';
 afterEach(cleanup);
 
 describe('BrandMark', () => {
-  it('renders the wordmark with the integral glyph by default', () => {
+  it('renders the wordmark by default', () => {
     render(<BrandMark />);
     const root = screen.getByLabelText(BRAND.name);
     expect(root).toBeTruthy();
-    expect(root.textContent).toContain('Int');
-    expect(root.textContent).toContain('grale');
-    expect(root.textContent).toContain('∫'); // ∫
+    expect(root.textContent).toBe(BRAND.wordmark);
   });
 
-  it('renders only the glyph when showWordmark=false', () => {
+  it('renders only the monogram when showWordmark=false', () => {
     render(<BrandMark showWordmark={false} />);
     const root = screen.getByLabelText(BRAND.name);
-    expect(root.textContent?.trim()).toBe('∫');
+    expect(root.textContent?.trim()).toBe('C');
   });
 
   it('applies the invert tone class on the inner wordmark span', () => {

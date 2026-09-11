@@ -1,0 +1,87 @@
+-- =====================================================================
+-- Migration: 20260910000003_grant_authenticated_public_tutors.sql
+-- Sprint:     Phase 2 marketing-site acceptance — follow-up to
+--             20260910000001_public_tutors_view.sql
+--
+-- Description
+-- -----------
+-- Closes the 42501 (insufficient privilege) error on
+--   /[locale]/tutors
+-- for SIGNED-IN visitors. The same route was already working for
+-- anonymous visitors after
+-- `20260910000001_public_tutors_view.sql`, which created the
+-- `public.public_tutors` curated view and granted `anon SELECT`
+-- on it. That migration forgot the matching `authenticated`
+-- grant, so a session-authenticated visitor hitting the page
+-- was met with:
+--
+--   permission denied for view public_tutors  (Postgres 42501)
+--
+-- This file grants `authenticated SELECT` on the existing view.
+-- It does NOT recreate the view, does NOT alter the base
+-- `public.tutors` table, and does NOT touch any RLS policy.
+--
+-- Why a grant and not a policy
+-- ----------------------------
+-- Per the established pattern in
+-- `20260905000001_grant_anon_select_catalog.sql` (the catalog
+-- grant migration), RLS on the base table is admin-only by
+-- design — there is no need to expose it to authenticated users
+-- either. The view is the curated, non-PII projection; a
+-- `SELECT` grant on the view is exactly the right surface to
+-- open to authenticated callers, mirroring what `anon` already
+-- has.
+--
+-- Why this is safe
+-- ----------------
+-- 1. The view is the only read surface that gets a new grant.
+--    The base table `public.tutors` (which carries PII: email,
+--    phone, notes) keeps the existing `tutors_admin_all` policy
+--    unchanged. `authenticated` can read the view but cannot
+--    read the base table directly — no GRANT on the base table
+--    for `authenticated` is added in this migration.
+-- 2. The view's column list is unchanged: `id`, `full_name`,
+--    `subject` (from `metadata.subject`), `bio` (from
+--    `metadata.bio`), `years_experience`. The base columns
+--    `email`, `phone`, `notes`, `calendly_event_uri`,
+--    `zoom_user_id`, `rating_count`, `currency`, `metadata`
+--    remain invisible.
+-- 3. The view filters on `status = 'active'` so inactive
+--    tutors never reach the marketing site, regardless of the
+--    caller's role.
+-- 4. Only `SELECT` is granted. `INSERT`, `UPDATE`, `DELETE`
+--    remain with the owner and the `service_role`. A signed-in
+--    student cannot create, modify, or delete tutor rows.
+-- 5. The view does not write data and does not call
+--    SECURITY DEFINER functions.
+-- 6. The application does not need the service-role key on
+--    the public tutors route for either role now — the route
+--    uses the regular RLS-respecting server client
+--    (`createSupabaseServerClient`).
+--
+-- Why a NEW file and not an edit of the previous one
+-- --------------------------------------------------
+-- Migrations are forward-only. The view migration has already
+-- been applied to the local stack (the view is present, the
+-- `anon` grant is in place) and editing it would diverge the
+-- file from the recorded state. A new forward-only file
+-- re-applies cleanly on staging and production when the
+-- environment is brought up to date.
+--
+-- Idempotency
+-- -----------
+-- Re-running a GRANT is a no-op in PostgreSQL.
+--
+-- Forward-only
+-- ------------
+-- New file. Does not modify any previously applied migration.
+-- =====================================================================
+
+begin;
+
+-- ---------------------------------------------------------------------
+-- Grant: authenticated SELECT on the public_tutors view only
+-- ---------------------------------------------------------------------
+grant select on table public.public_tutors to authenticated;
+
+commit;

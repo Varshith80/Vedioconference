@@ -35,6 +35,49 @@ const intl = createIntlMiddleware({
 });
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // 0. Bypass the dev-overlay polling paths. The Next.js 15.0.x
+  //    dev error overlay polls two stack-frame endpoints on every
+  //    error: `/__nextjs_original-stack-frames?…` (plural, the
+  //    bundle-side lookup) and `/__nextjs_original-stack-frame?…`
+  //    (singular, a newer dev-overlay endpoint added in 15.0.0).
+  //    The dev server returns 404 for both because dev source maps
+  //    are not emitted alongside the bundle (production has them,
+  //    dev does not). If we let next-intl see this path it
+  //    307-redirects to `/en/__nextjs_original-stack-frames` (a
+  //    404) and the dev overlay's Network tab fills with 404s.
+  //
+  //    The plural path is rewired in `next.config.mjs` to
+  //    `/dev-stack-frames-stub`. The singular path, however, is
+  //    intercepted by Next.js's built-in dev-overlay handler
+  //    BEFORE the rewrite fires, and that built-in handler
+  //    returns 400 for query shapes the dev overlay actually
+  //    uses (e.g. `?lineNumber=…&columnNumber=…` without a
+  //    `file` parameter). The result is a 400 chain in F12.
+  //
+  //    We short-circuit both paths here with a 204 No Content.
+  //    The dev overlay treats 204 as "no remap available" and
+  //    falls back to the post-transform JS stack — the same
+  //    stack the user would see in production.
+  //
+  //    `/favicon.ico` is no longer handled here: the matcher
+  //    below excludes it so the request never reaches the
+  //    middleware. The App Router will serve the file from
+  //    `public/` (we ship `favicon.svg`, not `.ico`).
+  //    `manifest.json` and `apple-touch-icon.png` are likewise
+  //    matcher-excluded; their 204 stubs live at
+  //    `app/manifest.json/route.ts` and
+  //    `app/apple-touch-icon.png/route.ts`. The matcher-level
+  //    exclusion is what stops the next-intl 307-redirect to a
+  //    locale-prefixed path that 404s.
+  if (
+    pathname === '/__nextjs_original-stack-frames' ||
+    pathname === '/__nextjs_original-stack-frame'
+  ) {
+    return new NextResponse(null, { status: 204 });
+  }
+
   // 1. Locale handling (also handles the root `/` redirect).
   const intlResponse = intl(request);
 
@@ -99,7 +142,6 @@ export async function middleware(request: NextRequest) {
     // correct redirect.
     user = null;
   }
-  const { pathname } = request.nextUrl;
 
   // 3. Protected-route check on the locale-prefixed paths. Both
   //    `/en/dashboard/*` and `/fr/dashboard/*` are protected.
@@ -107,13 +149,60 @@ export async function middleware(request: NextRequest) {
     /^\/(?:en|fr)\/dashboard(?:\/|$)/.test(pathname) ||
     /^\/(?:en|fr)\/admin(?:\/|$)/.test(pathname);
 
+  // 3a. Resolve the active locale for redirect targets. We
+  //     re-derive it from the URL prefix (same logic the layout
+  //     uses) so the middleware never depends on the request
+  //     header that next-intl mutates downstream.
+  const localeMatch = pathname.match(/^\/(en|fr)/);
+  const activeLocale: Locale =
+    (localeMatch?.[1] as Locale | undefined) ?? defaultLocale;
+
   if (isProtected && !user) {
-    const localeMatch = pathname.match(/^\/(en|fr)/);
-    const locale: Locale = (localeMatch?.[1] as Locale | undefined) ?? defaultLocale;
     const url = request.nextUrl.clone();
-    url.pathname = `/${locale}/auth/login`;
+    url.pathname = `/${activeLocale}/auth/login`;
     url.searchParams.set('next', pathname);
     return NextResponse.redirect(url);
+  }
+
+  // 3b. Admin role-guard. The previous design lived inside the
+  //     dashboard RSC layout (`app/[locale]/dashboard/layout.tsx`)
+  //     and called `redirect(...)` from a Server Component when
+  //     the signed-in user had `role === 'admin' | 'super_admin'`.
+  //     Next 15 + React 19 surface that thrown `NEXT_REDIRECT` as
+  //     a dev-overlay console error before the actual navigation
+  //     completes (see Sprint 3.7 / commit b5e44f0 follow-up).
+  //     Doing the same redirect here — as a real 307 from
+  //     `NextResponse.redirect` — is silent, idempotent, and
+  //     keeps the dev console clean.
+  //
+  //     The dashboard layout keeps `requireProfile()` as a
+  //     defense-in-depth fallback for routes that bypass the
+  //     middleware (e.g. a custom deployment without the matcher),
+  //     but with the role-mismatch redirect removed: by the time
+  //     the layout runs, the middleware has already moved the
+  //     admin to `/admin`, so the only role-mismatch the layout
+  //     can see is "anonymous" — which `requireProfile` already
+  //     handles by redirecting to /auth/login.
+  if (
+    user &&
+    new RegExp(`^/${activeLocale}/dashboard(?:/|$)`).test(pathname)
+  ) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      const role = (profile as { role?: string } | null)?.role;
+      if (role === 'admin' || role === 'super_admin') {
+        const url = request.nextUrl.clone();
+        url.pathname = `/${activeLocale}/admin`;
+        return NextResponse.redirect(url);
+      }
+    } catch {
+      // Best-effort: if the profile read fails the layout's
+      // requireProfile() will still produce the correct redirect.
+    }
   }
 
   return intlResponse;
@@ -121,9 +210,20 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip API routes (language-agnostic), Next.js internals, and static
-    // assets. Everything else flows through next-intl + Supabase.
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Skip API routes (language-agnostic), Next.js internals, and
+    // static assets. The metadata-file probes (robots.txt,
+    // sitemap.xml, manifest.json, apple-touch-icon.png,
+    // favicon.ico) are explicitly listed in the negative
+    // lookahead too: the App Router registers `app/robots.ts`
+    // and `app/sitemap.ts` at the root (NOT under /en/ or /fr/),
+    // so letting next-intl's matcher see those paths produces a
+    // 307 → /<locale>/robots.txt → 404 chain in F12 every time a
+    // browser or crawler probes them. We exclude them at the
+    // matcher level so the App Router route handler serves them
+    // directly. The same applies to manifest.json and
+    // apple-touch-icon.png — we don't ship those, and a 404 from
+    // a real route handler is cleaner than a 307 → 404.
+    '/((?!api|_next/static|_next/image|robots\\.txt|sitemap\\.xml|manifest\\.json|apple-touch-icon\\.png|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
 

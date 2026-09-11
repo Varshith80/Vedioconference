@@ -23,6 +23,7 @@ vi.stubGlobal('fetch', mockFetch);
 
 vi.mock('@/services/curriculum/session-grants', () => ({
   createPendingSessionGrant: mockCreatePending,
+  createPendingPackGrant: vi.fn(),
 }));
 
 const { POST } = await import('@/app/api/session-grants/route');
@@ -92,7 +93,7 @@ describe('POST /api/session-grants', () => {
   it('returns 401 when the user is not signed in', async () => {
     mockAuthUser.mockResolvedValue({ data: { user: null } });
     await loadServerMockMocked(tableQueue([]));
-    const res = await POST(makeReq({ session_id: SESSION_ROW.id }));
+    const res = await POST(makeReq({ kind: 'session', session_id: SESSION_ROW.id }));
     expect(res.status).toBe(401);
   });
 
@@ -107,7 +108,7 @@ describe('POST /api/session-grants', () => {
     mockAuthUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
     mockCreatePending.mockResolvedValue({ kind: 'session_not_found' });
     await loadServerMockMocked(tableQueue([]));
-    const res = await POST(makeReq({ session_id: SESSION_ROW.id }));
+    const res = await POST(makeReq({ kind: 'session', session_id: SESSION_ROW.id }));
     expect(res.status).toBe(404);
   });
 
@@ -115,7 +116,7 @@ describe('POST /api/session-grants', () => {
     mockAuthUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
     mockCreatePending.mockResolvedValue({ kind: 'session_price_missing' });
     await loadServerMockMocked(tableQueue([]));
-    const res = await POST(makeReq({ session_id: SESSION_ROW.id }));
+    const res = await POST(makeReq({ kind: 'session', session_id: SESSION_ROW.id }));
     expect(res.status).toBe(422);
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('session_price_missing');
@@ -128,7 +129,7 @@ describe('POST /api/session-grants', () => {
       grant: GRANT_ROW,
     });
     await loadServerMockMocked(tableQueue([]));
-    const res = await POST(makeReq({ session_id: SESSION_ROW.id }));
+    const res = await POST(makeReq({ kind: 'session', session_id: SESSION_ROW.id }));
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe('session_grant_exists');
@@ -145,7 +146,7 @@ describe('POST /api/session-grants', () => {
       tableQueue([{ data: SESSION_ROW, error: null }]),
     );
     const res = await POST(
-      makeReq({ session_id: SESSION_ROW.id }, 'NEXT_LOCALE=fr'),
+      makeReq({ kind: 'session', session_id: SESSION_ROW.id }, 'NEXT_LOCALE=fr'),
     );
     expect(res.status).toBe(503);
     const body = (await res.json()) as { error: { code: string } };
@@ -170,15 +171,74 @@ describe('POST /api/session-grants', () => {
       tableQueue([{ data: SESSION_ROW, error: null }]),
     );
     const res = await POST(
-      makeReq({ session_id: SESSION_ROW.id }, 'NEXT_LOCALE=en'),
+      makeReq({ kind: 'session', session_id: SESSION_ROW.id }, 'NEXT_LOCALE=en'),
     );
     expect(res.status).toBe(201);
     const body = (await res.json()) as {
       ok: boolean;
-      data: { checkout_url: string; session_grant_id: string };
+      data: { checkout_url: string; session_grant_id: string; kind: string };
     };
     expect(body.ok).toBe(true);
     expect(body.data.checkout_url).toContain('stripe.example');
     expect(body.data.session_grant_id).toBe(GRANT_ROW.id);
+    expect(body.data.kind).toBe('session');
+  });
+
+  // Sprint 5 (Slice A): Pack 10 ---------------------------------------
+
+  it('returns 409 pack_grant_exists when the student already owns an active pack', async () => {
+    mockAuthUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
+    const { createPendingPackGrant } = await import(
+      '@/services/curriculum/session-grants'
+    );
+    (createPendingPackGrant as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      kind: 'duplicate_active_pack',
+      grant: { id: GRANT_ROW.id, student_id: 'u1' },
+    });
+    await loadServerMockMocked(tableQueue([]));
+    const res = await POST(makeReq({ kind: 'pack' }));
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('pack_grant_exists');
+  });
+
+  it('returns 201 with kind="pack" when n8n creates the Stripe Checkout Session', async () => {
+    mockAuthUser.mockResolvedValue({ data: { user: { id: 'u1' } } });
+    const { createPendingPackGrant } = await import(
+      '@/services/curriculum/session-grants'
+    );
+    (createPendingPackGrant as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      kind: 'ok',
+      grant: { ...GRANT_ROW, grant_type: 'pack', total_credits: 10 },
+    });
+    mockServerEnv.mockReturnValue({
+      N8N_ENROLLMENT_WEBHOOK_URL: 'https://n8n.example/webhook',
+      N8N_WEBHOOK_SECRET: 'secret',
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        checkout_url: 'https://stripe.example/c/pay/pack',
+        stripe_session_id: 'cs_test_pack',
+      }),
+    });
+    await loadServerMockMocked(tableQueue([]));
+    const res = await POST(makeReq({ kind: 'pack' }, 'NEXT_LOCALE=en'));
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      ok: boolean;
+      data: { checkout_url: string; session_grant_id: string; kind: string };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.data.kind).toBe('pack');
+    expect(body.data.checkout_url).toContain('stripe.example');
+    // n8n payload must include kind:'pack' and total_credits:10.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(
+      (mockFetch.mock.calls[0]?.[1] as { body: string } | undefined)?.body ??
+        '{}',
+    );
+    expect(sent.kind).toBe('pack');
+    expect(sent.total_credits).toBe(10);
   });
 });

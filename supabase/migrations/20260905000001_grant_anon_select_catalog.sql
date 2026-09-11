@@ -1,0 +1,150 @@
+-- =====================================================================
+-- Migration: 20260905000001_grant_anon_select_catalog.sql
+-- Sprint:     Phase 2 marketing-site acceptance close-out
+--
+-- Description
+-- -----------
+-- Closes item #3 of the "Remaining privilege gaps" section in
+-- `supabase/migrations/20260829000001_rls_prerequisite_grants.sql`:
+--
+--   3. `anon` SELECT on the marketing-site tables
+--      (`programs`, `grades`, `chapters`, `sessions`, `courses`).
+--      Required for the unauthenticated marketing pages
+--      (`/en`, `/en/levels`, `/en/courses`, `/en/programs/…`).
+--      Deferred to the marketing-site acceptance round.
+--
+-- That round is the Phase 2 J/K remediation sweep. The fix is
+-- GRANT-only — no new RLS policies, no schema changes, no data
+-- modifications, and no writes.
+--
+-- Why the grant is safe
+-- ---------------------
+-- 1. The existing RLS policies on every table in this migration
+--    apply to the `public` pseudo-role. Postgres resolves `public`
+--    to BOTH `anon` and `authenticated`, so the policies already
+--    intend to permit anon reads — they are merely blocked by the
+--    GRANT check that runs before the RLS check.
+-- 2. Every existing SELECT policy gates the row visibility on
+--    `is_published = true` (or, on `sessions`, on
+--    `is_published = true OR is_preview = true`) OR `is_admin()`.
+--    Granting SELECT to `anon` therefore only exposes
+--    already-public catalog content — never drafts and never
+--    rows tied to a specific user.
+-- 3. None of the five catalog tables in this migration carry
+--    user-identifying data. Verified via
+--    `information_schema.columns`:
+--      - programs  : id, slug, title, subtitle, description,
+--                    is_published, sort_order, metadata,
+--                    created_at, updated_at
+--      - grades    : id, program_id, slug, title, sort_order,
+--                    metadata, created_at, updated_at
+--      - courses   : id, slug, title, subtitle, description,
+--                    subject, level, level_group, price_cents,
+--                    currency, duration_min, is_subscription,
+--                    is_published, cover_image, metadata,
+--                    program_id, grade_id, created_at, updated_at
+--      - chapters  : id, course_id, position, slug, title,
+--                    description, default_duration_min,
+--                    is_published, sort_order, metadata,
+--                    created_at, updated_at
+--      - sessions  : id, chapter_id, position, slug, title,
+--                    description, duration_min, price_cents,
+--                    currency, is_published, is_preview,
+--                    calendly_event_uri, sort_order, metadata,
+--                    tutor_id, created_at, updated_at
+--    No email, phone, notes, student_id, paid_at,
+--    stripe_session_id, or auth.uid()-bound column is reachable
+--    via these tables. Safe.
+-- 4. This migration explicitly does NOT grant `anon` SELECT on
+--    `public.tutors`. The `tutors` table holds PII
+--    (full_name, email, phone, notes) and the only existing
+--    policy on it is `tutors_admin_all` (admin-only). A public
+--    tutor directory is intentionally absent from the MVP per
+--    the Sprint 3.8 comment block in
+--    `apps/web/services/tutors.ts`. Granting anon SELECT on
+--    `tutors` would be a data exposure bug, not a fix.
+-- 5. Only `SELECT` is granted. `INSERT`, `UPDATE`, `DELETE`
+--    remain with the `authenticated` role (or higher). The
+--    marketing catalog is append-only by admins; anon visitors
+--    cannot create, modify, or delete catalog rows.
+--
+-- Scope of this migration
+-- -----------------------
+-- GRANT-only. Idempotent (re-running the same GRANT is a no-op
+-- in PostgreSQL). Forward-only. No DROP, no DELETE, no UPDATE,
+-- no COPY, no data modification. No ALTER TABLE. No new
+-- functions, no new policies, no policy drops.
+--
+-- Does NOT apply
+-- --------------
+-- * `public.tutors` — see the "Why the grant is safe" section.
+-- * `public.tutor_change_requests` — student-auth only.
+-- * `public.profiles`, `public.notifications`,
+--   `public.resource_grants`, `public.session_bookings`, …
+--   — none of these tables are touched by anonymous marketing
+--   readers, and granting anon SELECT here would expose PII.
+--
+-- Verified against the live local stack at the time of authoring:
+--
+--   $ SELECT tablename, policyname, roles, cmd
+--     FROM pg_policies
+--     WHERE schemaname='public'
+--       AND tablename IN
+--         ('programs','grades','courses','chapters','sessions')
+--       AND cmd='SELECT'
+--     ORDER BY tablename, policyname;
+--    chapters   | chapters_select_published_or_admin | {public}  | SELECT
+--    courses    | courses_select_public_published    | {public}  | SELECT
+--    grades     | grades_select_published_or_admin   | {public}  | SELECT
+--    programs   | programs_select_published_or_admin | {public}  | SELECT
+--    sessions   | sessions_select_published_or_admin | {public}  | SELECT
+--
+--   $ SELECT grantee, privilege_type, table_name
+--     FROM information_schema.role_table_grants
+--     WHERE table_schema='public'
+--       AND table_name IN
+--         ('programs','grades','courses','chapters','sessions')
+--       AND grantee IN ('anon','authenticated')
+--     ORDER BY table_name, grantee, privilege_type;
+--   (Before this migration) anon → none of these tables.
+--   (After this migration)  anon → SELECT on all five.
+--
+-- =====================================================================
+
+begin;
+
+-- Catalog ----------------------------------------------------------------
+-- The five tables the marketing site (/levels, /courses,
+-- /sessions) reads from for anonymous visitors. Every existing
+-- SELECT policy already gates visibility on
+-- `is_published = true` (or `is_preview = true` on sessions)
+-- — no draft rows leak.
+grant select on table public.programs to anon;
+grant select on table public.grades   to anon;
+grant select on table public.courses  to anon;
+grant select on table public.chapters to anon;
+grant select on table public.sessions to anon;
+
+-- Done intentionally not-granted ----------------------------------------
+--
+-- public.tutors
+--   The table carries PII (full_name, email, phone, notes). The
+--   only existing policy is `tutors_admin_all`. No public tutor
+--   directory exists in the MVP (see `apps/web/services/tutors.ts`
+--   Sprint 3.8 note). Even if the marketing `/tutors` page were
+--   later re-introduced, it must read a curated projection that
+--   excludes the PII columns — not the whole table.
+--
+-- public.profiles, public.notifications, public.session_bookings,
+-- public.session_grants, public.payments, public.meeting_links,
+-- public.enrollments, public.modules, public.module_progress,
+-- public.module_bookings, public.bookings, public.subscriptions,
+-- public.coupons, public.invoices, public.webhook_events,
+-- public.n8n_executions, public.n8n_dead_letters, public.audit_logs,
+-- public.resources, public.resource_grants,
+-- public.tutor_change_requests
+--   These tables are all either owner-restricted or admin-only
+--   by existing RLS policy. Granting `anon` SELECT on any of them
+--   would be a data exposure bug, not a fix.
+
+commit;

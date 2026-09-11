@@ -1,6 +1,6 @@
 import 'server-only';
 import { cookies } from 'next/headers';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient, type CookieMethodsServer } from '@supabase/ssr';
 import type { Database } from '@/types/database.generated';
 import { publicEnv } from '@/lib/env';
 
@@ -79,9 +79,8 @@ async function _createServerClient<TDatabase = unknown>(opts: { timeoutMs?: numb
   } catch {
     const client = createServerClient<TDatabase>(url, key, {
       cookies: {
-        get:     () => undefined,
-        set:    () => undefined,
-        remove: () => undefined,
+        getAll: () => [],
+        setAll: () => undefined,
       },
       global: globalFetch,
       // Suppress the realtime WebSocket client entirely. Server
@@ -96,27 +95,48 @@ async function _createServerClient<TDatabase = unknown>(opts: { timeoutMs?: numb
     return client;
   }
 
+  // Use the `getAll`/`setAll` cookie API (not the deprecated
+  // `get`/`set`/`remove` triplet). When a Supabase session JWT
+  // exceeds ~4 KB it is split into chunked cookies named
+  // `sb-<ref>-auth-token`, `sb-<ref>-auth-token.0`, `…1`, etc.
+  // The legacy `get` API only fetches the un-suffixed name and
+  // hands the chunked JSON back to the auth client as a
+  // malformed session — the postgrest Authorization header
+  // then carries an unusable fragment, `auth.uid()` resolves
+  // to NULL, `is_admin()` returns false, and every RLS-guarded
+  // write is rejected with SQLSTATE 42501. The `getAll` form
+  // lets @supabase/ssr enumerate the chunks and reassemble
+  // the session, which is what the auth client needs to
+  // forward a valid Bearer token to PostgREST.
+  // See node_modules/@supabase/ssr/dist/main/cookies.js for
+  // the chunk-handling implementation.
   const client = createServerClient<TDatabase>(url, key, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        // Read every cookie the user-agent sent in one pass.
+        // The library then handles the chunked-session merge.
+        // Next.js's RequestCookies#getAll already returns
+        // Array<{ name: string, value: string }> — pass it
+        // through unchanged.
+        return cookieStore.getAll();
       },
-      set(name: string, value: string, options: CookieOptions) {
+      setAll(cookiesToSet) {
+        // Server Components cannot set cookies (no response
+        // context), and the middleware already refreshes the
+        // session on every request, so we silently no-op here.
+        // Route Handlers and Server Actions DO have a response
+        // context and will hit this branch — rethrow in that
+        // case so the caller can surface a proper error
+        // rather than silently losing the cookie.
         try {
-          cookieStore.set({ name, value, ...options });
+          for (const { name, value, options } of cookiesToSet) {
+            cookieStore.set({ name, value, ...options });
+          }
         } catch {
-          // Server Components cannot set cookies; ignored on purpose.
-          // The middleware refreshes the session on every request.
+          // Server Component — ignored on purpose.
         }
       },
-      remove(name: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value: '', ...options });
-        } catch {
-          // see above
-        }
-      },
-    },
+    } satisfies CookieMethodsServer,
     global: globalFetch,
     realtime: { transport: NoopRealtimeTransport },
   });

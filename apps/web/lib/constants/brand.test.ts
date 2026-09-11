@@ -7,8 +7,8 @@ import {
 
 describe('brand constants (structural only)', () => {
   it('BRAND has the client-mandated name and wordmark', () => {
-    expect(BRAND.name).toBe('Intégrale');
-    expect(BRAND.wordmark).toBe('Intégrale');
+    expect(BRAND.name).toBe('CoursEnLigne');
+    expect(BRAND.wordmark).toBe('CoursEnLigne');
   });
 
   it('BRAND exposes no localised fields (tagline / shortDescription live in messages/)', () => {
@@ -17,9 +17,9 @@ describe('brand constants (structural only)', () => {
   });
 
   it('BRAND has the legal entity, contact email, and address', () => {
-    expect(BRAND.legalName).toBe('Intégrale SAS');
-    expect(BRAND.contactEmail).toBe('contact@integrale.fr');
-    expect(BRAND.supportEmail).toBe('support@integrale.fr');
+    expect(BRAND.legalName).toBe('CoursEnLigne SAS');
+    expect(BRAND.contactEmail).toBe('contact@coursenligne.fr');
+    expect(BRAND.supportEmail).toBe('support@coursenligne.fr');
     expect(BRAND.addressLocality).toBe('Paris');
     expect(BRAND.addressCountry).toBe('FR');
   });

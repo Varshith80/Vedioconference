@@ -82,7 +82,7 @@ describe('email templates', () => {
   it('enrollment_confirmed renders a complete shell', async () => {
     const r = await renderEnrollmentConfirmedEmail('en', baseProps.enrollmentConfirmed);
     expect(r.subject).toContain('Welcome');
-    expect(r.html).toContain('Intégrale');
+    expect(r.html).toContain('CoursEnLigne');
     expect(r.html).toContain('https://example.com/en/dashboard');
     expect(r.text.length).toBeGreaterThan(0);
   });

@@ -85,7 +85,7 @@ export function AdminSidebar() {
       <div className="flex h-16 items-center border-b px-5">
         <Link
           href={`/${locale}/admin`}
-          aria-label="Intégrale — Admin"
+          aria-label="CoursEnLigne — Admin"
           className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BrandMark />

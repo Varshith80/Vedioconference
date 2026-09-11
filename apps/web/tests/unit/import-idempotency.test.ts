@@ -106,7 +106,6 @@ function naturalKey(table: Table, row: Row): string {
   if (table === 'sessions') return `${row.chapter_id}::${row.position}`;
   return 'unknown';
 }
-
 function buildFakeSupabase() {
   const log: CallLog = [];
   const ids: Record<Table, Map<string, string>> = {
@@ -427,5 +426,93 @@ describe('importParsedCurriculum (Sprint 3.6 §5.0 invariant #3: idempotent)', (
     for (const call of sessionCalls) {
       expect((call.rows as ReadonlyArray<Row>)).toHaveLength(1);
     }
+  });
+
+  it('re-import invariant: language="fr" run preserves the existing row.title (EN canonical) and only adds metadata.titles.fr', async () => {
+    // This is the load-bearing invariant for the FR import:
+    // when a row already exists in the DB (imported by an
+    // earlier run, typically language="en"), a subsequent
+    // language="fr" import must NOT overwrite the display
+    // fields. Only `metadata.titles.fr` is added. The runtime
+    // `localizedTitle(row, 'en')` helper falls back to
+    // `row.title` when `metadata.titles.en` is missing, so
+    // overwriting `row.title` would break the EN locale.
+    //
+    // Scenario:
+    //   1. EN import: creates row.title="Test Program" (EN).
+    //   2. FR import: passes the SAME slug but
+    //      program.title="Programme Test" (FR). The
+    //      importer must preserve row.title="Test Program"
+    //      and add metadata.titles.fr.title=
+    //      "Programme Test".
+    const enTree = buildParsedCurriculum();
+    await importParsedCurriculum(
+      fake as unknown as Parameters<typeof importParsedCurriculum>[0],
+      enTree,
+    );
+    // Sanity: after the EN import, the program's title is
+    // "Test Program".
+    const programAfterEnRows = callsFor(fake._log, 'programs')[0]!.rows as Row[];
+    const programAfterEn = programAfterEnRows[0]!;
+    expect(programAfterEn.title).toBe('Test Program');
+
+    // Build a parallel FR tree with the SAME slugs/ids but
+    // FR display fields. The slugs are stable across
+    // languages (the canonical EN slug is the natural key).
+    const frTree: ParsedCurriculum = {
+      ...buildParsedCurriculum(),
+      language: 'fr',
+      programs: [{ ...enTree.programs[0]!, title: 'Programme Test' }],
+      courses: [{ ...enTree.courses[0]!, title: 'COURS DE TEST' }],
+      chapters: [{ ...enTree.chapters[0]!, title: 'Chapitre Un' }],
+      sessions: enTree.sessions.map((s) => ({ ...s, title: `Session ${s.position} : intro` })),
+    };
+
+    // Snapshot the row store before the FR import.
+    const programBefore = Array.from(fake._store.programs.values())[0]!;
+    const courseBefore = Array.from(fake._store.courses.values())[0]!;
+    const chapterBefore = Array.from(fake._store.chapters.values())[0]!;
+    const sessionBefore1 = Array.from(fake._store.sessions.values())[0]!;
+    const sessionBefore2 = Array.from(fake._store.sessions.values())[1]!;
+    expect(programBefore.title).toBe('Test Program');
+    expect(courseBefore.title).toBe('TEST COURSE');
+    expect(chapterBefore.title).toBe('Chapter One');
+    expect(sessionBefore1.title).toBe('Session 1: intro');
+    expect(sessionBefore2.title).toBe('Session 2: deep dive');
+
+    await importParsedCurriculum(
+      fake as unknown as Parameters<typeof importParsedCurriculum>[0],
+      frTree,
+    );
+
+    // After the FR import, the canonical EN title is
+    // PRESERVED on every entity.
+    const programAfter = Array.from(fake._store.programs.values())[0]!;
+    expect(programAfter.title).toBe('Test Program');
+    const programMeta = programAfter.metadata as Record<string, unknown>;
+    const programTitles = programMeta.titles as Record<string, { title: string } | undefined>;
+    expect(programTitles.fr?.title).toBe('Programme Test');
+
+    const courseAfter = Array.from(fake._store.courses.values())[0]!;
+    expect(courseAfter.title).toBe('TEST COURSE');
+    const courseMeta = courseAfter.metadata as Record<string, unknown>;
+    const courseTitles = courseMeta.titles as Record<string, { title: string } | undefined>;
+    expect(courseTitles.fr?.title).toBe('COURS DE TEST');
+
+    const chapterAfter = Array.from(fake._store.chapters.values())[0]!;
+    expect(chapterAfter.title).toBe('Chapter One');
+    const chapterMeta = chapterAfter.metadata as Record<string, unknown>;
+    const chapterTitles = chapterMeta.titles as Record<string, { title: string } | undefined>;
+    expect(chapterTitles.fr?.title).toBe('Chapitre Un');
+
+    const sessionsAfter = Array.from(fake._store.sessions.values());
+    expect(sessionsAfter[0]!.title).toBe('Session 1: intro');
+    expect(sessionsAfter[1]!.title).toBe('Session 2: deep dive');
+    const s1Meta = sessionsAfter[0]!.metadata as Record<string, unknown>;
+    const s1Titles = s1Meta.titles as Record<string, { title: string } | undefined>;
+    expect(s1Titles.fr?.title).toBe('Session 1 : intro');
+    const s2Meta = sessionsAfter[1]!.metadata as Record<string, unknown>;
+    const s2Titles = s2Meta.titles as Record<string, { title: string } | undefined>;
+    expect(s2Titles.fr?.title).toBe('Session 2 : intro');
   });
 });

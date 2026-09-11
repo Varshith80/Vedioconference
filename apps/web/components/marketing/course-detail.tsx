@@ -6,7 +6,6 @@ import { Heading } from '@/components/shared/heading';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { formatCents } from '@/lib/utils/format';
 import { JsonLd } from '@/components/marketing/jsonld';
 import type { Course } from '@/types/domain';
@@ -20,12 +19,15 @@ interface CourseDetailProps {
    *  `lib/i18n/localized-title.ts`; the importer is the
    *  only writer of the metadata field. */
   displayTitle?: string;
+  /** Active application locale, used to render the price
+   *  with the correct symbol placement and decimal separator. */
+  locale: 'en' | 'fr';
   // Sprint 3.8 — `tutors` is removed. Tutors are now
   // operational reference records, not marketing personas;
   // the course detail page no longer renders a tutor list.
 }
 
-export function CourseDetail({ course, displayTitle }: CourseDetailProps) {
+export function CourseDetail({ course, displayTitle, locale }: CourseDetailProps) {
   // The display title is the localized string; fall back to
   // `course.title` when the caller did not pre-resolve it.
   const title = displayTitle ?? course.title;
@@ -40,11 +42,13 @@ export function CourseDetail({ course, displayTitle }: CourseDetailProps) {
           { label: title },
         ]}
         actions={
-          <Button asChild size="lg" disabled aria-disabled>
-            <span title="Les réservations seront disponibles en Phase 3">
-              Réserver un créneau
-            </span>
-          </Button>
+          // Reservations open with the Phase 3 booking flow.
+          // Until then we show an honest "wait for the
+          // launch" note instead of a disabled button — see
+          // CLAUDE.md §3.3: never ship fake placeholders.
+          <span className="inline-flex items-center rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+            Réservations bientôt disponibles
+          </span>
         }
       />
 
@@ -88,16 +92,21 @@ export function CourseDetail({ course, displayTitle }: CourseDetailProps) {
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground">Tarif</p>
                   <p className="mt-1 font-heading text-3xl font-bold text-foreground">
-                    {formatCents(course.price_cents, course.currency)}
+                    {formatCents(course.price_cents, course.currency, locale)}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     par séance · TVA incluse
                   </p>
-                  <Button asChild className="mt-6 w-full" size="lg" disabled aria-disabled>
-                    <span title="Les réservations seront disponibles en Phase 3">
-                      Réserver
-                    </span>
-                  </Button>
+                  {/*
+                    No buy button yet — the Phase 3 booking flow
+                    wires reservations. Per CLAUDE.md §3.3 we
+                    deliberately do NOT ship a disabled button
+                    here; the price card is honest about what is
+                    and isn't actionable.
+                  */}
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    Réservations bientôt disponibles.
+                  </p>
                   <p className="mt-3 text-center text-xs text-muted-foreground">
                     Annulation gratuite jusqu’à 1h avant.
                   </p>

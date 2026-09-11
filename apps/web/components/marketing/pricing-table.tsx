@@ -1,5 +1,8 @@
+'use client';
+
 import * as React from 'react';
 import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +12,8 @@ import { formatCents } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 
 export function PricingTable() {
+  const t = useTranslations('Pricing');
+  const locale = useLocale();
   return (
     <ul
       role="list"
@@ -24,23 +29,23 @@ export function PricingTable() {
           >
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">{tier.name}</CardTitle>
-                {tier.highlight && <Badge>Le plus populaire</Badge>}
+                <CardTitle className="text-xl">{t(tier.name)}</CardTitle>
+                {tier.badge ? <Badge>{t(tier.badge)}</Badge> : null}
               </div>
-              <CardDescription>{tier.description}</CardDescription>
+              <CardDescription>{t(tier.description)}</CardDescription>
             </CardHeader>
             <CardContent className="flex-1">
               <div className="flex items-baseline gap-1">
                 <span className="font-heading text-4xl font-bold tracking-tight">
-                  {formatCents(tier.priceCents, tier.currency)}
+                  {formatCents(tier.priceCents, tier.currency, locale as 'en' | 'fr')}
                 </span>
-                <span className="text-sm text-muted-foreground">/ {tier.billing}</span>
+                <span className="text-sm text-muted-foreground">/ {t(tier.billing)}</span>
               </div>
               <ul role="list" className="mt-6 space-y-3 text-sm">
                 {tier.features.map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                    <span className="text-foreground/90">{f}</span>
+                    <span className="text-foreground/90">{t(f)}</span>
                   </li>
                 ))}
               </ul>
@@ -51,7 +56,7 @@ export function PricingTable() {
                 variant={tier.highlight ? 'default' : 'outline'}
                 asChild
               >
-                <Link href={tier.cta.href}>{tier.cta.label}</Link>
+                <Link href={tier.cta.href}>{t(tier.cta.label)}</Link>
               </Button>
             </CardFooter>
           </Card>

@@ -1,0 +1,39 @@
+-- supabase/migrations/20260901000001_grant_tutors_write_to_authenticated.sql
+--
+-- Purpose
+-- -------
+-- Grant the minimum base PostgreSQL privileges on public.tutors to the
+-- authenticated role so that tutor CREATE / UPDATE / DELETE requests from
+-- PostgREST can reach RLS evaluation.
+--
+-- Security model (must remain intact)
+-- -----------------------------------
+-- 1. This migration grants base table privileges only. It does NOT touch
+--    Row-Level Security. RLS stays enabled (relrowsecurity = true) and the
+--    existing policy stack (tutors_admin_all and any future policies on
+--    public.tutors) remains the sole authority for whether a given
+--    authenticated user may read or mutate a row.
+-- 2. Non-admin authenticated users will still be denied INSERT / UPDATE /
+--    DELETE because no policy exposes a USING or WITH CHECK expression that
+--    allows them. The GRANT alone is not sufficient.
+-- 3. The service-role key is not used as a workaround by this migration and
+--    must not be used as a workaround by the application code path. All
+--    mutations still flow through the user-context Supabase client.
+--
+-- Scope
+-- -----
+-- Touches: privilege grants on exactly one table (public.tutors) for exactly
+-- one role (authenticated).
+-- Does NOT touch: schema, columns, indexes, triggers, RLS enablement, RLS
+-- policies, data, or any other table.
+--
+-- Idempotency
+-- -----------
+-- GRANT statements in PostgreSQL are idempotent: re-running this migration
+-- is a no-op.
+--
+-- Forward-only
+-- ------------
+-- New file. Does not modify any previously applied migration.
+
+grant insert, update, delete on table public.tutors to authenticated;

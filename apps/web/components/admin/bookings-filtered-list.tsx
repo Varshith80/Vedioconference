@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { BookingRow } from '@/components/admin/bookings-row';
 import type {
   BookingWithDetails,
   BookingStatus,
@@ -48,7 +49,6 @@ interface BookingsFilterProps {
   // Pre-resolved status label maps (enum value -> localized string).
   bookingStatusLabels: Record<BookingStatus, string>;
   paymentStatusLabels: Record<PaymentStatus, string>;
-  renderRow: (b: BookingWithDetails) => React.ReactNode;
   // Columns config used by the parent AdminListPage chrome.
   columns: ReadonlyArray<{ key: string; label: string; className?: string }>;
 }
@@ -81,7 +81,6 @@ export function BookingsFilteredList({
   paymentStatusEnum,
   bookingStatusLabels,
   paymentStatusLabels,
-  renderRow,
   columns,
 }: BookingsFilterProps) {
   // Local filter state.
@@ -250,39 +249,113 @@ export function BookingsFilteredList({
           {labels.empty}
         </div>
       ) : (
-        <ul role="list" className="flex flex-col gap-2">
-          {filtered.map((b) => (
-            <li
-              key={b.id}
-              className={`rounded-md border bg-card p-3 text-sm transition-colors hover:bg-muted/50 sm:grid sm:grid-cols-1 sm:gap-3 ${gridColsClass(columns.length)}`}
-            >
-              <Link
-                href={`/${locale}${basePath}/${b.id}`}
-                className="contents focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {renderRow(b)}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        /*
+          The bookings list uses a real HTML <table> on >= sm
+          so all 10 columns align cleanly, the action column
+          is always the same trailing width, and row heights
+          match (a long course title no longer pushes the
+          payment status pill down). On < sm the table
+          collapses to a stacked key/value list.
+
+          Each header cell width comes from `columns[].className`
+          so the parent page owns the column contract and the
+          rows inherit it for free.
+        */
+        <div className="rounded-md border bg-card">
+          <div className="overflow-x-auto">
+            <table className="hidden w-full text-sm sm:table">
+              <thead>
+                <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {columns.map((c) => (
+                    <th
+                      key={c.key}
+                      scope="col"
+                      className={`whitespace-nowrap px-4 py-3 font-semibold ${c.className ?? ''}`}
+                    >
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((b) => {
+                  /*
+                    BookingRow is a presentational component that
+                    returns a flat array of 10 <span> cells in
+                    column order. We walk the array and wrap
+                    each in a <td> with the matching column's
+                    width class. The whole row is wrapped in a
+                    <Link> so clicking anywhere navigates to the
+                    booking detail page.
+                  */
+                  const cells = BookingRow({
+                    b,
+                    bookingStatusLabels,
+                    paymentStatusLabels,
+                  });
+                  return (
+                    <tr
+                      key={b.id}
+                      className="border-b last:border-b-0 transition-colors hover:bg-muted/40"
+                    >
+                      {cells.map((child, idx) => {
+                        if (!React.isValidElement(child)) return child;
+                        const col = columns[idx];
+                        return (
+                          <td
+                            key={col?.key ?? idx}
+                            className={`align-top px-4 py-3 [&>*]:min-w-0 ${col?.className ?? ''}`}
+                          >
+                            <Link
+                              href={`/${locale}${basePath}/${b.id}`}
+                              className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              {child}
+                            </Link>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <ul role="list" className="flex flex-col gap-3 p-3 sm:hidden">
+              {filtered.map((b) => {
+                const cells = BookingRow({
+                  b,
+                  bookingStatusLabels,
+                  paymentStatusLabels,
+                });
+                return (
+                  <li key={b.id} className="rounded-md border bg-card p-3 text-sm">
+                    <Link
+                      href={`/${locale}${basePath}/${b.id}`}
+                      className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <dl className="flex flex-col gap-1.5">
+                        {columns.map((c, idx) => (
+                          <div
+                            key={c.key}
+                            className="flex items-baseline justify-between gap-2"
+                          >
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {c.label}
+                            </dt>
+                            <dd className="text-right">{cells[idx]}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
       )}
     </div>
   );
-}
-
-function gridColsClass(n: number): string {
-  switch (n) {
-    case 2: return 'sm:grid-cols-2';
-    case 3: return 'sm:grid-cols-3';
-    case 4: return 'sm:grid-cols-4';
-    case 5: return 'sm:grid-cols-5';
-    case 6: return 'sm:grid-cols-6';
-    case 7: return 'sm:grid-cols-7';
-    case 8: return 'sm:grid-cols-8';
-    case 9: return 'sm:grid-cols-9';
-    case 10: return 'sm:grid-cols-10';
-    default: return 'sm:grid-cols-4';
-  }
 }
 
 // =============================================================

@@ -77,7 +77,7 @@ export function CourseCard({ course, displayTitle, className }: CourseCardProps)
           </Badge>
         </div>
         <span className="font-heading text-lg font-semibold text-foreground">
-          {formatCents(course.price_cents, course.currency)}
+          {formatCents(course.price_cents, course.currency, locale as 'en' | 'fr')}
         </span>
       </CardFooter>
       <Link

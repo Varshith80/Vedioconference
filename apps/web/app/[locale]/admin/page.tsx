@@ -17,7 +17,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.overview' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin` },
     robots: { index: false, follow: false },
   };

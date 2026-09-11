@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { Hero } from '@/components/marketing/hero';
 import { TrustBar } from '@/components/marketing/trust-bar';
 import { FeaturedTutors } from '@/components/marketing/featured-tutors';
@@ -13,6 +13,7 @@ import { TestimonialsI18n } from '@/components/marketing/testimonials-i18n';
 import { CtaBand } from '@/components/marketing/cta-band';
 import { Faq } from '@/components/marketing/faq';
 import { JsonLd } from '@/components/marketing/jsonld';
+import { StudentProgressHeroCard } from '@/components/marketing/student-progress-hero-card';
 import { BRAND } from '@/lib/constants/brand';
 import { getBrandCopy } from '@/lib/i18n/brand';
 import {
@@ -29,6 +30,8 @@ import {
   type LocalisedFeaturedTutor,
   type LocalisedPopularCourse,
 } from '@/lib/i18n/paths';
+import { getCurrentUser } from '@/services/auth';
+import { getStudentProgress } from '@/services/student/progress';
 
 export const revalidate = 60;
 
@@ -86,6 +89,44 @@ export default async function MarketingHomePage() {
   const tBrand = await getTranslations('Brand');
   const brand = getBrandCopy(tBrand);
 
+  // Authenticated-student state for the hero progress card.
+  // Both services are wrapped in React.cache(), so the
+  // marketing layout's earlier getCurrentUser() call and the
+  // dashboard's call share the same roundtrip. Visitors
+  // (user == null) keep the existing decorative <HeroCurve />
+  // because we leave the `progressCard` prop undefined.
+  const user = await getCurrentUser();
+  const summary = user
+    ? await getStudentProgress(user.id)
+    : { programs: [], totals: { purchased: 0, booked: 0, completed: 0 }, hasAny: false };
+
+  // Read the active locale from the request context so the
+  // "Explore courses" CTA links to /<locale>/courses, not
+  // always /en/courses.
+  const locale = await getLocale();
+
+  const progressCard = user ? (
+    <StudentProgressHeroCard
+      locale={locale}
+      summary={summary}
+      copy={{
+        title: tHome('progress.title'),
+        subline: tHome('progress.subline'),
+        notStarted: tHome('progress.notStarted'),
+        completed: tHome('progress.completed'),
+        percent: (percent) => tHome('progress.percent', { percent }),
+        purchased: (count) => tHome('progress.purchased', { count }),
+        booked: (count) => tHome('progress.booked', { count }),
+        completedCount: (count) => tHome('progress.completedCount', { count }),
+        ctaNoEnrollment: {
+          title: tHome('progress.ctaNoEnrollment.title'),
+          subline: tHome('progress.ctaNoEnrollment.subline'),
+          cta: tHome('progress.ctaNoEnrollment.cta'),
+        },
+      }}
+    />
+  ) : null;
+
   const paths = getLearningPaths(tHome);
   const steps = getMethodSteps(tHome);
   const figures = getKeyFigures(tHome);
@@ -105,6 +146,7 @@ export default async function MarketingHomePage() {
         primaryLabel={tHome('ctaPrimary')}
         secondaryLabel={tHome('ctaSecondary')}
         socialProof={tHome('socialProof')}
+        progressCard={progressCard}
       />
 
       <TrustBar items={trustItems} />

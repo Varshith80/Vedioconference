@@ -66,6 +66,29 @@ const ALLOW_FILES: ReadonlyArray<string> = [
   // `lib/excel/program-slug-alias.ts` for the full
   // rationale.
   'apps/web/lib/excel/program-slug-alias.ts',
+  // The FR-to-EN course title alias file: by design, the
+  // KEYS of the alias table are the FR course titles
+  // ("Mathématiques", "Physique-Chimie"). These are the
+  // spreadsheet column labels the importer must identify
+  // to map to the EN canonical course title. They are NOT
+  // domain data — they appear in exactly one file (the
+  // alias table) and only at parse time. The runtime app
+  // never reads them; the catalog lookup uses the EN
+  // canonical slug. See `lib/excel/course-title-alias.ts`
+  // for the full rationale.
+  'apps/web/lib/excel/course-title-alias.ts',
+  // The FR-to-EN grade slug alias file: by design, the
+  // KEYS of the alias table are the FR cycle grade slugs
+  // (the FR-derivative of the workbook's grade labels
+  // after slugify). These are workbook labels the
+  // importer must identify to map to the EN canonical
+  // grade slug. They are NOT domain data — they appear
+  // in exactly one file (the alias table) and only at
+  // parse time. The runtime app never reads them; the
+  // catalog lookup uses the EN canonical slug. See
+  // `lib/excel/grade-slug-alias.ts` for the full
+  // rationale.
+  'apps/web/lib/excel/grade-slug-alias.ts',
   // The workbook shape doc may discuss the canonical names.
 ];
 

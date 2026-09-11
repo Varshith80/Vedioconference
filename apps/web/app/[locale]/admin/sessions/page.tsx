@@ -5,6 +5,7 @@ import { isLocale } from '@/i18n';
 import { requireAdmin } from '@/hooks/use-require-user';
 import { getAllSessions, getAllChapters, getAllCourses } from '@/services/admin/catalog';
 import { getAllTutors } from '@/services/admin/tutors';
+import { safeAdminFetch } from '@/services/admin/admin-fetch';
 import { AdminListPage } from '@/components/admin/admin-list-page';
 import { SessionCreateTrigger } from '@/components/admin/session-create-trigger';
 import { SessionRowActions } from '@/components/admin/session-row-actions';
@@ -19,20 +20,10 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.sessions' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin/sessions` },
     robots: { index: false, follow: false },
   };
-}
-
-// Format an integer cents amount as "12,34" (en-US style
-// with 2 fraction digits).
-function formatCents(cents: number | null): string {
-  if (cents == null) return '';
-  return (cents / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }
 
 export default async function AdminSessionsPage({
@@ -47,14 +38,31 @@ export default async function AdminSessionsPage({
 
   const t = await getTranslations('Admin.sessions');
   const tCommon = await getTranslations('Admin.common');
-  const [sessions, chapters, courses, tutors] = await Promise.all([
-    getAllSessions(),
-    getAllChapters(),
-    getAllCourses(),
-    getAllTutors(),
+  // Each read is wrapped independently so one failure does not
+  // short-circuit the others. The envelope is the source of
+  // truth for `AdminDataState`; the .data fallback keeps the
+  // row map and the create-dialog pickers safe even when a
+  // read failed.
+  const [sessionsResult, chaptersResult, coursesResult, tutorsResult] = await Promise.all([
+    safeAdminFetch(getAllSessions, 'admin.getAllSessions'),
+    safeAdminFetch(getAllChapters, 'admin.getAllChapters'),
+    safeAdminFetch(getAllCourses, 'admin.getAllCourses'),
+    safeAdminFetch(getAllTutors, 'admin.getAllTutors'),
   ]);
+  const sessions =
+    sessionsResult.state === 'data' ? sessionsResult.data : [];
+  const chapters =
+    chaptersResult.state === 'data' ? chaptersResult.data : [];
+  const courses =
+    coursesResult.state === 'data' ? coursesResult.data : [];
+  const tutors =
+    tutorsResult.state === 'data' ? tutorsResult.data : [];
 
-  const chapterById = new Map(chapters.map((ch) => [ch.id, ch.title]));
+  // Course chain is needed to scope the create-dialog parent
+  // picker (chapter by "Course — Chapter"). It is intentionally
+  // not rendered in the list rows — readability contract says
+  // slug, sort, internal ids, updatedAt, etc. live on the
+  // create/edit page, not the list.
   const courseById = new Map(courses.map((c) => [c.id, c.title]));
   const tutorById = new Map(tutors.map((tu) => [tu.id, tu.full_name]));
 
@@ -79,6 +87,12 @@ export default async function AdminSessionsPage({
       subline={t('subline')}
       empty={t('empty')}
       emptyIcon={<CalendarRange className="h-6 w-6" aria-hidden={true} />}
+      result={sessionsResult}
+      labels={{
+        loading: tCommon('loading'),
+        loadErrorTitle: tCommon('loadErrorTitle'),
+        retry: tCommon('retry'),
+      }}
       items={sessions}
       getKey={(s) => s.id}
       interactiveActions
@@ -92,61 +106,40 @@ export default async function AdminSessionsPage({
         <SessionRowActions sessionId={s.id} slug={s.slug} title={s.title} />
       )}
       columns={[
-        { key: 'title',  label: t('columns.title') },
-        { key: 'slug',   label: t('columns.slug') },
-        { key: 'chap',   label: t('columns.chapter') },
-        { key: 'pos',    label: t('columns.position') },
-        { key: 'dur',    label: t('columns.duration') },
-        { key: 'price',  label: t('columns.price') },
-        { key: 'tutor',  label: t('columns.assignedTutor') },
-        { key: 'pub',    label: t('columns.published') },
-        { key: 'prev',   label: t('columns.preview') },
+        { key: 'title', label: t('columns.title'), width: 'min-w-[280px]' },
+        { key: 'tutor', label: t('columns.assignedTutor'), width: 'min-w-[200px]' },
+        { key: 'status', label: t('columns.status'), width: 'w-32' },
       ]}
-      renderItem={(s) => (
-        <>
-          <span className="font-medium text-foreground">{s.title}</span>
-          <span className="font-mono text-xs text-muted-foreground">{s.slug}</span>
-          <span className="text-xs text-muted-foreground">
-            {chapterById.get(s.chapter_id) ?? tCommon('na')}
-          </span>
-          <span className="text-xs text-muted-foreground">{s.position}</span>
-          <span className="text-xs text-muted-foreground">
-            {s.duration_min != null ? `${s.duration_min} min` : tCommon('na')}
-          </span>
-          <span className="text-xs tabular-nums text-foreground">
-            {s.price_cents == null ? (
-              <span className="italic text-muted-foreground">{t('priceTbd')}</span>
-            ) : (
-              formatCents(s.price_cents)
-            )}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {s.tutor_id
-              ? (tutorById.get(s.tutor_id) ?? tCommon('na'))
-              : <span className="italic">{tCommon('na')}</span>}
-          </span>
-          <span className="text-xs">
-            {s.is_published ? (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                {tCommon('yes')}
+      renderItem={(s) => {
+        // Status: three states. "Preview" wins over "Draft" when
+        // both flags are set (a free preview is always public).
+        const statusKey: 'published' | 'preview' | 'draft' = !s.is_published
+          ? 'draft'
+          : s.is_preview
+            ? 'preview'
+            : 'published';
+        const statusClass =
+          statusKey === 'published'
+            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+            : statusKey === 'preview'
+              ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
+              : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+        return (
+          <>
+            <span className="font-medium text-foreground">{s.title}</span>
+            <span className="text-xs text-muted-foreground">
+              {s.tutor_id
+                ? (tutorById.get(s.tutor_id) ?? tCommon('na'))
+                : <span className="italic">{tCommon('na')}</span>}
+            </span>
+            <span className="text-xs">
+              <span className={`inline-block rounded-full px-2 py-0.5 ${statusClass}`}>
+                {t(`status.${statusKey}`)}
               </span>
-            ) : (
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                {tCommon('no')}
-              </span>
-            )}
-          </span>
-          <span className="text-xs">
-            {s.is_preview ? (
-              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                {tCommon('yes')}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">{tCommon('no')}</span>
-            )}
-          </span>
-        </>
-      )}
+            </span>
+          </>
+        );
+      }}
     />
   );
 }

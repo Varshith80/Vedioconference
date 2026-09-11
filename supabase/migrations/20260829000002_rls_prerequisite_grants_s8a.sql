@@ -1,0 +1,103 @@
+-- =====================================================================
+-- Migration: 20260829000002_rls_prerequisite_grants_s8a.sql
+-- Sprint:     Post-Sprint-8 S8-A transitive-privilege unblock (F-1/F-2)
+--
+-- Description
+-- -----------
+-- The Sprint 8 RLS read path that loads resources for a student (and
+-- for the admin list) goes through `resources_select_visible`, whose
+-- policy sub-select joins four tables:
+--
+--     resource_grants  ->  session_grants  ->  sessions  ->  chapters
+--
+-- `resource_grants` already has SELECT for `authenticated` (granted in
+-- 20260829000001_rls_prerequisite_grants.sql). The other three are
+-- still missing it.
+--
+-- The `resource_grants_select_via_session_grant` admin policy
+-- similarly sub-selects through `session_grants`.
+--
+-- PostgreSQL evaluates the RLS policy expression before deciding
+-- whether to admit the row. Even when the policy short-circuits on
+-- `is_admin() = true`, the planner still resolves the full join
+-- expression and therefore requires SELECT on every transitively
+-- referenced table. Missing privileges surface as SQLSTATE 42501
+-- ("permission denied for table …") — the same root cause as D1+D2,
+-- but on the transitively-joined tables rather than the head table.
+--
+-- Scope of this migration
+-- -----------------------
+-- The smallest possible grant set that fixes S8-A read paths:
+--
+--   session_grants   : SELECT  (F-1; required by both
+--                                `resources_select_visible` and
+--                                `resource_grants_select_via_session_grant`)
+--   sessions         : SELECT  (F-2; required by the inner join of
+--                                `resources_select_visible`)
+--   chapters         : SELECT  (F-2; required by the inner join of
+--                                `resources_select_visible`)
+--
+-- No INSERT, UPDATE, DELETE, or TRUNCATE is granted to anyone. No
+-- GRANTs to `anon` or `service_role`. No RLS policy is added,
+-- dropped, or modified. No table is renamed, dropped, or altered.
+-- No data is touched.
+--
+-- What is intentionally NOT granted
+-- ----------------------------------
+-- * `courses`, `programs`, `grades`, `levels`. Not required by any
+--   S8-A read path. The marketing-site surfaces (`/en`, `/en/levels`,
+--   `/en/courses`, `/en/programs/…`) are anon reads and remain out
+--   of scope; they have been failing since Phase 1 baseline and are
+--   tracked as F-3 in the previous verification report.
+--
+-- * INSERT/UPDATE/DELETE on `resources`, `resource_grants`. Required
+--   by S8-A6/A9/A10 admin write paths and tracked as F-4 in the
+--   previous verification report.
+--
+-- * UPDATE on `session_bookings` + a new admin-allowed UPDATE RLS
+--   policy. Required by S8-B2/B3 manual-complete and tracked as F-5.
+--
+-- * Other tables required by later sprints (tutors, payments,
+--   meeting_links, …). Tracked as F-6.
+--
+-- Idempotency
+-- -----------
+-- PostgreSQL `GRANT … TO authenticated` is idempotent: re-issuing the
+-- same statement against a role that already has the privilege is a
+-- no-op. The migration can therefore be safely re-applied.
+-- No `DROP` statements. No `DELETE` statements. No data modification.
+--
+-- Verified against the live local stack at the time of authoring:
+--   $ SELECT grantee, privilege_type FROM information_schema.role_table_grants
+--       WHERE table_schema='public' AND table_name IN
+--         ('session_grants','sessions','chapters')
+--         AND grantee='authenticated' ORDER BY table_name, privilege_type;
+--   chapters      | REFERENCES
+--   chapters      | TRIGGER
+--   chapters      | TRUNCATE
+--   session_grants| REFERENCES
+--   session_grants| TRIGGER
+--   session_grants| TRUNCATE
+--   sessions      | REFERENCES
+--   sessions      | TRIGGER
+--   sessions      | TRUNCATE
+-- (no SELECT on any of the three — exactly the gap this migration closes)
+--
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- F-1: session_grants — joined by both resources and resource_grants
+--      policies. SELECT only.
+-- ---------------------------------------------------------------------
+grant select on table public.session_grants to authenticated;
+
+-- ---------------------------------------------------------------------
+-- F-2: sessions + chapters — joined by resources_select_visible.
+--      SELECT only.
+-- ---------------------------------------------------------------------
+grant select on table public.sessions to authenticated;
+grant select on table public.chapters to authenticated;
+
+-- =====================================================================
+-- End of migration
+-- =====================================================================

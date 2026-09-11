@@ -6,101 +6,100 @@ import { logger } from '@/lib/utils/logger';
 import type { Course } from '@/types/domain';
 
 // =====================================================================
-// Sprint 3.8 — Standalone tutor architecture.
+// Sprint 3.8 + Phase 2 marketing acceptance — Standalone tutor
+// architecture, with a curated public projection.
 //
-// Tutors are no longer 1:1 with `auth.users` + `profiles` and no
-// longer have a `course_tutors` join. They are a flat reference
-// table (`public.tutors`). The marketing site no longer renders a
-// public tutor directory: there is no "Meet the tutors" page in
-// the MVP because tutors are operational records, not personas.
+// Tutors are a flat reference table (`public.tutors`) that
+// carries PII (email, phone, notes). Anonymous marketing visitors
+// MUST NOT be able to read that base table. The migration
+// `20260910000001_public_tutors_view.sql` creates a
+// `public.public_tutors` view that whitelists only the non-PII
+// columns (id, full_name, subject, bio, years_experience) and
+// grants `anon SELECT` on the view only.
 //
-// This file is kept so existing imports (`listPublishedTutors`,
-// `getTutorBySlug`, `getAllPublishedTutorSlugs`) still resolve
-// type-wise and the marketing route falls back to "[]" without a
-// 500. If a future sprint re-introduces a public tutor directory,
-// it will use the standalone shape defined here.
+// The marketing tutors page is back in scope per the editorial
+// structure (`CoursEnLigne-Editorial-Structure_160826-EN.docx`).
+// This service reads from the view so the marketing surface
+// stays PII-free while the admin surface keeps the full record.
 // =====================================================================
 
 /** RFC 4122-shaped UUID, lower-case. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** Public shape of a tutor on the marketing site (standalone MVP). */
+/**
+ * Public shape of a tutor on the marketing site. NEVER carries
+ * PII: no email, no phone, no notes. Comes from the
+ * `public.public_tutors` view.
+ */
 export interface PublicTutor {
   id: string;
   full_name: string;
-  email: string;
-  phone: string | null;
-  status: 'active' | 'inactive';
-  notes: string | null;
+  subject: string;
+  bio: string | null;
+  years_experience: number;
 }
 
-interface TutorRow {
+interface PublicTutorRow {
   id: string;
   full_name: string;
-  email: string;
-  phone: string | null;
-  status: 'active' | 'inactive';
-  notes: string | null;
+  subject: string;
+  bio: string | null;
+  years_experience: number;
 }
 
-function toPublicTutor(row: TutorRow): PublicTutor {
+function toPublicTutor(row: PublicTutorRow): PublicTutor {
   return {
     id: row.id,
     full_name: row.full_name,
-    email: row.email,
-    phone: row.phone,
-    status: row.status,
-    notes: row.notes,
+    subject: row.subject,
+    bio: row.bio,
+    years_experience: row.years_experience,
   };
 }
 
-const TUTOR_SELECT = 'id, full_name, email, phone, status, notes';
+const PUBLIC_TUTOR_SELECT = 'id, full_name, subject, bio, years_experience';
 
 /**
- * Active tutors, ordered by full_name asc.
- *
- * Returns an empty array in the MVP because tutors are operational
- * records that the Admin manages — not a marketing surface. The
- * marketing "tutors" page is removed; this function remains only
- * so any leftover call site degrades to an EmptyState.
+ * Active tutors for the marketing directory, ordered by
+ * full_name asc. Reads from the `public.public_tutors` view,
+ * which exposes only non-PII columns and filters on
+ * `status = 'active'`.
  */
 export const listPublishedTutors = cache(async (): Promise<PublicTutor[]> => {
   try {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
-      .from('tutors')
-      .select(TUTOR_SELECT)
-      .eq('status', 'active')
+      .from('public_tutors')
+      .select(PUBLIC_TUTOR_SELECT)
       .order('full_name', { ascending: true });
     if (error) throw error;
-    return ((data ?? []) as unknown as TutorRow[]).map(toPublicTutor);
+    return ((data ?? []) as unknown as PublicTutorRow[]).map(toPublicTutor);
   } catch (e) {
-    // Marketing lists must degrade gracefully when the database
-    // is unreachable. The page renders an EmptyState; we log the
-    // error so the operator still sees it.
+    // Marketing lists must surface errors to the operator but
+    // never leak the raw exception to the page. The page
+    // renders an EmptyState; we log the full error.
     logger.error('listPublishedTutors failed', describeError(e));
     return [];
   }
 });
 
 /**
- * Single tutor by id. Kept for URL backwards-compat
- * (`/tutors/[uuid]` is still a valid route, but the page now
- * just returns notFound() because the marketing surface is
- * gone in the MVP).
+ * Single tutor by id (UUID — no slug in the standalone schema,
+ * Sprint 3.8). Reads from the curated public view, not the
+ * base PII table.
  */
 export const getTutorBySlug = cache(async (slug: string): Promise<PublicTutor | null> => {
   try {
     if (!UUID_RE.test(slug)) return null;
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
-      .from('tutors')
-      .select(TUTOR_SELECT)
+      .from('public_tutors')
+      .select(PUBLIC_TUTOR_SELECT)
       .eq('id', slug)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
-    return toPublicTutor(data as unknown as TutorRow);
+    return toPublicTutor(data as unknown as PublicTutorRow);
   } catch (e) {
     logger.error('getTutorBySlug failed', { slug, ...describeError(e) });
     return null;

@@ -7,29 +7,30 @@ interface BrandMarkProps {
   showWordmark?: boolean;
   /** Icon size in Tailwind classes. */
   size?: 'sm' | 'md' | 'lg';
-  /** Foreground tone. `invert` is for use on dark surfaces (Bleu Plan, dark mode). */
+  /** Foreground tone. `invert` is for use on dark surfaces. */
   tone?: 'default' | 'invert';
   className?: string;
 }
 
 const SIZES = {
-  sm: { box: 'h-7 w-7',  text: 'text-base',   glyph: 'text-xl'   },
-  md: { box: 'h-9 w-9',  text: 'text-lg',     glyph: 'text-2xl'  },
-  lg: { box: 'h-12 w-12', text: 'text-2xl',    glyph: 'text-4xl'  },
+  sm: { box: 'h-7 w-7',   text: 'text-base',  glyph: 'text-xl'  },
+  md: { box: 'h-9 w-9',   text: 'text-lg',    glyph: 'text-2xl' },
+  lg: { box: 'h-12 w-12', text: 'text-2xl',   glyph: 'text-4xl' },
 } as const;
 
-const INTEGRAL_GLYPH = '∫'; // ∫
-
 /**
- * Brand mark for the Intégrale platform. The wordmark replaces the
- * second "é" of "Intégrale" with the integral sign (`∫`). Per the
- * client brief, the `∫` is a *letter* — never a decorative icon —
- * so the glyph is rendered with the same Plex Serif weight as the
- * rest of the wordmark and inherits the foreground colour.
+ * Brand mark for the CoursEnLigne platform.
+ *
+ * Per the editorial spec
+ * (`CoursEnLigne-Editorial-Structure_160826-EN.docx`), the wordmark
+ * is the literal string "CoursEnLigne" rendered in Plex Serif.
+ * The optional square icon (when `showWordmark` is false) is a
+ * plain monogram tile holding the first letter "C" — there is no
+ * decorative integral glyph in the new wordmark.
  *
  * Variants:
- *   - `default`: Bleu Plan glyph + graphite wordmark (light surfaces).
- *   - `invert`:  Vélin glyph + vélin wordmark (Bleu Plan / dark surfaces).
+ *   - `default`: graphite wordmark (light surfaces).
+ *   - `invert`:  primary-foreground wordmark (dark surfaces).
  */
 export function BrandMark({
   showWordmark = true,
@@ -47,7 +48,7 @@ export function BrandMark({
     >
       {showWordmark ? (
         <span aria-hidden="true" className={cn('font-heading font-semibold tracking-tight', s.text, fg)}>
-          Int<span className={cn('font-serif', s.glyph)}>{INTEGRAL_GLYPH}</span>grale
+          {BRAND.wordmark}
         </span>
       ) : (
         <span
@@ -55,10 +56,10 @@ export function BrandMark({
           className={cn(
             'inline-flex items-center justify-center font-serif font-semibold',
             s.box, s.glyph, fg,
-            'rounded-md',
+            'rounded-md bg-primary/10',
           )}
         >
-          {INTEGRAL_GLYPH}
+          C
         </span>
       )}
     </span>

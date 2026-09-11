@@ -6,10 +6,11 @@ import { requireAdmin } from '@/hooks/use-require-user';
 import {
   getAllTutors,
   getTutorCounts,
-  type AdminTutor,
 } from '@/services/admin/tutors';
+import { safeAdminFetch } from '@/services/admin/admin-fetch';
 import { AdminListPage } from '@/components/admin/admin-list-page';
 import { TutorCreateTrigger } from '@/components/admin/tutor-create-trigger';
+import { TutorDeleteButton } from '@/components/admin/tutor-delete-button';
 
 // =====================================================================
 // Sprint 3.8 — /admin/tutors (list). Read-only directory of every
@@ -32,7 +33,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.tutors' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin/tutors` },
     robots: { index: false, follow: false },
   };
@@ -51,8 +52,15 @@ export default async function AdminTutorsPage({
   await requireAdmin();
 
   const t = await getTranslations('Admin.tutors');
+  const tCommon = await getTranslations('Admin.common');
 
-  const tutors = await getAllTutors();
+  const tutorsResult = await safeAdminFetch(getAllTutors, 'admin.getAllTutors');
+  // For the per-row counts fan-out we still need the raw rows
+  // even when the envelope is in `error` or `empty`, so the
+  // counts look-up stays empty rather than blowing up. Only
+  // pull the rows when the envelope is `data`.
+  const tutors =
+    tutorsResult.state === 'data' ? tutorsResult.data : [];
   // Per-tutor counts. We fan out the reads in parallel because
   // the admin directory is small (low tens of rows) and the
   // session_bookings counts are sub-millisecond on the v2
@@ -69,75 +77,86 @@ export default async function AdminTutorsPage({
       subline={t('subline')}
       empty={t('empty')}
       emptyIcon={<GraduationCap className="h-6 w-6" aria-hidden={true} />}
+      result={tutorsResult}
+      labels={{
+        loading: tCommon('loading'),
+        loadErrorTitle: tCommon('loadErrorTitle'),
+        retry: tCommon('retry'),
+      }}
       items={tutors}
       getKey={(tu) => tu.id}
+      interactiveActions
       headerAction={<TutorCreateTrigger />}
       actions={(tu) => (
         // Detail page link is a plain anchor (the AdminListPage
         // already has the `interactiveActions` opt-in for that).
-        <a
-          href={`./tutors/${tu.id}`}
-          className="text-xs font-medium text-primary hover:underline"
-        >
-          {t('detail.title')} →
-        </a>
+        // The trash button is a client component so it can hold
+        // its own open/submitting/error state without forcing
+        // the whole RSC page to re-render. We group the two in
+        // a flex row to match the per-row actions pattern used
+        // on the other admin pages.
+        <div className="flex items-center gap-1">
+          <a
+            href={`./tutors/${tu.id}`}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            {t('detail.title')} →
+          </a>
+          <TutorDeleteButton tutorId={tu.id} fullName={tu.full_name} />
+        </div>
       )}
       columns={[
-        { key: 'name',  label: t('columns.name') },
-        { key: 'email', label: t('columns.email') },
-        { key: 'act',   label: t('columns.activeSessions') },
-        { key: 'tot',   label: t('columns.totalAssigned') },
-        { key: 'status', label: t('columns.status') },
-        { key: 'join',  label: t('columns.joinedAt') },
+        { key: 'name',  label: t('columns.name'),  width: 'min-w-[200px]' },
+        { key: 'email', label: t('columns.email'), width: 'min-w-[200px]' },
+        { key: 'act',   label: t('columns.activeSessions'), width: 'w-28' },
+        { key: 'tot',   label: t('columns.totalAssigned'), width: 'w-32' },
+        { key: 'status', label: t('columns.status'), width: 'w-28' },
+        { key: 'join',  label: t('columns.joinedAt'), width: 'w-32' },
       ]}
-      renderItem={(tu) => (
-        <TutorRow
-          tutor={tu}
-          counts={countsByTutor.get(tu.id) ?? { active: 0, total: 0 }}
-          activeLabel={t('status.active')}
-          inactiveLabel={t('status.inactive')}
-        />
-      )}
+      renderItem={(tu) => {
+        // Contract: return one Fragment with N children matching
+        // the N columns declared above. AdminListPage unwraps the
+        // Fragment's children and maps each to its own <td>.
+        // Returning a wrapper component here would collapse the
+        // N cells into a single <td> (the component element
+        // itself counts as one child), which is why this page
+        // was the only one still misaligned. Inline the cells.
+        const counts = countsByTutor.get(tu.id) ?? { active: 0, total: 0 };
+        const isActive = tu.status === 'active';
+        return (
+          <>
+            <span className="flex flex-col text-xs">
+              <span className="font-medium text-foreground">{tu.full_name}</span>
+              {tu.phone ? (
+                <span className="text-muted-foreground">{tu.phone}</span>
+              ) : null}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {tu.email || '—'}
+            </span>
+            <span className="text-xs tabular-nums text-foreground">
+              {counts.active}
+            </span>
+            <span className="text-xs tabular-nums text-foreground">
+              {counts.total}
+            </span>
+            <span className="text-xs">
+              {isActive ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                  {t('status.active')}
+                </span>
+              ) : (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                  {t('status.inactive')}
+                </span>
+              )}
+            </span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {FORMAT_YEAR_MONTH_DAY(tu.created_at)}
+            </span>
+          </>
+        );
+      }}
     />
-  );
-}
-
-function TutorRow({
-  tutor,
-  counts,
-  activeLabel,
-  inactiveLabel,
-}: {
-  tutor: AdminTutor;
-  counts: { active: number; total: number };
-  activeLabel: string;
-  inactiveLabel: string;
-}): React.JSX.Element {
-  return (
-    <>
-      <span className="flex flex-col text-xs">
-        <span className="font-medium text-foreground">{tutor.full_name}</span>
-        {tutor.phone ? (
-          <span className="text-muted-foreground">{tutor.phone}</span>
-        ) : null}
-      </span>
-      <span className="text-xs text-muted-foreground">{tutor.email || '—'}</span>
-      <span className="text-xs tabular-nums text-foreground">{counts.active}</span>
-      <span className="text-xs tabular-nums text-foreground">{counts.total}</span>
-      <span className="text-xs">
-        {tutor.status === 'active' ? (
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-            {activeLabel}
-          </span>
-        ) : (
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            {inactiveLabel}
-          </span>
-        )}
-      </span>
-      <span className="font-mono text-xs text-muted-foreground">
-        {FORMAT_YEAR_MONTH_DAY(tutor.created_at)}
-      </span>
-    </>
   );
 }

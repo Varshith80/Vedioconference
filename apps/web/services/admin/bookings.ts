@@ -138,6 +138,21 @@ export interface BookingWithDetails {
     created_at: string;
   } | null;
 
+  // -- grant (session_grants row) ----------------------------------
+  // Sprint 5 Slice D — surface the unit-of-payment shape so the
+  // admin can distinguish PAYG from Pack from Subscription and
+  // see remaining credits on Pack/Subscription pools. Read-only.
+  grant: {
+    id: string;
+    grant_type: 'individual' | 'pack' | 'subscription';
+    status: string;
+    total_credits: number | null;
+    consumed_credits: number;
+    expires_at: string | null;
+    amount_cents: number;
+    currency: string;
+  } | null;
+
   // -- meeting (1:1 Zoom meeting, nullable until n8n creates it) ---
   meeting: {
     id: string;
@@ -189,7 +204,7 @@ const BOOKINGS_SELECT = `
     )
   ),
   grant:session_grants!session_bookings_session_grant_id_fkey (
-    id
+    id, grant_type, status, total_credits, consumed_credits, expires_at, amount_cents, currency
   ),
   meeting:meeting_links!meeting_links_session_booking_id_fkey (
     id, provider, meeting_id, join_url, passcode, start_url
@@ -238,6 +253,13 @@ interface RawBookingRow {
   } | null;
   grant: {
     id: string;
+    grant_type: 'individual' | 'pack' | 'subscription';
+    status: string;
+    total_credits: number | null;
+    consumed_credits: number;
+    expires_at: string | null;
+    amount_cents: number;
+    currency: string;
   } | null;
   meeting: {
     id: string;
@@ -327,6 +349,18 @@ function toBookingWithDetails(
           created_at: payment.created_at,
         }
       : null,
+    grant: row.grant
+      ? {
+          id: row.grant.id,
+          grant_type: row.grant.grant_type,
+          status: row.grant.status,
+          total_credits: row.grant.total_credits,
+          consumed_credits: row.grant.consumed_credits,
+          expires_at: row.grant.expires_at,
+          amount_cents: row.grant.amount_cents,
+          currency: row.grant.currency,
+        }
+      : null,
     meeting: row.meeting
       ? {
           id: row.meeting.id,
@@ -375,25 +409,21 @@ async function fetchPaymentsByGrant(
 
 // Every booking with its full join, ordered newest first.
 // Cached per request — the admin page is RSC, so this is
-// a single fetch per render. Returns [] on read failure so
-// the page degrades to an empty state (never a 500).
+// a single fetch per render. Throws on read failure so the
+// calling page can build an `AdminFetchResult` envelope
+// through `safeAdminFetch()` (see services/admin/admin-fetch.ts).
 export const getAllBookingsWithDetails = cache(
   async (): Promise<ReadonlyArray<BookingWithDetails>> => {
-    try {
-      const supabase = await createSupabaseServerClientUntyped();
-      const { data, error } = await supabase
-        .from('session_bookings')
-        .select(BOOKINGS_SELECT)
-        .order('scheduled_start', { ascending: false });
-      if (error) throw error;
-      const rows = (data ?? []) as unknown as RawBookingRow[];
-      const grantIds = rows.map((r) => r.grant?.id).filter((id): id is string => typeof id === 'string');
-      const paymentByGrant = await fetchPaymentsByGrant(supabase, grantIds);
-      return rows.map((row) => toBookingWithDetails(row, paymentByGrant));
-    } catch (e) {
-      logger.error('admin.getAllBookingsWithDetails failed', describeError(e));
-      return [];
-    }
+    const supabase = await createSupabaseServerClientUntyped();
+    const { data, error } = await supabase
+      .from('session_bookings')
+      .select(BOOKINGS_SELECT)
+      .order('scheduled_start', { ascending: false });
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as RawBookingRow[];
+    const grantIds = rows.map((r) => r.grant?.id).filter((id): id is string => typeof id === 'string');
+    const paymentByGrant = await fetchPaymentsByGrant(supabase, grantIds);
+    return rows.map((row) => toBookingWithDetails(row, paymentByGrant));
   },
 );
 

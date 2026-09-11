@@ -56,7 +56,7 @@ export function DashboardSidebar() {
       <div className="flex h-16 items-center border-b px-5">
         <Link
           href={`/${locale}`}
-          aria-label="Intégrale — Home"
+          aria-label="CoursEnLigne — Home"
           className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BrandMark />

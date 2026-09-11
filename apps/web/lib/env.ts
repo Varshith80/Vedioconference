@@ -110,6 +110,7 @@ const serverSchema = z.object({
   STRIPE_SECRET_KEY:         z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET:     z.string().min(1).optional(),
   STRIPE_PRICE_PAYG:         z.string().min(1).optional(),
+  STRIPE_PRICE_PACK10:       z.string().min(1).optional(),
   STRIPE_PRICE_SUBSCRIPTION: z.string().min(1).optional(),
   // Sprint C: per-course price map. JSON string of the form
   //   { "<course-uuid>": "price_xxx", ... }
@@ -158,6 +159,7 @@ export function serverEnv(): ServerEnv {
     STRIPE_SECRET_KEY:            process.env.STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET:        process.env.STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_PAYG:            process.env.STRIPE_PRICE_PAYG,
+    STRIPE_PRICE_PACK10:          process.env.STRIPE_PRICE_PACK10,
     STRIPE_PRICE_SUBSCRIPTION:    process.env.STRIPE_PRICE_SUBSCRIPTION,
     STRIPE_PRICE_TABLE_JSON:      process.env.STRIPE_PRICE_TABLE_JSON,
     ZOOM_ACCOUNT_ID:              process.env.ZOOM_ACCOUNT_ID,

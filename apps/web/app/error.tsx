@@ -9,7 +9,7 @@ import { ErrorState } from '@/components/shared/error-state';
  * mount so we get observability even when the error happens before
  * monitoring (Phase 5 Sentry) is in place.
  */
-export default function GlobalError({ error, reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error; reset: () => void }) {
   const t = useTranslations('Error');
   useEffect(() => {
     // eslint-disable-next-line no-console

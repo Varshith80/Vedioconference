@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { isLocale } from '@/i18n';
 import { requireAdmin } from '@/hooks/use-require-user';
 import { listAllResources } from '@/services/resources';
+import { safeAdminFetch } from '@/services/admin/admin-fetch';
 import { AdminListPage } from '@/components/admin/admin-list-page';
 import { ResourceCreateTrigger } from '@/components/admin/resource-create-trigger';
 import { ResourceDeleteButton } from '@/components/admin/resource-delete-button';
@@ -31,7 +32,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.resources' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin/resources` },
     robots: { index: false, follow: false },
   };
@@ -63,8 +64,9 @@ export default async function AdminResourcesPage({
   await requireAdmin();
 
   const t = await getTranslations('Admin.resources');
+  const tCommon = await getTranslations('Admin.common');
 
-  const resources = await listAllResources();
+  const resources = await safeAdminFetch(listAllResources, 'admin.listAllResources');
 
   return (
     <AdminListPage
@@ -72,7 +74,13 @@ export default async function AdminResourcesPage({
       subline={t('subline')}
       empty={t('empty')}
       emptyIcon={<FileText className="h-6 w-6" aria-hidden={true} />}
-      items={resources}
+      result={resources}
+      labels={{
+        loading: tCommon('loading'),
+        loadErrorTitle: tCommon('loadErrorTitle'),
+        retry: tCommon('retry'),
+      }}
+      items={resources.state === 'data' ? resources.data : []}
       getKey={(r) => r.id}
       interactiveActions
       headerAction={<ResourceCreateTrigger />}

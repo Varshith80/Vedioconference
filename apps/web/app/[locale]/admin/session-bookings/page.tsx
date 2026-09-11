@@ -4,6 +4,8 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { isLocale } from '@/i18n';
 import { requireAdmin } from '@/hooks/use-require-user';
 import { getAdminSessionBookings } from '@/services/admin/session-bookings';
+import { getAllTutors } from '@/services/admin/tutors';
+import { safeAdminFetch } from '@/services/admin/admin-fetch';
 import { AdminListPage } from '@/components/admin/admin-list-page';
 import { ManualCompleteButton } from '@/components/admin/manual-complete-button';
 
@@ -31,7 +33,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.sessionBookings' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin/session-bookings` },
     robots: { index: false, follow: false },
   };
@@ -68,9 +70,24 @@ export default async function AdminSessionBookingsPage({
   await requireAdmin();
 
   const t = await getTranslations('Admin.sessionBookings');
+  const tCommon = await getTranslations('Admin.common');
   const tStatus = await getTranslations('Dashboard.bookings.status');
 
-  const bookings = await getAdminSessionBookings();
+  // Sprint 9 — P1-4 fix: pull the full tutor directory in parallel so
+  // each row can show the tutor's display name rather than a UUID
+  // prefix. The directory is small and cache()-wrapped, so this is
+  // effectively free on subsequent renders. Each read is wrapped
+  // independently so a failure of one does not short-circuit the
+  // other.
+  const [bookingsResult, tutorsResult] = await Promise.all([
+    safeAdminFetch(getAdminSessionBookings, 'admin.getAdminSessionBookings'),
+    safeAdminFetch(getAllTutors, 'admin.getAllTutors'),
+  ]);
+  const bookings =
+    bookingsResult.state === 'data' ? bookingsResult.data : [];
+  const tutors =
+    tutorsResult.state === 'data' ? tutorsResult.data : [];
+  const tutorById = new Map(tutors.map((tu) => [tu.id, tu.full_name]));
 
   return (
     <AdminListPage
@@ -78,6 +95,12 @@ export default async function AdminSessionBookingsPage({
       subline={t('subline')}
       empty={t('empty')}
       emptyIcon={<CalendarCheck className="h-6 w-6" aria-hidden={true} />}
+      result={bookingsResult}
+      labels={{
+        loading: tCommon('loading'),
+        loadErrorTitle: tCommon('loadErrorTitle'),
+        retry: tCommon('retry'),
+      }}
       items={bookings}
       getKey={(b) => b.id}
       interactiveActions
@@ -94,13 +117,31 @@ export default async function AdminSessionBookingsPage({
       ]}
       renderItem={(b) => {
         const badge = STATUS_BADGE[b.status] ?? STATUS_BADGE['scheduled']!;
+        const tutorLabel = b.tutorId ? (tutorById.get(b.tutorId) ?? null) : null;
+        const sessionLabel = b.sessionTitle ?? '—';
+        const studentLabel = b.studentName ?? b.studentEmail ?? '—';
         return (
           <>
-            <span className="font-mono text-xs text-muted-foreground">
-              {b.studentId.slice(0, 8)}
+            <span className="flex flex-col text-xs">
+              <span className="font-medium text-foreground">{studentLabel}</span>
+              {b.studentEmail ? (
+                <span className="text-muted-foreground">{b.studentEmail}</span>
+              ) : null}
+              {tutorLabel ? (
+                <span className="text-xs text-muted-foreground">
+                  {tutorLabel}
+                </span>
+              ) : null}
             </span>
-            <span className="line-clamp-1 text-xs font-medium text-foreground">
-              {b.sessionId.slice(0, 8)}
+            <span className="flex flex-col text-xs">
+              <span className="line-clamp-1 font-medium text-foreground">
+                {sessionLabel}
+              </span>
+              {(b.courseTitle ?? b.chapterTitle) ? (
+                <span className="text-muted-foreground">
+                  {[b.courseTitle, b.chapterTitle].filter(Boolean).join(' · ')}
+                </span>
+              ) : null}
             </span>
             <span className="font-mono text-xs text-muted-foreground">
               {FORMAT_DATE_TIME(b.scheduledStart)}

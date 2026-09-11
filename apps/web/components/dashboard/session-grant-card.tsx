@@ -10,6 +10,9 @@ interface SessionGrantCardProps {
   /** Locale-prefixed path the "View" button points at
    *  (the public session detail page). */
   viewHref: string;
+  /** Active application locale, used to render the grant
+   *  amount with the correct symbol placement and decimal separator. */
+  locale: 'en' | 'fr';
 }
 
 /**
@@ -20,7 +23,7 @@ interface SessionGrantCardProps {
  * and the grant status. The "View" button is a normal link
  * (no destructive action).
  */
-export function SessionGrantCard({ grant, viewHref }: SessionGrantCardProps) {
+export function SessionGrantCard({ grant, viewHref, locale }: SessionGrantCardProps) {
   const statusVariant = variantForStatus(grant.status);
   return (
     <Card className="flex h-full flex-col">
@@ -42,7 +45,7 @@ export function SessionGrantCard({ grant, viewHref }: SessionGrantCardProps) {
       </CardHeader>
       <CardContent className="mt-auto flex items-center justify-between gap-3 text-sm">
         <span className="font-semibold text-foreground">
-          {formatCents(grant.amount_cents, grant.currency)}
+          {formatCents(grant.amount_cents, grant.currency, locale)}
         </span>
         <Link
           href={viewHref}

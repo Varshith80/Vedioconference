@@ -98,7 +98,7 @@
     ],
     "tutorsEyebrow": "Profils à la une",
     "tutorsTitle": "Des profs qui enseignent comme vous apprenez.",
-    "tutorsIntro": "Quelques-uns des profs vérifiés qui enseignent sur Intégrale ce trimestre. Chaque profil passe un entretien pédagogique et une démo de cours avant d'être publié.",
+    "tutorsIntro": "Quelques-uns des profs vérifiés qui enseignent sur CoursEnLigne ce trimestre. Chaque profil passe un entretien pédagogique et une démo de cours avant d'être publié.",
     "tutorsSeeAll": "Voir tous les profs",
     "tutors": [
       {
@@ -185,9 +185,9 @@
     "methodEyebrow": "02 — Méthode",
     "methodTitle": "Comment se passe une séance.",
     "methodIntro": "Trois briques simples, pensées pour qu'on progresse sans se noyer dans le contenu.",
-    "benefitsEyebrow": "03 — Pourquoi Intégrale",
+    "benefitsEyebrow": "03 — Pourquoi CoursEnLigne",
     "benefitsTitle": "Tout ce qu'il vous faut, rien de superflu.",
-    "benefitsIntro": "Six raisons pour lesquelles les élèves et les parents choisissent Intégrale plutôt qu'un prof isolé ou une bibliothèque de contenu.",
+    "benefitsIntro": "Six raisons pour lesquelles les élèves et les parents choisissent CoursEnLigne plutôt qu'un prof isolé ou une bibliothèque de contenu.",
     "benefits": [
       {
         "icon": "award",
@@ -374,14 +374,29 @@
         "value": "4",
         "label": "Niveaux · Lycée → Licence"
       }
-    ]
+    ],
+    "progress": {
+      "title": "Votre progression",
+      "subline": "Sur l'ensemble de vos programmes.",
+      "notStarted": "Pas encore commencé",
+      "completed": "Terminé",
+      "percent": "{percent} %",
+      "purchased": "{count} séances achetées",
+      "booked": "{count} planifiées",
+      "completedCount": "{count} terminées",
+      "ctaNoEnrollment": {
+        "title": "Commencez votre parcours",
+        "subline": "Vous n'avez pas encore de programme actif. Parcourez le catalogue et choisissez un prof.",
+        "cta": "Voir les cours"
+      }
+    }
   },
   "About": {
     "eyebrow": "À propos",
-    "title": "À propos — Intégrale",
-    "description": "Intégrale est une plateforme de cours particuliers en ligne, mathématiques et physique-chimie, du lycée à la licence.",
+    "title": "À propos — CoursEnLigne",
+    "description": "CoursEnLigne est une plateforme de cours particuliers en ligne, mathématiques et physique-chimie, du lycée à la licence.",
     "h1": "Une seule conviction : la qualité d’une explication change tout.",
-    "body1": "Intégrale est née à Paris en 2026 d’un constat simple : les élèves qui réussissent en sciences ne sont pas ceux qui passent le plus d’heures, ce sont ceux qui ont compris un bon prof, à un moment clé. Notre travail est de mettre ces profs devant chaque élève, en visio, au bon moment.",
+    "body1": "CoursEnLigne est née à Paris en 2026 d’un constat simple : les élèves qui réussissent en sciences ne sont pas ceux qui passent le plus d’heures, ce sont ceux qui ont compris un bon prof, à un moment clé. Notre travail est de mettre ces profs devant chaque élève, en visio, au bon moment.",
     "body2": "Mathématiques, physique, chimie — du lycée à la licence. Pas de promesse miracle, pas de contenu préfabriqué. Un prof, un élève, un programme, et l’exigence qu’il faut.",
     "valuesEyebrow": "01 — Convictions",
     "valuesTitle": "Ce que nous défendons.",
@@ -430,7 +445,7 @@
   },
   "Pricing": {
     "eyebrow": "Tarifs",
-    "title": "Tarifs — Intégrale",
+    "title": "Tarifs — CoursEnLigne",
     "description": "Trois formules : à la carte, pack 5 séances, mentorat continu. Tarif clair, facturation automatique, reçu envoyé par e-mail.",
     "h1": "Tarifs simples, sans surprise",
     "intro": "Choisissez la formule qui correspond à votre besoin. Aucun engagement caché, facturation automatique, reçu envoyé par e-mail.",
@@ -452,12 +467,37 @@
         "q": "Le prix inclut-il les ressources ?",
         "a": "Oui, les supports partagés par le tuteur sont accessibles gratuitement pendant toute la durée du suivi."
       }
-    ]
+    ],
+    "individualTitle": "Séance à l’unité",
+    "individualDescription": "Séance de 60 minutes en visio avec un tuteur vérifié.",
+    "individualBilling": "par séance de 60 min",
+    "individualFeature1": "Cours en visio de 60 minutes",
+    "individualFeature2": "Tuteur vérifié, adapté à votre niveau",
+    "individualFeature3": "Supports de séance envoyés après le cours",
+    "individualFeature4": "Annulation gratuite jusqu’à 1 heure avant",
+    "individualCta": "Réserver une séance",
+    "pack10Title": "Pack 10 séances",
+    "pack10Description": "Dix séances de 60 minutes, valable 6 mois, même tuteur pour la continuité.",
+    "pack10Billing": "pour 10 séances",
+    "pack10Feature1": "Tout ce qui est inclus à l’unité",
+    "pack10Feature2": "Tuteur attitré, même prof à chaque séance",
+    "pack10Feature3": "Tableau de bord de progression détaillé",
+    "pack10Feature4": "Priorité sur les créneaux disponibles",
+    "pack10Badge": "Le plus choisi",
+    "pack10Cta": "Choisir ce pack",
+    "monthlyTitle": "Suivi mensuel",
+    "monthlyDescription": "Quatre séances de 60 minutes par mois, sans engagement, résiliable à tout moment.",
+    "monthlyBilling": "par mois, 4 séances incluses",
+    "monthlyFeature1": "4 séances de 60 min par mois",
+    "monthlyFeature2": "Bilan mensuel de progression envoyé aux parents",
+    "monthlyFeature3": "Sans engagement, résiliable à tout moment",
+    "monthlyFeature4": "Séances reportables d’un mois sur l’autre",
+    "monthlyCta": "Démarrer le suivi"
   },
   "Contact": {
     "eyebrow": "Contact",
-    "title": "Contact — Intégrale",
-    "description": "Contactez l’équipe Intégrale : demande d’information, niveau, premier cours offert. Réponse sous 24 heures ouvrées.",
+    "title": "Contact — CoursEnLigne",
+    "description": "Contactez l’équipe CoursEnLigne : demande d’information, niveau, premier cours offert. Réponse sous 24 heures ouvrées.",
     "h1": "Nous contacter",
     "intro": "Une question, un projet, un partenariat ? Nous lisons tout et revenons vers vous sous 24 heures ouvrées.",
     "formTitle": "Envoyez-nous un message",
@@ -503,8 +543,8 @@
   },
   "Tutors": {
     "eyebrow": "Tuteurs",
-    "title": "Tuteurs — Intégrale",
-    "description": "Annuaire des tuteurs vérifiés Intégrale : sélectionnez votre professeur particulier en lycée, classes préparatoires, BTS ou licence.",
+    "title": "Tuteurs — CoursEnLigne",
+    "description": "Annuaire des tuteurs vérifiés CoursEnLigne : sélectionnez votre professeur particulier en lycée, classes préparatoires, BTS ou licence.",
     "h1": "Nos tuteurs",
     "intro": "Tous nos tuteurs sont vérifiés sur dossier, entretien et démonstration de cours.",
     "emptyTitle": "Les profils arrivent au lancement",
@@ -513,7 +553,7 @@
   },
   "Courses": {
     "eyebrow": "Cours",
-    "title": "Cours — Intégrale",
+    "title": "Cours — CoursEnLigne",
     "description": "Catalogue de cours particuliers en ligne : mathématiques, physique, chimie. Lycée, classes préparatoires, BTS et licence.",
     "h1": "Tous les cours",
     "intro": "Parcourez l’ensemble du catalogue par matière et niveau.",
@@ -538,7 +578,7 @@
   "Auth": {
     "layout": {
       "skipLink": "Aller au contenu principal",
-      "brandAria": "Intégrale — Accueil"
+      "brandAria": "CoursEnLigne — Accueil"
     },
     "login": {
       "h1": "Connexion",
@@ -660,9 +700,22 @@
       "title": "Tableau de bord",
       "welcome": "Bienvenue.",
       "subline": "Retrouvez vos cours, vos paiements et vos ressources.",
-      "open": "Ouvrir"
+      "open": "Ouvrir",
+      "progress": {
+        "title": "Votre progression",
+        "subline": "Séances achetées et terminées, par programme.",
+        "emptyTitle": "Aucune progression pour le moment",
+        "emptyDescription": "Dès que vous achetez une séance, votre progression s’affichera ici.",
+        "sessionsPurchased_one": "{count} séance achetée",
+        "sessionsPurchased_other": "{count} séances achetées",
+        "sessionsCompleted": "{count} terminée(s)",
+        "sessionsScheduled": "{count} planifiée(s)",
+        "percent": "{percent}% terminé",
+        "viewAll": "Voir tous les programmes"
+      }
     },
     "cards": {
+      "heading": "Accès rapides",
       "bookings": {
         "title": "Mes réservations",
         "description": "Consultez vos séances à venir et votre historique."
@@ -1007,9 +1060,14 @@
       "columns": {
         "title": "Titre",
         "slug": "Slug",
+        "status": "Statut",
         "published": "Publié",
         "sortOrder": "Tri",
         "createdAt": "Créé le"
+      },
+      "status": {
+        "published": "Publié",
+        "draft": "Brouillon"
       }
     },
     "grades": {
@@ -1059,20 +1117,34 @@
         "duration": "Durée",
         "price": "Prix",
         "assignedTutor": "Tuteur assigné",
+        "status": "Statut",
         "published": "Pub.",
         "preview": "Aperçu"
+      },
+      "status": {
+        "draft": "Brouillon",
+        "preview": "Aperçu",
+        "published": "Publiée"
       },
       "priceTbd": "Prix à définir"
     },
     "payments": {
       "title": "Paiements",
-      "subline": "Grand livre de chaque paiement Stripe lié à un grant de séance.",
+      "subline": "Grand livre des paiements Stripe. Chaque charge et remboursement lié à un grant de séance.",
       "empty": "Aucun paiement pour le moment.",
+      "grantType": {
+        "individual": "À l'unité",
+        "pack": "Pack",
+        "subscription": "Abonnement"
+      },
       "columns": {
         "amount": "Montant",
         "currency": "Dev.",
+        "grantType": "Type de grant",
+        "credits": "Crédits",
         "status": "Statut",
-        "grant": "Grant",
+        "provider": "Fournisseur",
+        "paidAt": "Payé le",
         "createdAt": "Créé le"
       }
     },
@@ -1113,7 +1185,7 @@
         "paymentStatus": "Statut du paiement",
         "date": "Date",
         "reset": "Réinitialiser les filtres",
-        "results": "{n} sur {total} réservations",
+        "results": "'{n}' sur '{total}' réservations",
         "emptyFiltered": "Aucune réservation ne correspond aux filtres actuels."
       },
       "status": {
@@ -1141,6 +1213,7 @@
         "tutor": "Tuteur",
         "curriculum": "Cursus",
         "payment": "Paiement",
+        "grant": "Grant",
         "meeting": "Réunion"
       },
       "fields": {
@@ -1153,6 +1226,19 @@
         "createdAt": "Réservée le",
         "calendlyInvitee": "Invité Calendly",
         "noCalendly": "Pas encore relié à Calendly"
+      },
+      "columns": {
+        "credits": "Crédits"
+      },
+      "grant": {
+        "type": "Type de grant",
+        "typeIndividual": "À l’unité",
+        "typePack": "Pack",
+        "typeSubscription": "Abonnement",
+        "creditsUsed": "{used} / {total} crédits utilisés",
+        "expiresAt": "Expire le",
+        "expiresNone": "Sans expiration",
+        "amount": "Montant"
       },
       "actions": {
         "copyLink": "Copier le lien",
@@ -1188,6 +1274,9 @@
       "confirmDeleteBody": "Cette action est définitive. Saisissez le slug de la ressource ci-dessous pour confirmer.",
       "confirmDeletePrompt": "Saisissez {slug} pour confirmer",
       "confirmDeleteCta": "Supprimer",
+      "loading": "Chargement…",
+      "loadErrorTitle": "Impossible de charger les données",
+      "retry": "Réessayer",
       "resource": {
         "program": "programme",
         "grade": "niveau",
@@ -1384,7 +1473,7 @@
         "slug": "Slug",
         "description": "Description",
         "course": "Cours parent",
-        "sortOrder": "Ordre",
+        "position": "Position",
         "durationMin": "Durée par défaut (minutes)",
         "isPublished": "Publié"
       }
@@ -1399,7 +1488,7 @@
         "title": "Titre",
         "slug": "Slug",
         "description": "Description",
-        "sortOrder": "Ordre",
+        "position": "Position",
         "durationMin": "Durée par défaut (minutes)",
         "isPublished": "Publié"
       }
@@ -1478,6 +1567,18 @@
         "active": "Actif",
         "inactive": "Inactif"
       },
+      "delete": {
+        "title": "Supprimer ce tuteur ?",
+        "body": "Cette action supprime définitivement le tuteur de l'annuaire. Les séances qui lui sont assignées perdront leur tuteur assigné.",
+        "confirmCta": "Supprimer le tuteur",
+        "success": "Tuteur supprimé.",
+        "error": {
+          "hasUpcoming": "Ce tuteur a des séances à venir assignées. Désassignez-les depuis /admin/sessions, ou passez le statut du tuteur à « inactif » pour le conserver dans l’historique.",
+          "hasHistory": "Ce tuteur ne peut pas être supprimé car des réservations le référencent encore. Passez son statut à « inactif » pour le conserver dans l’historique sans bloquer les futures modifications.",
+          "readError": "Impossible de vérifier les enregistrements dépendants du tuteur. Veuillez réessayer.",
+          "fallback": "Ce tuteur ne peut pas être supprimé car d’autres enregistrements le référencent encore. Passez son statut à « inactif » pour le conserver dans l’historique."
+        }
+      },
       "detail": {
         "title": "Fiche tuteur",
         "back": "Retour aux tuteurs",
@@ -1539,7 +1640,9 @@
         "student": "Étudiant",
         "session": "Séance",
         "scheduledStart": "Début prévu",
-        "status": "Statut"
+        "status": "Statut",
+        "tutor": "Tuteur",
+        "course": "Cours"
       }
     },
     "manualComplete": {
@@ -1555,7 +1658,7 @@
     "signup": "Créer un compte",
     "openMenu": "Ouvrir le menu",
     "closeMenu": "Fermer le menu",
-    "ariaHome": "Intégrale — Accueil",
+    "ariaHome": "CoursEnLigne — Accueil",
     "languageSwitcher": {
       "label": "Langue",
       "english": "Anglais",
@@ -1563,7 +1666,7 @@
     }
   },
   "SiteFooter": {
-    "copyright": "© {year} Intégrale"
+    "copyright": "© {year} CoursEnLigne"
   },
   "Validation": {
     "emailInvalid": "Adresse e-mail invalide.",
@@ -1700,6 +1803,82 @@
       "booking_reminder": "Rappel de réservation",
       "tutor_change_sla_breach": "Délai de réponse changement de tuteur dépassé",
       "system": "Notification"
+    }
+  },
+  "common": {
+    "retry": "Reessayer"
+  },
+  "TutorChange": {
+    "status": {
+      "pending": "En attente",
+      "alternativesProposed": "Alternatives proposees",
+      "studentSelected": "Selectionne",
+      "completed": "Termine",
+      "cancelled": "Annule"
+    },
+    "student": {
+      "listTitle": "Demandes de changement de tuteur",
+      "listSubtitle": "Suivez vos demandes de changement de tuteur en cours et passees, avec notre engagement de reponse sous 24 heures.",
+      "newCta": "Demander un changement de tuteur",
+      "empty": "Vous n'avez aucune demande de changement de tuteur.",
+      "overdueBadge": "En retard",
+      "slaOkBadge": "Dans les delais",
+      "slaDeadlineLabel": "Reponse avant",
+      "yourReasonLabel": "Votre motif",
+      "detailsTitle": "Demande de changement de tuteur",
+      "requestedAtLabel": "Demandee le",
+      "respondedAtLabel": "Reponse le",
+      "currentTutorLabel": "Tuteur actuel",
+      "selectedLabel": "Tuteur selectionne",
+      "adminNotesLabel": "Notes de l'administration",
+      "backToList": "Retour aux demandes",
+      "newTitle": "Demander un changement de tuteur",
+      "newIntro": "Choisissez une seance a venir et dites-nous pourquoi vous souhaitez changer de tuteur. Nous repondrons sous 24 heures.",
+      "selectAlternativeTitle": "Choisissez un tuteur de remplacement",
+      "selectAlternativeHelp": "Selectionnez l'un des tuteurs proposes pour votre prochaine seance.",
+      "selectCta": "Confirmer la selection",
+      "selecting": "Envoi...",
+      "bookingLabel": "Seance a reassigner",
+      "bookingPlaceholder": "Choisissez une seance a venir...",
+      "reasonLabel": "Pourquoi souhaitez-vous changer ? (facultatif)",
+      "reasonPlaceholder": "Dites-nous ce qui n'a pas fonctionne - rythme, style d'enseignement, horaire, n'importe quoi.",
+      "submit": "Envoyer la demande",
+      "submitting": "Envoi..."
+    },
+    "admin": {
+      "listTitle": "Demandes de changement de tuteur",
+      "listSubtitle": "Toutes les demandes, en cours et passees. L'objectif SLA est de 24 heures a partir de la demande.",
+      "filterAll": "Toutes",
+      "filterPending": "En attente",
+      "filterAlternativesProposed": "Alternatives proposees",
+      "filterStudentSelected": "Selectionne",
+      "filterCompleted": "Termine",
+      "filterCancelled": "Annule",
+      "studentLabel": "Etudiant",
+      "statusLabel": "Statut",
+      "requestedAtLabel": "Demandee",
+      "slaDeadlineLabel": "Echeance SLA",
+      "empty": "Aucune demande de changement de tuteur.",
+      "overdueBadge": "SLA depasse",
+      "detailsTitle": "Demande de changement de tuteur",
+      "currentTutorLabel": "Tuteur actuel",
+      "respondedAtLabel": "Reponse",
+      "alternativesLabel": "Alternatives proposees",
+      "studentReasonLabel": "Motif de l'etudiant",
+      "adminNotesLabel": "Notes admin",
+      "proposeTitle": "Proposer des tuteurs alternatifs",
+      "proposeHelp": "Choisissez jusqu'a 3 tuteurs a proposer a l'etudiant. L'etudiant en selectionnera un.",
+      "proposeSubmit": "Envoyer la proposition",
+      "proposeSubmitting": "Envoi...",
+      "resolveTitle": "Resoudre la demande",
+      "resolveHelp": "Annulez la demande ou reassignez la seance a un tuteur precis.",
+      "resolveNotesLabel": "Notes internes",
+      "resolveNotesPlaceholder": "Contexte facultatif que l'etudiant ne verra pas.",
+      "resolveSelectedLabel": "Reattribuer a",
+      "resolveSelectedPlaceholder": "Choisissez un tuteur...",
+      "resolveCancelCta": "Annuler la demande",
+      "resolveCompleteCta": "Reattribuer et terminer",
+      "resolving": "Enregistrement..."
     }
   }
 }

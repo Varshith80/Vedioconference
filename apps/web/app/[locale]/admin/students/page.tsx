@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { isLocale } from '@/i18n';
 import { requireAdmin } from '@/hooks/use-require-user';
 import { getAllStudents } from '@/services/admin/catalog';
+import { safeAdminFetch } from '@/services/admin/admin-fetch';
 import { AdminListPage } from '@/components/admin/admin-list-page';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.students' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin/students` },
     robots: { index: false, follow: false },
   };
@@ -34,7 +35,7 @@ export default async function AdminStudentsPage({
 
   const t = await getTranslations('Admin.students');
   const tCommon = await getTranslations('Admin.common');
-  const students = await getAllStudents();
+  const students = await safeAdminFetch(getAllStudents, 'admin.getAllStudents');
 
   return (
     <AdminListPage
@@ -42,13 +43,19 @@ export default async function AdminStudentsPage({
       subline={t('subline')}
       empty={t('empty')}
       emptyIcon={<Users className="h-6 w-6" aria-hidden={true} />}
-      items={students}
+      result={students}
+      labels={{
+        loading: tCommon('loading'),
+        loadErrorTitle: tCommon('loadErrorTitle'),
+        retry: tCommon('retry'),
+      }}
+      items={students.state === 'data' ? students.data : []}
       getKey={(s) => String(s.id)}
       columns={[
-        { key: 'name',  label: t('columns.name') },
-        { key: 'email', label: t('columns.email') },
-        { key: 'created',  label: t('columns.created') },
-        { key: 'lastLogin', label: t('columns.lastLogin') },
+        { key: 'name',  label: t('columns.name'),  width: 'min-w-[200px]' },
+        { key: 'email', label: t('columns.email'), width: 'min-w-[200px]' },
+        { key: 'created',  label: t('columns.created'), width: 'w-32' },
+        { key: 'lastLogin', label: t('columns.lastLogin'), width: 'w-32' },
       ]}
       renderItem={(s) => {
         const row = s as {

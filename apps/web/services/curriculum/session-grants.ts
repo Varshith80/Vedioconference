@@ -30,6 +30,11 @@ export type CreatePendingGrantResult =
   | { kind: 'duplicate_active_grant'; grant: SessionGrant }
   | { kind: 'session_not_found' };
 
+export type CreatePendingPackResult =
+  | { kind: 'ok'; grant: SessionGrant }
+  | { kind: 'duplicate_active_pack'; grant: SessionGrant }
+  | { kind: 'pack_unavailable' };
+
 /**
  * Fetch all session grants for the current student, with
  * the session + chapter + course + program + grade eagerly
@@ -148,6 +153,75 @@ export async function createPendingSessionGrant(
     return { kind: 'ok', grant: data as unknown as SessionGrant };
   } catch (e) {
     logger.error('createPendingSessionGrant failed', { studentId, sessionId, ...describeError(e) });
+    throw e;
+  }
+}
+
+/**
+ * Insert a new `pending_payment` session grant for the
+ * Pack 10 credit pool. The pool row has NO `session_id`
+ * (the student will allocate the 10 credits to specific
+ * sessions later). The row carries `grant_type = 'pack'`,
+ * `total_credits = 10`, and `expires_at = now + 6 months`.
+ *
+ * Sprint 5 (Slice A). Backed by the P1-A migration
+ * (`20260825000001_session_grants_pack_subscription.sql`)
+ * which makes `session_id` nullable for pack/subscription
+ * rows.
+ *
+ * Returns a discriminated-union result so the route handler
+ * can map it to a structured HTTP response:
+ *   - `{ kind: 'ok' }` — pool row created.
+ *   - `{ kind: 'duplicate_active_pack' }` — the student
+ *     already owns an active Pack 10 pool. The partial
+ *     unique index `uq_session_grants_pack_active` would
+ *     also fire on insert; the service catches it as a
+ *     structured result instead of bubbling a 500.
+ *   - `{ kind: 'pack_unavailable' }` — placeholder for
+ *     future operator-config gating (e.g. Pack 10 is
+ *     temporarily disabled). Not used today but kept so
+ *     the route handler does not change later.
+ */
+export async function createPendingPackGrant(
+  studentId: string,
+  totalCredits: number,
+  expiresAtIso: string,
+): Promise<CreatePendingPackResult> {
+  try {
+    const supabase = await createSupabaseServerClientUntyped();
+
+    const { data: existing, error: eErr } = await supabase
+      .from('session_grants')
+      .select('*')
+      .eq('student_id', studentId)
+      .eq('grant_type', 'pack')
+      .eq('status', 'active')
+      .maybeSingle();
+    if (eErr) throw eErr;
+    if (existing) {
+      return { kind: 'duplicate_active_pack', grant: existing as unknown as SessionGrant };
+    }
+
+    const { data, error } = await supabase
+      .from('session_grants')
+      .insert({
+        student_id: studentId,
+        session_id: null,
+        grant_type: 'pack',
+        total_credits: totalCredits,
+        consumed_credits: 0,
+        expires_at: expiresAtIso,
+        status: 'pending_payment',
+        amount_cents: 29900, // Slice A: Pack 10 is €299. Sprint 5 Slice C will read the operator-configured Stripe Price ID and backfill the amount from the Checkout Session.
+        currency: 'EUR',
+        metadata: { kind: 'pack', credits: totalCredits },
+      } as never)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return { kind: 'ok', grant: data as unknown as SessionGrant };
+  } catch (e) {
+    logger.error('createPendingPackGrant failed', { studentId, ...describeError(e) });
     throw e;
   }
 }

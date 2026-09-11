@@ -1,0 +1,50 @@
+-- Migration: 20260911000004_grant_authenticated_delete_resources.sql
+--
+-- Context. The local Supabase stack rejects
+-- `DELETE /api/admin/resources/{id}` from the admin's
+-- authenticated Supabase client with SQLSTATE 42501:
+--
+--   "permission denied for table resources"
+--   "Grant the required privileges to the current role
+--    with: GRANT DELETE ON public.resources TO authenticated;"
+--
+-- This is the documented "Remaining privilege gaps" item
+-- tracked in 20260829000001_rls_prerequisite_grants.sql
+-- (lines 79-92 and 109):
+--
+--   * `INSERT` / `UPDATE` / `DELETE` on `resources` were
+--     intentionally not granted to `authenticated` in that
+--     migration because Sprint 8 read paths did not require
+--     them.
+--   * The Sprint 8 admin Resources write surface (R-3 hard
+--     delete) routes through the SSR Supabase client. The
+--     existing RLS policy `resources_write_admin_or_tutor`
+--     already gates every write to `public.is_admin()` OR
+--     `uploaded_by = auth.uid()`, so the only thing missing
+--     is the base-table privilege.
+--
+-- Why this is the smallest correct fix.
+--
+--   1. The GRANT is the *only* privilege gap the admin
+--      DELETE code path triggers. The pre-existing
+--      `resources_write_admin_or_tutor` RLS policy already
+--      permits an admin (or the resource's uploader) to
+--      delete a row.
+--   2. We do NOT add an `anon` GRANT — the DELETE API is
+--      admin-gated by `requireAdminRoute()` and anon calls
+--      correctly return 401 before this GRANT is consulted.
+--   3. We do NOT touch the `resources` RLS policy. It is
+--      unchanged. Adding the privilege without the policy
+--      would be a security regression; adding it without
+--      the privilege is the documented Sprint 8 gap.
+--   4. We do NOT introduce the service-role key into the
+--      API route. The DELETE handler still uses the
+--      RLS-respecting SSR client, so the call is scoped
+--      by the admin's JWT and the row-level policy.
+--
+-- Forward-only. Idempotent: re-applying the GRANT against
+-- a role that already holds the privilege is a no-op (the
+-- ACL entry is left untouched). No data is modified. No
+-- existing policy is dropped.
+
+grant delete on table public.resources to authenticated;

@@ -5,6 +5,20 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // The Sprint 3.7 `levels-page.test.tsx` imports an RSC page
+  // (a `.tsx` file that contains JSX without an explicit
+  // `import * as React from 'react'`). Next.js compiles such
+  // files with the React 19 automatic runtime (`jsx:
+  // 'preserve'` + Babel/SWC). Vitest's esbuild transformer
+  // defaults to the *classic* runtime, which emits
+  // `React.createElement(...)` and fails with "React is not
+  // defined". Force the automatic runtime at the top-level
+  // (NOT inside `test:` — that sub-key is for esbuild options
+  // *per file*, but the JSX transform is a project-wide
+  // default) so the same JSX compiles cleanly under Vitest.
+  esbuild: {
+    jsx: 'automatic',
+  },
   test: {
     include: [
       'tests/**/*.test.{ts,tsx}',

@@ -26,6 +26,8 @@ import {
   BOOKING_STATUS_COLOR,
   PAYMENT_STATUS_COLOR,
 } from '@/components/admin/bookings-filtered-list';
+import { formatCents as formatCentsShared } from '@/lib/utils/format';
+import { type Locale } from '@/i18n';
 
 // =====================================================================
 // Sprint 3.7 + 3.8 — /admin/bookings/[id] (read-only detail view).
@@ -63,7 +65,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.bookingDetail' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin/bookings` },
     robots: { index: false, follow: false },
   };
@@ -87,15 +89,12 @@ function formatDateTime(iso: string): string {
   return iso.slice(0, 10) + ' ' + iso.slice(11, 16);
 }
 
-function formatCents(cents: number, currency: string): string {
-  return (
-    (cents / 100).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }) +
-    ' ' +
-    currency
-  );
+function formatCents(cents: number, currency: string, locale: string): string {
+  // Delegates to the shared formatter (whole euros, no decimal
+  // zeroes — see `lib/utils/format.ts`). The currency parameter
+  // is accepted for call-site stability but the shared helper
+  // always renders the EUR symbol to match the rest of the app.
+  return formatCentsShared(cents, currency, (locale || 'en') as Locale);
 }
 
 export default async function AdminBookingDetailPage({
@@ -143,7 +142,7 @@ export default async function AdminBookingDetailPage({
               <Heading id="admin-booking-detail-title" level="h1" className="text-3xl sm:text-4xl">
                 {t('title')}
               </Heading>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
+              <p className="mt-2 font-mono text-xs text-muted-foreground">
                 {booking.id}
               </p>
             </div>
@@ -294,7 +293,7 @@ export default async function AdminBookingDetailPage({
                 <>
                   <Row label="Amount">
                     <span className="font-medium tabular-nums">
-                      {formatCents(booking.payment.amount_cents, booking.payment.currency)}
+                      {formatCents(booking.payment.amount_cents, booking.payment.currency, locale)}
                     </span>
                   </Row>
                   <Row label="Status">
@@ -316,6 +315,49 @@ export default async function AdminBookingDetailPage({
                 </>
               ) : (
                 <p className="text-muted-foreground">{t('noPayment')}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* GRANT (Unit of payment) -------------------------------- */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('sections.grant')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {booking.grant ? (
+                <>
+                  <Row label={t('grant.type')}>
+                    {booking.grant.grant_type === 'individual'
+                      ? t('grant.typeIndividual')
+                      : booking.grant.grant_type === 'pack'
+                        ? t('grant.typePack')
+                        : t('grant.typeSubscription')}
+                  </Row>
+                  {booking.grant.grant_type !== 'individual' &&
+                  booking.grant.total_credits != null ? (
+                    <Row label={t('columns.credits')}>
+                      {t('grant.creditsUsed', {
+                        used: booking.grant.consumed_credits,
+                        total: booking.grant.total_credits,
+                      })}
+                    </Row>
+                  ) : null}
+                  {booking.grant.grant_type !== 'individual' ? (
+                    <Row label={t('grant.expiresAt')}>
+                      {booking.grant.expires_at
+                        ? booking.grant.expires_at.slice(0, 10)
+                        : t('grant.expiresNone')}
+                    </Row>
+                  ) : null}
+                  <Row label={t('grant.amount')}>
+                    <span className="font-medium tabular-nums">
+                      {formatCents(booking.grant.amount_cents, booking.grant.currency, locale)}
+                    </span>
+                  </Row>
+                </>
+              ) : (
+                <p className="text-muted-foreground">—</p>
               )}
             </CardContent>
           </Card>

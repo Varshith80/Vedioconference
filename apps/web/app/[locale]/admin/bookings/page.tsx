@@ -4,20 +4,19 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { isLocale } from '@/i18n';
 import { requireAdmin } from '@/hooks/use-require-user';
 import { getAllPrograms } from '@/services/admin/catalog';
+import { getAllTutors } from '@/services/admin/tutors';
 import {
   getAllBookingsWithDetails,
   type BookingStatus,
   type PaymentStatus,
 } from '@/services/admin/bookings';
+import { safeAdminFetch } from '@/services/admin/admin-fetch';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
 import { Badge } from '@/components/ui/badge';
-import {
-  BookingsFilteredList,
-  BOOKING_STATUS_COLOR,
-  PAYMENT_STATUS_COLOR,
-} from '@/components/admin/bookings-filtered-list';
+import { AdminDataState } from '@/components/admin/admin-data-state';
+import { BookingsFilteredList } from '@/components/admin/bookings-filtered-list';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +28,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Admin.bookings' });
   return {
-    title: `${t('title')} — Intégrale`,
+    title: `${t('title')} — CoursEnLigne`,
     alternates: { canonical: `/${locale}/admin/bookings` },
     robots: { index: false, follow: false },
   };
@@ -52,12 +51,6 @@ const PAYMENT_STATUSES: ReadonlyArray<PaymentStatus> = [
   'partially_refunded',
 ];
 
-// Locale-agnostic YYYY-MM-DD HH:MM (UTC). Avoids any
-// toLocaleString hydration mismatch on SSR/CSR.
-function formatDateTime(iso: string): string {
-  return iso.slice(0, 10) + ' ' + iso.slice(11, 16);
-}
-
 export default async function AdminBookingsPage({
   params,
 }: {
@@ -69,22 +62,38 @@ export default async function AdminBookingsPage({
   await requireAdmin();
 
   const t = await getTranslations('Admin.bookings');
+  const tCommon = await getTranslations('Admin.common');
 
-  const [bookings, programs] = await Promise.all([
-    getAllBookingsWithDetails(),
-    getAllPrograms(),
+  // Each read is wrapped independently so one failure does not
+  // short-circuit the others. The bookings envelope is the
+  // source of truth for the AdminDataState. The companion reads
+  // (programs, tutors) keep their .data fallbacks so the filter
+  // dropdown can still render even if a bookings read fails.
+  const [bookingsResult, programsResult, tutorsResult] = await Promise.all([
+    safeAdminFetch(getAllBookingsWithDetails, 'admin.getAllBookingsWithDetails'),
+    safeAdminFetch(getAllPrograms, 'admin.getAllPrograms'),
+    safeAdminFetch(getAllTutors, 'admin.getAllTutors'),
   ]);
+  const bookings =
+    bookingsResult.state === 'data' ? bookingsResult.data : [];
+  const programs =
+    programsResult.state === 'data' ? programsResult.data : [];
+  const allTutors =
+    tutorsResult.state === 'data' ? tutorsResult.data : [];
 
-  // Derive the tutor dropdown from the bookings we already
-  // fetched. Avoids an extra roundtrip; if the same tutor
-  // appears on N bookings, dedupe by id.
-  const tutorMap = new Map<string, { id: string; full_name: string | null }>();
-  for (const b of bookings) {
-    if (b.tutor) tutorMap.set(b.tutor.id, { id: b.tutor.id, full_name: b.tutor.full_name });
-  }
-  const tutors = Array.from(tutorMap.values()).sort((a, b) =>
-    (a.full_name ?? '').localeCompare(b.full_name ?? ''),
-  );
+  // Sprint 9 — admin P1-2 fix:
+  // The tutor dropdown now lists EVERY tutor in the directory,
+  // not just tutors who already appear on a booking. A tutor
+  // with zero bookings is still a valid filter value (the admin
+  // may want to see "no bookings for tutor X" — i.e. confirm
+  // an empty schedule). The dropdown also stays stable as
+  // bookings come and go; previously a brand-new tutor was
+  // invisible until their first booking landed.
+  const tutors = allTutors
+    .map((tu) => ({ id: tu.id, full_name: tu.full_name }))
+    .sort((a, b) =>
+      (a.full_name ?? '').localeCompare(b.full_name ?? ''),
+    );
 
   // Build the localized label maps for the status pills.
   const bookingStatusLabels: Record<BookingStatus, string> = {
@@ -103,18 +112,21 @@ export default async function AdminBookingsPage({
     partially_refunded: t('paymentStatus.partially_refunded'),
   };
 
-  // The 10 column header labels.
+  // The 10 column header labels. Each `className` is a Tailwind
+  // width utility that pins the cell width on >= sm, so the
+  // table grid stays aligned even when one row has a long
+  // course title and the next has a short one.
   const columns = [
-    { key: 'id',      label: t('columns.id') },
-    { key: 'student', label: t('columns.student') },
-    { key: 'program', label: t('columns.program') },
-    { key: 'course',  label: t('columns.course') },
-    { key: 'chapter', label: t('columns.chapter') },
-    { key: 'session', label: t('columns.session') },
-    { key: 'tutor',   label: t('columns.tutor') },
-    { key: 'when',    label: t('columns.when') },
-    { key: 'status',  label: t('columns.status') },
-    { key: 'payment', label: t('columns.payment') },
+    { key: 'id',      label: t('columns.id'),      className: 'w-28' },
+    { key: 'student', label: t('columns.student'), className: 'min-w-[200px]' },
+    { key: 'program', label: t('columns.program'), className: 'min-w-[160px]' },
+    { key: 'course',  label: t('columns.course'),  className: 'min-w-[180px]' },
+    { key: 'chapter', label: t('columns.chapter'), className: 'min-w-[180px]' },
+    { key: 'session', label: t('columns.session'), className: 'min-w-[200px]' },
+    { key: 'tutor',   label: t('columns.tutor'),   className: 'w-44' },
+    { key: 'when',    label: t('columns.when'),    className: 'w-40' },
+    { key: 'status',  label: t('columns.status'),  className: 'w-32' },
+    { key: 'payment', label: t('columns.payment'), className: 'w-36' },
   ];
 
   return (
@@ -132,113 +144,45 @@ export default async function AdminBookingsPage({
           <p className="mt-2 text-base text-muted-foreground">{t('subline')}</p>
         </header>
 
-        {bookings.length === 0 ? (
-          <div className="mt-10 flex flex-col items-center gap-2 rounded-md border bg-card p-10 text-center text-sm text-muted-foreground">
-            <CalendarCheck className="h-6 w-6" aria-hidden={true} />
-            <p>{t('empty')}</p>
-          </div>
-        ) : (
-          <BookingsFilteredList
-            bookings={bookings}
-            locale={locale}
-            basePath="/admin/bookings"
-            programs={programs.map((p) => ({ id: p.id, title: p.title }))}
-            tutors={tutors}
-            labels={{
-              search: t('filters.search'),
-              searchPlaceholder: t('filters.searchPlaceholder'),
-              all: t('filters.all'),
-              program: t('filters.program'),
-              tutor: t('filters.tutor'),
-              bookingStatus: t('filters.bookingStatus'),
-              paymentStatus: t('filters.paymentStatus'),
-              date: t('filters.date'),
-              reset: t('filters.reset'),
-              results: t('filters.results'),
-              empty: t('filters.emptyFiltered'),
-            }}
-            bookingStatusEnum={BOOKING_STATUSES}
-            paymentStatusEnum={PAYMENT_STATUSES}
-            bookingStatusLabels={bookingStatusLabels}
-            paymentStatusLabels={paymentStatusLabels}
-            columns={columns}
-            renderRow={(b) => (
-              <BookingRow
-                b={b}
-                bookingStatusLabels={bookingStatusLabels}
-                paymentStatusLabels={paymentStatusLabels}
-              />
-            )}
-          />
-        )}
+        <AdminDataState
+          result={bookingsResult}
+          empty={t('empty')}
+          emptyIcon={<CalendarCheck className="h-6 w-6" aria-hidden={true} />}
+          labels={{
+            loading: tCommon('loading'),
+            loadErrorTitle: tCommon('loadErrorTitle'),
+            retry: tCommon('retry'),
+          }}
+        >
+          {(rows) => (
+            <BookingsFilteredList
+              bookings={rows}
+              locale={locale}
+              basePath="/admin/bookings"
+              programs={programs.map((p) => ({ id: p.id, title: p.title }))}
+              tutors={tutors}
+              labels={{
+                search: t('filters.search'),
+                searchPlaceholder: t('filters.searchPlaceholder'),
+                all: t('filters.all'),
+                program: t('filters.program'),
+                tutor: t('filters.tutor'),
+                bookingStatus: t('filters.bookingStatus'),
+                paymentStatus: t('filters.paymentStatus'),
+                date: t('filters.date'),
+                reset: t('filters.reset'),
+                results: t('filters.results'),
+                empty: t('filters.emptyFiltered'),
+              }}
+              bookingStatusEnum={BOOKING_STATUSES}
+              paymentStatusEnum={PAYMENT_STATUSES}
+              bookingStatusLabels={bookingStatusLabels}
+              paymentStatusLabels={paymentStatusLabels}
+              columns={columns}
+            />
+          )}
+        </AdminDataState>
       </Container>
     </Section>
-  );
-}
-
-// Row renderer. Extracted as a small component for readability;
-// lives in the same file because it's a presentation detail of
-// the list page and has no other consumer.
-function BookingRow({
-  b,
-  bookingStatusLabels,
-  paymentStatusLabels,
-}: {
-  b: Awaited<ReturnType<typeof getAllBookingsWithDetails>>[number];
-  bookingStatusLabels: Record<BookingStatus, string>;
-  paymentStatusLabels: Record<PaymentStatus, string>;
-}) {
-  return (
-    <>
-      <span className="font-mono text-xs text-muted-foreground">
-        {b.id.slice(0, 8)}
-      </span>
-      <span className="flex flex-col text-xs">
-        <span className="font-medium text-foreground">
-          {b.student?.full_name ?? '—'}
-        </span>
-        <span className="text-muted-foreground">{b.student?.email ?? ''}</span>
-      </span>
-      <span className="text-xs text-foreground">
-        {b.curriculum?.program_title ?? '—'}
-      </span>
-      <span className="text-xs text-foreground">
-        {b.curriculum?.course_title ?? '—'}
-      </span>
-      <span className="text-xs text-foreground">
-        {b.curriculum?.chapter_title ?? '—'}
-      </span>
-      <span className="text-xs text-foreground">
-        {b.curriculum?.session_title ?? '—'}
-      </span>
-      <span className="text-xs text-foreground">
-        {b.tutor?.full_name ?? '—'}
-      </span>
-      <span className="font-mono text-xs tabular-nums text-foreground">
-        {formatDateTime(b.scheduled_start)}
-      </span>
-      <span>
-        <span
-          className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-            BOOKING_STATUS_COLOR[b.status] ??
-            'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-          }`}
-        >
-          {bookingStatusLabels[b.status] ?? b.status}
-        </span>
-      </span>
-      <span>
-        <span
-          className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-            b.payment
-              ? PAYMENT_STATUS_COLOR[b.payment.status] ??
-                'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-              : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
-          }`}
-        >
-          {b.payment ? (paymentStatusLabels[b.payment.status] ?? b.payment.status) : '—'}
-        </span>
-      </span>
-    </>
   );
 }

@@ -66,9 +66,9 @@ on conflict (id) do nothing;
 -- Demo courses
 insert into public.courses (id, slug, title, subtitle, description, subject, level, level_group, price_cents, duration_min, is_published)
 values
-    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'maths-lycee',     'Mathématiques – Lycée',     'Cours particuliers de la Seconde à la Terminale', 'Algèbre, analyse, probabilités.', 'Mathématiques', 'Lycée',     'high_school',   4500, 60, true),
-    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'physique-prepa',  'Physique – Prépa',          'Mécanique, électromagnétisme, thermodynamique.',    'Préparation intensive.',         'Physique',      'Prépa MPSI', 'preparatory', 6000, 90, true),
-    ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'francais-lycee',  'Français – Lycée',          'Méthodologie, dissertation, commentaire.',          'Aide au bac de français.',       'Français',      'Lycée',     'high_school',   4000, 60, true)
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'maths-lycee',     'Mathématiques – Lycée',     'Cours particuliers de la Seconde à la Terminale', 'Algèbre, analyse, probabilités.', 'Mathématiques', 'Lycée',     'high_school',   3500, 60, true),
+    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'physique-prepa',  'Physique – Prépa',          'Mécanique, électromagnétisme, thermodynamique.',    'Préparation intensive.',         'Physique',      'Prépa MPSI', 'preparatory', 3500, 60, true),
+    ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'francais-lycee',  'Français – Lycée',          'Méthodologie, dissertation, commentaire.',          'Aide au bac de français.',       'Français',      'Lycée',     'high_school',   3500, 60, true)
 on conflict (id) do nothing;
 
 -- Demo tutor (standalone — no auth.users, no profiles row)

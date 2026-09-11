@@ -19,7 +19,7 @@ export function TrustBar({ items }: { items: ReadonlyArray<string> }) {
     >
       <Container>
         <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Ils apprennent avec Intégrale
+          Ils apprennent avec CoursEnLigne
         </p>
         <ul
           role="list"

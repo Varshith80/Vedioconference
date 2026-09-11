@@ -78,9 +78,20 @@ export function TutorCreateForm({ className }: TutorCreateFormProps): React.JSX.
       });
       if (!res.ok) {
         const errBody = (await res.json().catch(() => null)) as
-          | { error?: { message?: string } }
+          | { error?: { message?: string; details?: { reason?: string } } }
           | null;
-        setServerError(errBody?.error?.message ?? tForms('saveError'));
+        // Show the API's top-level message (e.g. "A tutor with this
+        // email already exists." for a 409), and append the underlying
+        // reason when present so the admin can see the real DB /
+        // validation error instead of a generic 500. The 500 catch-all
+        // is only used when the body is unparseable.
+        const apiMessage = errBody?.error?.message;
+        const reason = errBody?.error?.details?.reason;
+        if (apiMessage && reason) {
+          setServerError(`${apiMessage} (${reason})`);
+        } else {
+          setServerError(apiMessage ?? tForms('saveError'));
+        }
         return;
       }
       reset({

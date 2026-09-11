@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2006/svg" viewBox="0 0 64 64" role="img" aria-label="Intégrale">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CoursEnLigne">
   <rect width="64" height="64" rx="12" fill="#EDF0EA"/>
   <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central"
-        font-family="'IBM Plex Serif', Georgia, serif" font-size="46" font-weight="600"
-        fill="#142B4D">∫</text>
+        font-family="'IBM Plex Serif', Georgia, serif" font-size="42" font-weight="700"
+        fill="#142B4D">C</text>
 </svg>

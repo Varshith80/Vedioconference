@@ -14,6 +14,7 @@ export type AuthErrorCode =
   | 'not_authenticated'
   | 'invalid_token'
   | 'token_expired'
+  | 'signout_failed'
   | 'unknown';
 
 export interface AuthError {

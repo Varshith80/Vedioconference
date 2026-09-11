@@ -47,6 +47,12 @@ export default async function CheckoutSessionGrantPage({
   if (!grant) notFound();
   if (grant.student_id !== user.id) notFound();
 
+  // Credit-pool grants (Pack / Subscription) do not have a
+  // pre-bound session: their credits are consumed at booking
+  // time by `fn_consume_pack_credit`. The per-session checkout
+  // page is only meaningful for individual (PAYG) grants.
+  if (grant.session_id === null) notFound();
+
   const session = await getSessionWithChapter(grant.session_id);
   if (!session) notFound();
 
@@ -88,7 +94,7 @@ export default async function CheckoutSessionGrantPage({
         <p className="mt-2 max-w-prose text-base text-muted-foreground">
           {t('description', {
             session: session.title,
-            amount: formatCents(grant.amount_cents, grant.currency),
+            amount: formatCents(grant.amount_cents, grant.currency, locale as 'en' | 'fr'),
           })}
         </p>
 

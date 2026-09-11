@@ -52,5 +52,5 @@ export default async function TutorDetailPage(
   const tutor = await getTutorBySlug(slug);
   if (!tutor) notFound();
   const courses = await listCoursesForTutorStandalone(tutor.id);
-  return <TutorDetail tutor={tutor} courses={courses} />;
+  return <TutorDetail tutor={tutor} courses={courses} locale={locale as 'en' | 'fr'} />;
 }

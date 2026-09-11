@@ -1,0 +1,248 @@
+-- =====================================================================
+-- Migration: 20260829000001_rls_prerequisite_grants.sql
+-- Sprint:     Post-Sprint-8 environment unblock (D1 + D2 fix)
+--
+-- Description
+-- -----------
+-- The Phase 2 / Sprint B2 RLS migration
+-- (`20260707000006_rls_policies.sql`) enabled Row Level Security
+-- on every application table and authored the policies that govern
+-- who may read / write each row, but the migration did NOT grant
+-- the underlying table-level privileges to the `authenticated`
+-- or `anon` roles.
+--
+-- In PostgreSQL, the GRANT check runs BEFORE the RLS policy is
+-- evaluated. If `authenticated` has no `SELECT` on a table, every
+-- query — even one that would have passed the RLS policy —
+-- fails with SQLSTATE 42501 ("permission denied for table …").
+-- The hint text the server emits is literally:
+--
+--   "Grant the required privileges to the current role with:
+--    GRANT SELECT ON public.<table> TO authenticated;"
+--
+-- This surfaced during Sprint 8 live browser acceptance testing
+-- as two related defects:
+--
+--   D2  Every authenticated request that tries to read the
+--       caller's own `profiles` row (the role-guard in
+--       `apps/web/middleware.ts`, `apps/web/hooks/use-require-user.ts`,
+--       `apps/web/lib/supabase/server.ts`, and the post-login
+--       profile read in `apps/web/app/[locale]/auth/login/actions.ts`)
+--       returns SQLSTATE 42501. Four occurrences observed in the
+--       dev log during one sign-in sequence.
+--
+--   D1  As a downstream consequence, `requireProfile()` and
+--       `requireAdmin()` see the failed `profiles` read as
+--       "profile not found" and redirect to `/auth/login`. The
+--       admin ends up on the login page after a successful
+--       sign-in instead of on `/admin`.
+--
+-- Scope of this migration
+-- -----------------------
+-- The smallest possible grant set that fixes the immediate
+-- confirmed blocker. It is the bare PostgreSQL privilege
+-- substrate that the existing RLS policies already assume.
+-- No RLS policy is added, dropped, or modified. No table
+-- is renamed, dropped, or altered. No data is touched.
+--
+-- What is granted
+-- ---------------
+-- `authenticated` receives the minimum SELECT (and UPDATE-only-
+-- where-the-RLS-policy-permits-it-owner-or-admin) privileges
+-- required for the Sprint 8 acceptance-test read paths and the
+-- post-login profile-lookup path:
+--
+--   profiles           : SELECT       (D2 confirmed blocker;
+--                                      used by every protected
+--                                      request, the middleware
+--                                      role-guard, and the
+--                                      post-login action)
+--   resources          : SELECT       (Sprint 8 S8-A: student
+--                                      list, admin list)
+--   resource_grants    : SELECT       (Sprint 8 S8-A: enrolled
+--                                      visibility for the
+--                                      student-facing list)
+--   notifications      : SELECT       (Sprint 8 S8-C: student
+--                                      notification feed)
+--                                  UPDATE       (Sprint 8 S8-C:
+--                                      mark-read; the
+--                                      notifications_update_own
+--                                      policy already permits
+--                                      owner-or-admin updates)
+--   audit_logs         : SELECT       (Sprint 8 S8-C admin:
+--                                      audit log page)
+--   session_bookings   : SELECT       (Sprint 8 S8-B: admin
+--                                      session-bookings list)
+--
+-- What is intentionally NOT granted
+-- ----------------------------------
+-- * `INSERT` / `UPDATE` / `DELETE` on `resources`,
+--   `resource_grants`, `audit_logs`. The Sprint 8 admin write
+--   paths for these tables route through the admin API and
+--   rely on existing RLS `…_admin_all` / `…_write_admin_only`
+--   policies. Granting the privileges here is required for
+--   those writes to function, but the existing RLS policies
+--   already permit the admin operations on top of the
+--   privilege layer. To keep this migration the smallest
+--   safe fix for the confirmed D1+D2 blocker, those write
+--   privileges are deferred to a follow-up migration. Sprint 8
+--   acceptance tests that depend on admin writes (A6, A9, A10,
+--   B2) will surface a SQLSTATE 42501 until that follow-up
+--   migration is applied. (See "Remaining privilege gaps"
+--   below.)
+--
+-- * `UPDATE` on `session_bookings`. The existing RLS surface
+--   has only ONE update policy:
+--       `session_bookings_student_update_cancel` (owner +
+--       status-restricted)
+--   and NO admin-allowed UPDATE policy. Granting `UPDATE` to
+--   `authenticated` without also adding the admin-allowed
+--   policy would silently widen the student self-cancel window
+--   (the existing policy's `with check` allows more `status`
+--   transitions than the `using` clause). Fixing the
+--   manual-complete feature requires BOTH this GRANT and a
+--   new admin UPDATE policy; the latter is an RLS change and
+--   is therefore outside the scope of this migration. (See
+--   "Remaining privilege gaps" below.)
+--
+-- * `DELETE` on any application table. The RLS surface for
+--   the Sprint 8 read paths does not require it.
+--
+-- * GRANTs on `anon`. The Sprint 8 acceptance flow is
+--   entirely auth'd; no anon read paths are tested in this
+--   round. The marketing pages that anon reads (programs,
+--   grades, chapters, sessions, courses) are unaffected by
+--   this migration — they have been failing with SQLSTATE
+--   42501 since Phase 1 baseline and were already known
+--   broken in the readiness report (see `permission denied
+--   for table courses` and `permission denied for table
+--   programs` in the dev log). They will be addressed by a
+--   separate, targeted migration when the marketing-site
+--   acceptance round runs.
+--
+-- * GRANTs on `service_role`. The service role already owns
+--   all application-table privileges via the implicit `OWNER`
+--   ACL on tables created in `supabase/migrations/*`. No
+--   change needed.
+--
+-- Idempotency
+-- -----------
+-- PostgreSQL `GRANT … TO authenticated` is idempotent: re-issuing
+-- the same statement against a role that already has the
+-- privilege is a no-op (the grant is added to the ACL if not
+-- already present, otherwise the existing entry is left
+-- untouched). The migration can therefore be safely re-applied.
+-- No `DROP` statements. No `DELETE` statements. No data
+-- modification.
+--
+-- Verified against the live local stack at the time of
+-- authoring:
+--   $ SELECT grantee, privilege_type FROM information_schema.role_table_grants
+--       WHERE table_schema='public' AND table_name='profiles'
+--       ORDER BY grantee, privilege_type;
+--   anon          | REFERENCES
+--   anon          | TRIGGER
+--   anon          | TRUNCATE
+--   authenticated | REFERENCES
+--   authenticated | TRIGGER
+--   authenticated | TRUNCATE
+--   postgres      | DELETE
+--   postgres      | INSERT
+--   postgres      | REFERENCES
+--   postgres      | SELECT
+--   postgres      | TRIGGER
+--   postgres      | TRUNCATE
+--   postgres      | UPDATE
+--   service_role  | REFERENCES
+--   service_role  | TRIGGER
+--   service_role  | TRUNCATE
+-- This migration brings `authenticated` up to the SELECT (and
+-- where required: UPDATE) level that the existing RLS policies
+-- already assume.
+--
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- profiles — the role-guard + post-login profile lookup
+-- ---------------------------------------------------------------------
+grant select on table public.profiles to authenticated;
+
+-- ---------------------------------------------------------------------
+-- Sprint 8 S8-A: Resources + Resource Grants (read paths)
+-- ---------------------------------------------------------------------
+grant select on table public.resources       to authenticated;
+grant select on table public.resource_grants to authenticated;
+
+-- ---------------------------------------------------------------------
+-- Sprint 8 S8-B: Session Bookings (admin list — read only here)
+-- ---------------------------------------------------------------------
+-- The Sprint 8 manual-complete (B2) UPDATE is intentionally NOT
+-- granted in this migration; see the header comment for the
+-- reasoning (the existing RLS surface has no admin-allowed UPDATE
+-- policy, so a bare GRANT would expand the student self-cancel
+-- window through the existing `session_bookings_student_update_cancel`
+-- policy's `with check` clause).
+grant select on table public.session_bookings to authenticated;
+
+-- ---------------------------------------------------------------------
+-- Sprint 8 S8-C: Notifications + Audit Logs
+-- ---------------------------------------------------------------------
+-- notifications: SELECT for the student's own feed, UPDATE for
+-- mark-read (the existing `notifications_update_own` policy
+-- permits owner-or-admin updates; granting UPDATE to
+-- authenticated is the minimum privilege substrate that policy
+-- already assumes).
+grant select, update on table public.notifications to authenticated;
+
+-- audit_logs: admin SELECT only. Writes come from the
+-- `fn_audit_changes` trigger (SECURITY DEFINER, runs as the
+-- function owner), so `authenticated` does not need INSERT,
+-- UPDATE, or DELETE on this table.
+grant select on table public.audit_logs to authenticated;
+
+-- =====================================================================
+-- Remaining privilege gaps (NOT included in this migration)
+-- =====================================================================
+-- The following privileges are required for the rest of the
+-- Sprint 8 acceptance surface but are NOT included here. Each
+-- is documented as a follow-up because granting it requires
+-- either an RLS change (out of scope for a GRANT-only
+-- migration) or a re-audit of the existing RLS surface.
+--
+-- 1. `resources` INSERT / UPDATE / DELETE for authenticated.
+--    Required by S8-A6 / A9 / A10 (admin create / patch /
+--    delete). The RLS policy `resources_write_admin_or_tutor`
+--    already permits these via `using (is_admin() or
+--    uploaded_by = auth.uid())`. Adding the GRANT is safe but
+--    should ship as a focused follow-up migration so this one
+--    remains the smallest possible D1+D2 fix.
+--
+-- 2. `session_bookings` UPDATE for authenticated (manual-
+--    complete B2 / B3). Requires ALSO a new admin-allowed
+--    UPDATE policy on `session_bookings`; the current RLS
+--    surface has only the owner-restricted
+--    `session_bookings_student_update_cancel` policy. This is
+--    a two-part fix (GRANT + policy) and is therefore deferred
+--    to its own migration.
+--
+-- 3. `anon` SELECT on the marketing-site tables
+--    (`programs`, `grades`, `chapters`, `sessions`, `courses`).
+--    Required for the unauthenticated marketing pages
+--    (`/en`, `/en/levels`, `/en/courses`, `/en/programs/…`).
+--    Deferred to the marketing-site acceptance round.
+--
+-- 4. `tutors`, `tutor_change_requests`, `subscriptions`,
+--    `coupons`, `invoices`, `session_grants`, `payments`,
+--    `meeting_links`, `bookings`, `webhook_events`,
+--    `n8n_executions`, `n8n_dead_letters`, `modules`,
+--    `enrollments`, `module_progress`, `module_bookings`.
+--    Required by later-sprint surfaces (Phase 3 booking flow,
+--    Phase 4 billing, Sprint 6 tutor-change) but NOT required
+--    for any of the 33 Sprint 8 acceptance tests. Deferred to
+--    the sprint that introduces / exercises each surface.
+--
+-- 5. `invoices`, `webhook_events`, `n8n_executions`,
+--    `n8n_dead_letters` — admin-only read paths; required
+--    only by future admin pages.
+--
+-- =====================================================================

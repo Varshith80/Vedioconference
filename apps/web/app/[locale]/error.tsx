@@ -11,7 +11,7 @@ import { ErrorState } from '@/components/shared/error-state';
  * is in place. Mirrors `app/error.tsx` but is local to the locale
  * segment so the message stays in the user's language.
  */
-export default function GlobalError({ error, reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error; reset: () => void }) {
   const t = useTranslations('Error');
   useEffect(() => {
     // eslint-disable-next-line no-console

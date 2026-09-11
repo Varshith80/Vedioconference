@@ -139,7 +139,16 @@ describe('getAllBookingsWithDetails', () => {
           },
         },
       },
-      grant: { id: 'g1' },
+      grant: {
+        id: 'g1',
+        grant_type: 'individual',
+        status: 'active',
+        total_credits: null,
+        consumed_credits: 0,
+        expires_at: null,
+        amount_cents: 3500,
+        currency: 'EUR',
+      },
       meeting: {
         id: 'm1',
         provider: 'zoom',
@@ -184,6 +193,10 @@ describe('getAllBookingsWithDetails', () => {
     expect(b.payment?.amount_cents).toBe(5000);
     expect(b.payment?.status).toBe('succeeded');
     expect(b.payment?.id).toBe('pay1');
+    expect(b.grant?.grant_type).toBe('individual');
+    expect(b.grant?.amount_cents).toBe(3500);
+    expect(b.grant?.consumed_credits).toBe(0);
+    expect(b.grant?.total_credits).toBeNull();
     expect(b.meeting?.meeting_id).toBe('123456789');
     expect(b.meeting?.join_url).toBe('https://zoom.us/j/123456789');
     expect(b.meeting?.passcode).toBe('secret');
@@ -264,7 +277,16 @@ describe('getAllBookingsWithDetails', () => {
           },
         },
       },
-      grant: { id: 'g1' },
+      grant: {
+        id: 'g1',
+        grant_type: 'individual',
+        status: 'active',
+        total_credits: null,
+        consumed_credits: 0,
+        expires_at: null,
+        amount_cents: 3500,
+        currency: 'EUR',
+      },
       meeting: null,
     };
     mockFrom.mockImplementation((table: string) => {
@@ -280,15 +302,19 @@ describe('getAllBookingsWithDetails', () => {
     expect(b.curriculum?.grade_title).toBe('G11');
   });
 
-  it('returns [] on read failure instead of throwing', async () => {
+  it('throws on bookings read failure so the admin page can render the error state', async () => {
+    // Sprint 9 — P3-1. The list-page services no longer swallow
+    // errors to `[]`; a Supabase failure throws so the calling
+    // page can build an `AdminFetchResult` envelope through
+    // `safeAdminFetch()` and the `AdminDataState` card can show
+    // a destructive block + Retry instead of a fake empty list.
     mockFrom.mockImplementation((table: string) => {
       if (table === 'session_bookings') {
         return buildBookingsChain({ data: null, error: { message: 'timeout' } });
       }
       throw new Error(`unexpected table: ${table}`);
     });
-    const out = await getAllBookingsWithDetails();
-    expect(out).toEqual([]);
+    await expect(getAllBookingsWithDetails()).rejects.toBeDefined();
   });
 
   it('degrades to payment=null when the payments read fails', async () => {
@@ -309,7 +335,16 @@ describe('getAllBookingsWithDetails', () => {
       student: null,
       tutor: null,
       session: null,
-      grant: { id: 'g1' },
+      grant: {
+        id: 'g1',
+        grant_type: 'individual',
+        status: 'active',
+        total_credits: null,
+        consumed_credits: 0,
+        expires_at: null,
+        amount_cents: 3500,
+        currency: 'EUR',
+      },
       meeting: null,
     };
     mockFrom.mockImplementation((table: string) => {
@@ -342,7 +377,16 @@ describe('getAllBookingsWithDetails', () => {
       student: null,
       tutor: null,
       session: null,
-      grant: { id: 'g1' },
+      grant: {
+        id: 'g1',
+        grant_type: 'individual',
+        status: 'active',
+        total_credits: null,
+        consumed_credits: 0,
+        expires_at: null,
+        amount_cents: 3500,
+        currency: 'EUR',
+      },
       meeting: null,
     };
     // The service sorts by `created_at desc, id desc`, so the
@@ -422,7 +466,16 @@ describe('getBookingByIdWithDetails', () => {
           },
         },
       },
-      grant: { id: 'g1' },
+      grant: {
+        id: 'g1',
+        grant_type: 'individual',
+        status: 'active',
+        total_credits: null,
+        consumed_credits: 0,
+        expires_at: null,
+        amount_cents: 3500,
+        currency: 'EUR',
+      },
       meeting: { id: 'm1', provider: 'zoom', meeting_id: '999', join_url: 'https://zoom.us/j/999', passcode: null, start_url: null },
     };
     const payments = [
@@ -458,5 +511,52 @@ describe('getBookingByIdWithDetails', () => {
     });
     const out = await getBookingByIdWithDetails('x');
     expect(out).toBeNull();
+  });
+
+  // Sprint 5 Slice D — the booking detail page now surfaces
+  // grant_type, consumed_credits, total_credits, expires_at so
+  // the admin can distinguish PAYG from Pack from Subscription.
+  it('projects Pack grant fields (consumed_credits, total_credits, expires_at)', async () => {
+    const booking = {
+      id: 'b10',
+      status: 'completed',
+      scheduled_start: '2026-08-10T10:00:00Z',
+      scheduled_end:   '2026-08-10T11:00:00Z',
+      timezone: 'Europe/Paris',
+      notes: null,
+      calendly_event_uri: null,
+      calendly_invitee_uri: null,
+      cancelled_at: null,
+      cancelled_reason: null,
+      rescheduled_from: null,
+      created_at: '2026-08-01T08:00:00Z',
+      updated_at: '2026-08-10T11:00:00Z',
+      student: null,
+      tutor: null,
+      session: null,
+      grant: {
+        id: 'g_pack',
+        grant_type: 'pack',
+        status: 'active',
+        total_credits: 10,
+        consumed_credits: 3,
+        expires_at: '2027-02-01T00:00:00Z',
+        amount_cents: 29900,
+        currency: 'EUR',
+      },
+      meeting: null,
+    };
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'session_bookings') return buildBookingsChain({ data: booking });
+      if (table === 'payments') return buildPaymentsChain({ data: [] });
+      throw new Error(`unexpected table: ${table}`);
+    });
+    const out = await getBookingByIdWithDetails('b10');
+    expect(out).not.toBeNull();
+    expect(out!.grant?.grant_type).toBe('pack');
+    expect(out!.grant?.total_credits).toBe(10);
+    expect(out!.grant?.consumed_credits).toBe(3);
+    expect(out!.grant?.expires_at).toBe('2027-02-01T00:00:00Z');
+    expect(out!.grant?.amount_cents).toBe(29900);
   });
 });

@@ -1,0 +1,64 @@
+-- Migration: 20260911000003_grant_authenticated_select_meeting_links.sql
+--
+-- Context. The local Supabase stack was last seeded through
+-- migration 20260720000001. Migration
+-- 20260829000001_rls_prerequisite_grants.sql granted
+-- `SELECT ON public.session_bookings TO authenticated` so
+-- admin pages can list bookings, but the same pattern
+-- applies to `public.meeting_links` and was not in scope
+-- for that migration. The intended RLS surface for
+-- `meeting_links` already exists and explicitly permits
+-- admin reads:
+--
+--   * `meeting_links_select_via_session_booking` (created
+--     in 20260714000007_rls_policies_curriculum_v2.sql
+--     section 2.7) — `using (is_admin() OR
+--     (session_booking_id IS NOT NULL AND EXISTS (SELECT 1
+--     FROM session_bookings sb WHERE sb.id =
+--     meeting_links.session_booking_id AND
+--     (sb.student_id = auth.uid() OR is_admin()))))`.
+--
+-- The RLS policy is in the live DB. RLS only runs after
+-- GRANTs, however, and PostgREST has no `SELECT` GRANT on
+-- `meeting_links` for the `authenticated` role. The admin
+-- `getAllBookingsWithDetails` service embeds a join through
+-- `meeting_links!meeting_links_session_booking_id_fkey`
+-- (services/admin/bookings.ts line 209) and the embedded
+-- sub-SELECT is rejected at SQLSTATE 42501 before the RLS
+-- policy is even evaluated. The browser surfaces the
+-- failure as `permission denied for table meeting_links`
+-- in the dev console (the page renders, but the
+-- `safeAdminFetch` typed envelope is `state: 'error'`).
+--
+-- Fix. Forward-only, one-statement GRANT. The RLS policy
+-- already enforces that the only rows readable through
+-- this GRANT are:
+--
+--   (a) any row where `is_admin()` is true (admins), or
+--   (b) any row whose `session_booking_id` belongs to a
+--       session_booking the caller (student) owns.
+--
+-- So the GRANT widens the privilege CHECK, not the
+-- visibility surface — the same posture migration
+-- 20260829000001 applied to `session_bookings` SELECT.
+--
+-- What is NOT in this migration.
+--
+--   * No `INSERT` / `UPDATE` / `DELETE` granted to
+--     `authenticated`. The existing `meeting_links_write_admin_only`
+--     policy (FOR ALL, `is_admin()`) covers the admin write
+--     path; the in-app `reminders` job uses the
+--     service-role Supabase client, so no
+--     authenticated-role write is required.
+--   * No GRANT to `anon`. RLS still denies anon even
+--     if a future migration grants table-level access to
+--     `anon` — the existing SELECT policy does not match
+--     an anonymous `auth.uid()`.
+--   * No RLS policy changes. The intended policies are
+--     already declared in 20260707000006 / 20260714000007
+--     and present in the live DB.
+
+grant select on table public.meeting_links to authenticated;
+
+comment on table public.meeting_links is
+    'meeting_links — see 20260911000003 for the GRANT rationale. SELECT is granted to authenticated; the RLS policy meeting_links_select_via_session_booking gates the actual visibility (admin or owner-student). INSERT/UPDATE/DELETE remain admin / service-role only.';

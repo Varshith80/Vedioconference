@@ -2,10 +2,21 @@
  * Brand source of truth (structural only).
  *
  * This file is the single place where the **locale-agnostic**
- * Intégrale brand identity lives: the palette, the fonts, the
+ * CoursEnLigne brand identity lives: the palette, the fonts, the
  * legal entity, the contact email, the address, the copyright
  * year, the social URLs. Everything in here is identical in every
  * language.
+ *
+ * Brand rename (2026-09-10)
+ * -------------------------
+ * The editorial source of truth
+ * (`CoursEnLigne-Editorial-Structure_160826-EN.docx`) re-binds
+ * the brand name to "CoursEnLigne" (previously "Intégrale"). This
+ * module is the structural source — every page, component, and
+ * admin route reads the brand name from `BRAND.name`, so updating
+ * this constant is the single change required to rebrand the
+ * entire application. The admin/footer/email/JSON-LD surfaces
+ * were audited and updated as part of the same sweep.
  *
  * Locale-specific strings — the tagline, the short description,
  * the primary nav, the footer links, the learning paths, the
@@ -42,25 +53,23 @@ export const BRAND_FONTS = {
  * from `lib/i18n/brand.ts`.
  */
 export const BRAND = {
-  /** Canonical brand name. The wordmark renders this string with
-   *  the second "e" replaced by a `∫` glyph (handled in `BrandMark`). */
-  name: 'Intégrale',
+  /** Canonical brand name. The wordmark renders this string. */
+  name: 'CoursEnLigne',
   /** The wordmark text exactly as it should be displayed. */
-  wordmark: 'Intégrale',
+  wordmark: 'CoursEnLigne',
   /** Legal entity. */
-  legalName: 'Intégrale SAS',
-  /** Public-facing e-mail. Placeholder until the client provisions
-   *  the project address. */
-  contactEmail: 'contact@integrale.fr',
-  supportEmail: 'support@integrale.fr',
+  legalName: 'CoursEnLigne SAS',
+  /** Public-facing e-mail. Provisioned in the editorial spec. */
+  contactEmail: 'contact@coursenligne.fr',
+  supportEmail: 'support@coursenligne.fr',
   addressCountry: 'FR',
   addressLocality: 'Paris',
   /** Year shown in the copyright. */
   copyrightYear: 2026,
   social: {
-    twitter:   'https://twitter.com/integrale',
-    linkedin:  'https://www.linkedin.com/company/integrale',
-    github:    'https://github.com/integrale',
+    twitter:   'https://twitter.com/coursenligne',
+    linkedin:  'https://www.linkedin.com/company/coursenligne',
+    github:    'https://github.com/coursenligne',
   },
 } as const;
 

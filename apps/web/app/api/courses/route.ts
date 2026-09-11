@@ -15,6 +15,17 @@ import { logger } from '@/lib/utils/logger';
 // use this route (it inserts courses directly via the
 // ON CONFLICT upsert in lib/excel/import.ts); this route
 // exists for manual admin creation.
+//
+// v1 schema: `courses` has several NOT NULL columns without
+// defaults (`level`, `price_cents`; the others have safe
+// defaults: `level_group default 'high_school'`, `currency
+// default 'EUR'`, `duration_min default 60`, `is_subscription
+// default false`, `is_published default false`, `metadata
+// default '{}'`). The admin create form does not surface
+// `level` or `price_cents` as fields today; the API defaults
+// both to safe values so the manual path works. The admin
+// can edit the course later via PATCH /api/courses/[id] to
+// set a real price once a Stripe price is configured.
 // =====================================================================
 
 const bodySchema = z.object({
@@ -80,6 +91,21 @@ export async function POST(req: NextRequest) {
       gradeId = (grade as unknown as { id: string }).id;
     }
 
+    // v1 `courses` has NOT NULL columns without DB defaults
+    // for `level` and `price_cents`. The current admin form
+    // does not surface these fields, so we default them
+    // here. `level` gets a generic literal; `price_cents`
+    // starts at 0 and the admin can update it via the edit
+    // form once a Stripe price is wired in. All other
+    // NOT-NULL columns have DB-side defaults and are
+    // therefore not set explicitly.
+    //
+    // `level_group` is a CHECK column whose allowed values
+    // are `high_school` and `preparatory` (v1). The form
+    // does not send it; the existing behaviour of falling
+    // back to the program slug is preserved here so we do
+    // not silently change what the form sends. A future
+    // edit will surface a proper dropdown.
     const insertPayload = {
       slug: parsed.data.slug,
       title: parsed.data.title,
@@ -88,8 +114,9 @@ export async function POST(req: NextRequest) {
       program_id: programId,
       grade_id: gradeId,
       subject: parsed.data.subject ?? parsed.data.title,
-      level: parsed.data.level ?? null,
+      level: parsed.data.level ?? 'Lycée',
       level_group: parsed.data.level_group ?? parsed.data.program_slug,
+      price_cents: 0,
       is_published: parsed.data.is_published ?? false,
     };
 

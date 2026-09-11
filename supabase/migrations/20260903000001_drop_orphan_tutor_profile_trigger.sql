@@ -1,0 +1,67 @@
+-- supabase/migrations/20260903000001_drop_orphan_tutor_profile_trigger.sql
+--
+-- Purpose
+-- -------
+-- Remove the BEFORE UPDATE trigger `trg_tutors_lock_profile` and its
+-- associated function `fn_lock_tutor_profile_id()` from public.tutors.
+--
+-- Why
+-- ---
+-- This trigger was added under the v1 design where public.tutors was tied
+-- 1:1 to a public.profiles row. The trigger function references
+-- NEW.profile_id and rejects any change to that field.
+--
+-- The standalone-tutor refactor (20260719000002_reshape_tutors_v1_to_standalone)
+-- removed the profile coupling and replaced the column list with the
+-- v2 shape (id, full_name, email, phone, status, notes, years_experience,
+-- currency, calendly_event_uri, zoom_user_id, rating_count, metadata,
+-- created_at, updated_at). It did NOT remove the trigger, which now
+-- references a column that no longer exists. Every BEFORE UPDATE on
+-- public.tutors raises:
+--
+--   SQLSTATE 42703: record "new" has no field "profile_id"
+--
+-- This blocks admin tutor edit operations even when the caller is
+-- correctly authenticated and authorized by RLS.
+--
+-- Provenance
+-- ----------
+-- Confirmed pre-apply via:
+--   * select from pg_proc where proname = 'fn_lock_tutor_profile_id'
+--     → exactly one function, no other functions depend on it
+--   * select from pg_trigger join pg_proc where proname =
+--     'fn_lock_tutor_profile_id' and not tgisinternal
+--     → exactly one trigger, trg_tutors_lock_profile on public.tutors
+--   * select from pg_rules where ev_class = 'public.tutors'::regclass
+--     → no rules on the table
+--   * select from information_schema.tables joined via pg_depend to
+--     pg_proc where proname = 'fn_lock_tutor_profile_id'
+--     → no views or other tables depend on the function
+--
+-- The function and trigger have no corresponding source file under
+-- supabase/migrations/ — they were applied out-of-band. This migration
+-- is the first durable record of their removal.
+--
+-- Scope
+-- -----
+-- Touches:
+--   * drop trigger trg_tutors_lock_profile on public.tutors
+--   * drop function public.fn_lock_tutor_profile_id()
+-- Does NOT touch:
+--   * any other trigger, function, table, view, rule, policy, or column
+--   * any row in public.tutors
+--   * RLS enablement or the tutors_admin_all policy
+--   * the authenticated role's GRANTs on public.tutors
+--   * any other table or schema
+--
+-- Idempotency
+-- -----------
+-- Both DROP statements use `if exists`, so re-running this migration is
+-- a no-op.
+--
+-- Forward-only
+-- ------------
+-- New file. Does not modify any previously applied migration.
+
+drop trigger if exists trg_tutors_lock_profile on public.tutors;
+drop function if exists public.fn_lock_tutor_profile_id();

@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { requireAdminRoute } from '@/lib/auth/require-admin-route';
-import { jsonResponse } from '@/lib/utils/api';
+import { jsonResponse, errorResponse } from '@/lib/utils/api';
 import { getOverviewCounters } from '@/services/admin/overview';
 
 // GET /api/admin/overview - aggregate stats for the admin
@@ -9,10 +9,14 @@ import { getOverviewCounters } from '@/services/admin/overview';
 // RSC page (/[locale]/admin/page.tsx). The API route is the
 // JSON surface for client-side refresh / polling use cases.
 export async function GET(_req: NextRequest) {
-  await requireAdminRoute();
-  const counters = await getOverviewCounters();
-  return jsonResponse({
-    ok: true as const,
-    data: counters,
-  });
+  try {
+    await requireAdminRoute();
+    const counters = await getOverviewCounters();
+    return jsonResponse({
+      ok: true as const,
+      data: counters,
+    });
+  } catch (e) {
+    return errorResponse(e);
+  }
 }

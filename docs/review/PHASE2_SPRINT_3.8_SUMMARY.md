@@ -305,7 +305,105 @@ Types:
 
 ---
 
+---
+
+## 17. Post-sprint debug + audit pass (2026-07-19)
+
+After the S0–S4 sprint closed, a follow-up stabilization pass was run
+to fix all runtime errors and missing translation keys exposed by the
+new code, and to add a "Create tutor" flow that the original scope
+explicitly left out.
+
+### 17.1 Issues found and fixed
+
+| # | Issue | Root cause | Fix |
+|---|-------|------------|-----|
+| 1 | **35 runtime errors: `MISSING_MESSAGE: Could not resolve 'Admin.sessionCreate.fields.description'`** | `session-create-form.tsx:208` calls `t('fields.description')` but neither locale had the key. | Added `"description": "Description"` to `Admin.sessionCreate.fields` in **both** `en.json` and `fr.json`. |
+| 2 | **No "Create tutor" button on `/admin/tutors`** — the page was read-only. | The original S0–S4 scope deliberately left the tutors directory read-only (per the user's tutor-scope reminder). User asked for a way to add tutors in this version. | New flow: `adminTutorCreateSchema` + `createTutor` service + `POST /api/admin/tutors` + `TutorCreateForm` + `TutorCreateTrigger` + wired into the page header. |
+| 3 | **Asymmetric i18n: FR missing many fields** | `programCreate.fields/placeholders/empty/errors`, `programEdit.fields`, `gradeCreate.fields/placeholders/empty/errors`, `gradeEdit.fields.programSlug` only present in `en.json`. | Added the full set to `fr.json` to match EN. |
+| 4 | **5 additional missing keys** | `Checkout.sessionGrant.cancel`, `Dashboard.module.{book,completed,locked}`, `Checkout.cancel.enrollmentId` not in either locale. | Added to both `en.json` and `fr.json`. |
+| 5 | **6 server-side missing keys in `/dashboard/sessions/[id]`** | `Dashboard.labels.{start, end, duration, cancelledNotice, linkPendingNotice, paid}` only in old "labels" namespace but not in the active `Dashboard.labels` map. | Added the 6 keys to `Dashboard.labels` in both locales. |
+
+### 17.2 New "Create tutor" flow (additive, no migration)
+
+**Path:** `Create` button on `/admin/tutors` → Radix Dialog → `TutorCreateForm`.
+
+**Form fields** (all opt-in except `full_name` + `email`):
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| `full_name` | yes | Display name |
+| `email` | yes | Contact + FK lookup |
+| `headline` | no | One-line description |
+| `bio` | no | Long-form description |
+| `years_experience` | no | Number |
+| `zoom_user_id` | no | For host start URL |
+| `calendly_event_uri` | no | Per-tutor Calendly event type |
+| `is_published` | no | Visible to admin assigner |
+
+**Service contract** (`services/admin/tutors.ts:createTutor`):
+
+1. `admin.auth.admin.listUsers({ email })` — find an existing auth user.
+2. If none, `admin.auth.admin.createUser({ email, password: random(36 hex), email_confirm: true, user_metadata: { source: 'admin_tutor_create' } })`. The `handle_new_user` trigger mirrors the row into `profiles`.
+3. `upsert profiles` (`onConflict: 'id'`) — handles "profile exists, tutor doesn't" case.
+4. `insert tutors` (`profile_id`, `hourly_rate: 0`, `currency: 'EUR'`, …). 23505 → 409 Conflict.
+
+The generated password is unguessable (18 random bytes hex) because
+tutors do not log in. The service-role client is used **only** here;
+no other code path was changed.
+
+**API:** `POST /api/admin/tutors` returns 201 + `AdminTutor` JSON. 409 on
+slug/profile conflict, 400 on Zod failure, 500 on unexpected error.
+
+### 17.3 Validation schema (`lib/validations/admin-catalog.ts`)
+
+```ts
+export const adminTutorCreateSchema = z.object({
+  full_name: z.string().min(1).max(200),
+  email: z.string().email().max(254),
+  headline: z.string().max(200).optional().nullable(),
+  bio: z.string().max(5000).optional().nullable(),
+  years_experience: z.coerce.number().int().nonnegative().max(80).optional(),
+  zoom_user_id: z.string().max(200).optional().nullable(),
+  calendly_event_uri: z.string().url().max(500).optional().nullable(),
+  is_published: z.boolean().optional(),
+});
+```
+
+### 17.4 i18n additions in this pass
+
+- `Admin.sessionCreate.fields.description` (en + fr)
+- `Admin.tutorCreate` (full namespace, en + fr): `title, subline, resource, fields.{fullName, email, headline, bio, yearsExperience, zoomUserId, calendlyEventUri, isPublished}, placeholders.{zoom, calendly}, submit`
+- `Admin.common.resource.tutor` (en + fr)
+- `Admin.programCreate.{fields, placeholders, empty, errors}` (fr only — already in en)
+- `Admin.programEdit.fields` (fr only)
+- `Admin.gradeCreate.{fields, placeholders, empty, errors}` (fr only)
+- `Admin.gradeEdit.fields.programSlug` (fr only)
+- `Dashboard.labels.{start, end, duration, cancelledNotice, linkPendingNotice, paid}` (en + fr)
+- `Dashboard.module.{book, completed, locked}` (en + fr)
+- `Checkout.sessionGrant.cancel` (en + fr)
+- `Checkout.cancel.enrollmentId` (en + fr)
+
+### 17.5 Quality gates (after the pass)
+
+| Gate | Result |
+|---|---|
+| `pnpm type-check` | ✓ exit 0 |
+| `pnpm lint` | ✓ exit 0 (only the pre-existing `lib/utils/logger.ts:31` warning) |
+| `pnpm test` | ✓ **35 files / 276 tests pass** (was 274 — the 2 additional cases come from the `tutorCreate` / `createTutor` service coverage in the existing `admin-tutors-route` suite) |
+| `pnpm build` | ✓ exit 0; no new routes added; `/api/admin/tutors` now also accepts POST |
+
+### 17.6 Migration document
+
+A complete index of every forward-only migration in
+`supabase/migrations/` was written to
+[`docs/database/MIGRATIONS.md`](../database/MIGRATIONS.md). The only
+schema change in this sprint remains
+`20260719000001_sessions_tutor_id.sql` (the nullable `sessions.tutor_id`
+column the user explicitly pre-approved). No other migration files
+were added, deleted, or modified during this debug pass.
+
 *Last updated: 2026-07-19. Owner: project lead. This sprint delivers
 manual CRUD for the entire curriculum, the new `/admin/tutors`
-directory, and the booking detail polish. Next sprint awaits explicit
-user approval.*
+directory, the booking detail polish, and the post-sprint debug +
+audit + Create-tutor pass. Next sprint awaits explicit user approval.*

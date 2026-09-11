@@ -5,7 +5,11 @@ import { jsonResponse, errorResponse } from '@/lib/utils/api';
 import { ApiError, BadRequest, Unauthorized, NotFound } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
 import { serverEnv } from '@/lib/env';
-import { createPendingSessionGrant } from '@/services/curriculum/session-grants';
+import {
+  createPendingSessionGrant,
+  createPendingPackGrant,
+} from '@/services/curriculum/session-grants';
+import type { SessionGrant } from '@/types/domain';
 
 /**
  * POST /api/session-grants — create a `pending_payment` session
@@ -44,9 +48,21 @@ import { createPendingSessionGrant } from '@/services/curriculum/session-grants'
  * When `N8N_ENROLLMENT_WEBHOOK_URL` is unset, the route returns
  * 503 `checkout_unavailable` — no destructive call is made.
  */
-const bodySchema = z.object({
-  session_id: z.string().uuid(),
-});
+/**
+ * Sprint 5 (Slice A): the body now discriminates between a
+ * per-session PAYG purchase (the Sprint 3.5 flow) and a Pack
+ * 10 credit-pool purchase (the new flow). Exactly one of
+ * `session_id` (PAYG) or `kind: 'pack'` is required.
+ */
+const bodySchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('session'),
+    session_id: z.string().uuid(),
+  }),
+  z.object({
+    kind: z.literal('pack'),
+  }),
+]);
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,54 +78,117 @@ export async function POST(req: NextRequest) {
       throw BadRequest('Invalid request body.', { issues: parsed.error.issues });
     }
 
-    // Create the pending grant. The service does the price +
-    // duplicate checks; the route maps the discriminated
-    // result to an HTTP response.
-    const result = await createPendingSessionGrant(
-      user.id,
-      parsed.data.session_id,
-    );
-    if (result.kind === 'session_not_found') {
-      throw NotFound('Session not found.');
-    }
-    if (result.kind === 'session_price_missing') {
-      // The session is published but its price has not yet
-      // been imported from the Excel curriculum. This is the
-      // documented 422 path for Sprint 3.5 — the student sees
-      // a "Price TBD" message in the UI. Sprint 5 will wire
-      // the Excel import to populate `sessions.price_cents`.
-      throw new ApiError(
-        422,
-        'session_price_missing',
-        'This session does not have a price yet. Please check back later.',
-      );
-    }
-    if (result.kind === 'duplicate_active_grant') {
-      throw new ApiError(
-        409,
-        'session_grant_exists',
-        'You already have an active or pending grant for this session.',
-        { grant_id: result.grant.id },
-      );
-    }
+    // Branch on the discriminated body. PAYG keeps the
+    // Sprint 3.5 flow verbatim; Pack 10 is the new flow
+    // added in Sprint 5 (Slice A).
+    let grant: SessionGrant;
+    let n8nPayload: Record<string, unknown>;
+    const locale = req.cookies.get('NEXT_LOCALE')?.value === 'fr' ? 'fr' : 'en';
 
-    const grant = result.grant;
+    if (parsed.data.kind === 'pack') {
+      // ---- Pack 10 (Slice A) ----
+      // Pack 10 = 10 credits, 6-month expiry. The price is
+      // hardcoded in the service (€299 = 29900 cents) and
+      // surfaced again at the Stripe Checkout level. The
+      // Stripe Price ID is read by n8n from the env var
+      // `STRIPE_PRICE_PACK10`.
+      const PACK_TOTAL_CREDITS = 10;
+      const PACK_DURATION_MS = 1000 * 60 * 60 * 24 * 30 * 6; // 6 months
+      const expiresAtIso = new Date(Date.now() + PACK_DURATION_MS).toISOString();
 
-    // Read the session for the n8n payload.
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .select('id, title, slug, price_cents, currency')
-      .eq('id', parsed.data.session_id)
-      .single();
-    const sessionRow = session as unknown as {
-      id: string;
-      title: string;
-      slug: string;
-      price_cents: number;
-      currency: string;
-    } | null;
-    if (sessionError || !sessionRow) {
-      throw NotFound('Session not found.');
+      const packResult = await createPendingPackGrant(
+        user.id,
+        PACK_TOTAL_CREDITS,
+        expiresAtIso,
+      );
+      if (packResult.kind === 'duplicate_active_pack') {
+        throw new ApiError(
+          409,
+          'pack_grant_exists',
+          'You already have an active Pack 10 credit pool.',
+          { grant_id: packResult.grant.id },
+        );
+      }
+      if (packResult.kind === 'pack_unavailable') {
+        throw new ApiError(
+          503,
+          'pack_unavailable',
+          'Pack 10 is not currently available.',
+        );
+      }
+      grant = packResult.grant;
+
+      n8nPayload = {
+        session_grant_id: grant.id,
+        student_id: grant.student_id,
+        amount_cents: grant.amount_cents,
+        currency: grant.currency,
+        success_url: '', // overwritten below
+        cancel_url: '',  // overwritten below
+        locale,
+        kind: 'pack',
+        total_credits: PACK_TOTAL_CREDITS,
+      };
+    } else {
+      // ---- PAYG (Sprint 3.5 flow, verbatim) ----
+      const result = await createPendingSessionGrant(
+        user.id,
+        parsed.data.session_id,
+      );
+      if (result.kind === 'session_not_found') {
+        throw NotFound('Session not found.');
+      }
+      if (result.kind === 'session_price_missing') {
+        throw new ApiError(
+          422,
+          'session_price_missing',
+          'This session does not have a price yet. Please check back later.',
+        );
+      }
+      if (result.kind === 'duplicate_active_grant') {
+        throw new ApiError(
+          409,
+          'session_grant_exists',
+          'You already have an active or pending grant for this session.',
+          { grant_id: result.grant.id },
+        );
+      }
+      grant = result.grant;
+
+      // Read the session for the n8n payload.
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select('id, title, slug, price_cents, currency')
+        .eq('id', parsed.data.session_id)
+        .single();
+      const sessionRow = session as unknown as {
+        id: string;
+        title: string;
+        slug: string;
+        price_cents: number;
+        currency: string;
+      } | null;
+      if (sessionError || !sessionRow) {
+        throw NotFound('Session not found.');
+      }
+
+      n8nPayload = {
+        session_grant_id: grant.id,
+        student_id: grant.student_id,
+        session: {
+          id: sessionRow.id,
+          title: sessionRow.title,
+          slug: sessionRow.slug,
+          price_cents: sessionRow.price_cents,
+          currency: sessionRow.currency,
+        },
+        amount_cents: grant.amount_cents,
+        currency: grant.currency,
+        success_url: '', // overwritten below
+        cancel_url: '',  // overwritten below
+        locale,
+        kind: 'session',
+      };
     }
 
     const env = serverEnv();
@@ -127,10 +206,13 @@ export async function POST(req: NextRequest) {
 
     // Resolve locale from the NEXT_LOCALE cookie. The site is
     // locale-prefixed; the success/cancel URLs are absolute.
-    const locale = req.cookies.get('NEXT_LOCALE')?.value === 'fr' ? 'fr' : 'en';
     const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
     const successUrl = `${origin}/${locale}/checkout/success?session_grant_id=${grant.id}`;
     const cancelUrl = `${origin}/${locale}/checkout/cancel?session_grant_id=${grant.id}`;
+
+    // Stamp the URLs into the payload now that they're known.
+    n8nPayload['success_url'] = successUrl;
+    n8nPayload['cancel_url'] = cancelUrl;
 
     // Call the n8n workflow. The workflow filename is
     // `enrollment-created.json` (kept unchanged per
@@ -138,29 +220,17 @@ export async function POST(req: NextRequest) {
     // per §6.4 of the plan. The n8n workflow is responsible
     // for creating the Stripe Checkout Session and returning
     // `{ checkout_url, stripe_session_id }`.
+    //
+    // For Slice A, the n8n workflow reads `kind: 'pack'` and
+    // uses `STRIPE_PRICE_PACK10` instead of
+    // `STRIPE_PRICE_PAYG`.
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'x-webhook-secret': env.N8N_WEBHOOK_SECRET ?? '',
       },
-      body: JSON.stringify({
-        session_grant_id: grant.id,
-        student_id: grant.student_id,
-        session: {
-          id: sessionRow.id,
-          title: sessionRow.title,
-          slug: sessionRow.slug,
-          price_cents: sessionRow.price_cents,
-          currency: sessionRow.currency,
-        },
-        amount_cents: grant.amount_cents,
-        currency: grant.currency,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        locale,
-        kind: 'session',
-      }),
+      body: JSON.stringify(n8nPayload),
     });
     if (!response.ok) {
       const text = await response.text().catch(() => '<unreadable>');
@@ -168,6 +238,7 @@ export async function POST(req: NextRequest) {
         status: response.status,
         body: text.slice(0, 500),
         session_grant_id: grant.id,
+        kind: n8nPayload['kind'],
       });
       throw new ApiError(
         502,
@@ -182,6 +253,7 @@ export async function POST(req: NextRequest) {
       logger.error('n8n enrollment-created webhook returned no checkout_url (session-grant path)', {
         payload,
         session_grant_id: grant.id,
+        kind: n8nPayload['kind'],
       });
       throw new ApiError(
         502,
@@ -197,6 +269,7 @@ export async function POST(req: NextRequest) {
           session_grant_id: grant.id,
           checkout_url: payload.checkout_url,
           stripe_session_id: payload.stripe_session_id ?? null,
+          kind: n8nPayload['kind'] === 'pack' ? 'pack' : 'session',
         },
       },
       { status: 201 },

@@ -1,0 +1,72 @@
+-- Migration: 20260911000005_grant_authenticated_insert_resources.sql
+--
+-- Context. POST /api/admin/resources from the admin's
+-- authenticated Supabase client is rejected with SQLSTATE
+-- 42501:
+--
+--   "permission denied for table resources"
+--   "Grant the required privileges to the current role
+--    with: GRANT INSERT ON public.resources TO authenticated;"
+--
+-- This is the same documented "Remaining privilege gaps"
+-- gap that 20260911000004 closed for DELETE: the
+-- `authenticated` role was intentionally not granted
+-- `INSERT` on `public.resources` in
+-- 20260829000001_rls_prerequisite_grants.sql (lines 79-92
+-- and 109) because the Sprint 8 admin write surface for the
+-- `resources` table was being rolled out incrementally. The
+-- DELETE half of that surface shipped in
+-- 20260911000004_grant_authenticated_delete_resources.sql.
+-- The INSERT half ships here.
+--
+-- Confirmed pre-migration ACL on public.resources (queried
+-- against the live local stack via information_schema):
+--
+--   grantee        | privs
+--   ---------------+----------------------------------------------
+--   anon           | REFERENCES, TRIGGER, TRUNCATE
+--   authenticated  | DELETE, REFERENCES, SELECT, TRIGGER, TRUNCATE
+--   postgres       | DELETE, INSERT, REFERENCES, SELECT,
+--                  | TRIGGER, TRUNCATE, UPDATE  (table owner)
+--   service_role   | REFERENCES, TRIGGER, TRUNCATE
+--
+-- `authenticated` was missing `INSERT` (and `UPDATE`). The
+-- admin form on /[locale]/admin/resources needs INSERT.
+--
+-- Confirmed RLS surface on public.resources (unchanged):
+--
+--   resources_select_visible       (SELECT,  no change)
+--   resources_write_admin_or_tutor (INSERT, UPDATE, DELETE:
+--                                   using (is_admin() OR
+--                                          uploaded_by = auth.uid())
+--                                   with check (same))
+--
+-- The RLS policy already permits an admin (or the resource's
+-- uploader) to INSERT. The base-table GRANT is the only
+-- missing layer — RLS only runs after the GRANT check.
+--
+-- Why this is the smallest correct fix.
+--
+--   1. We grant only `INSERT`. UPDATE is intentionally left
+--      for a follow-up migration; the user-facing form on
+--      this page does not currently exercise UPDATE, and
+--      adding it here would widen the diff without a
+--      confirmed need.
+--   2. We do NOT grant to `anon`. The POST API is gated by
+--      `requireAdminRoute()` which returns 401 for anon
+--      callers before this GRANT is consulted.
+--   3. We do NOT touch the `resources` RLS policy. It is
+--      unchanged. Adding the privilege without the policy
+--      would be a security regression; adding it without
+--      the privilege is the documented Sprint 8 gap.
+--   4. We do NOT introduce the service-role key into the
+--      API route. The POST handler still uses the
+--      RLS-respecting SSR client, so the call is scoped
+--      by the admin's JWT and the row-level policy.
+--
+-- Forward-only. Idempotent: re-applying the GRANT against
+-- a role that already holds the privilege is a no-op (the
+-- ACL entry is left untouched). No data is modified. No
+-- existing policy is dropped.
+
+grant insert on table public.resources to authenticated;

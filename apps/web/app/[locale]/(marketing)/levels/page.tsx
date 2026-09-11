@@ -1,20 +1,19 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
-import { ArrowRight } from 'lucide-react';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Container } from '@/components/shared/container';
 import { Section } from '@/components/shared/section';
 import { Heading } from '@/components/shared/heading';
-import { Button } from '@/components/ui/button';
 import { CtaBand } from '@/components/marketing/cta-band';
 import { JsonLd } from '@/components/marketing/jsonld';
-import { LevelChip } from '@/components/marketing/level-chip';
 import { SectionEyebrow } from '@/components/marketing/section-eyebrow';
+import { ProgramCard } from '@/components/marketing/program-card';
 import { BRAND } from '@/lib/constants/brand';
-import { getLearningPaths } from '@/lib/i18n/paths';
-import { getPublishedPrograms } from '@/services/curriculum/programs';
+import { localizedTitle } from '@/lib/i18n/localized-title';
+import { getPublishedPrograms, getProgramWithGrades } from '@/services/curriculum/programs';
+import { getCoursesByProgram } from '@/services/curriculum/courses';
 
 export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -27,94 +26,121 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 /**
- * Levels page. One card per learning path with the level
- * programme. All localised copy comes from the active locale's
- * `Homepage.paths` (the same array the home page uses), so the
- * home page and this page never drift.
+ * `/[locale]/levels` — the program's index. One card per
+ * published program, deep-linking into the per-program page.
+ *
+ * The page is data-driven: it iterates `getPublishedPrograms()`
+ * from the curriculum service. The deep-link page
+ * (`/[locale]/levels/[levelSlug]`) does the same, so the two
+ * cannot drift. The runtime app never hardcodes program names
+ * or slugs — every card and every href comes from the DB.
+ *
+ * For each program we resolve:
+ *  - `displayTitle`: the localized program title (EN canonical
+ *    or FR `metadata.titles.fr.title`), so `/fr` shows the
+ *    French title without any client-side switching.
+ *  - `courseCount`: number of published courses via
+ *    `getCoursesByProgram(program.id)`.
+ *  - `gradeCount`: number of grades via
+ *    `getProgramWithGrades(program.id)`. Only the high-school
+ *    program has grades today; other programs render without
+ *    the grade line.
+ *  - `href`: `/[locale]/levels/[program.slug]`. Always points
+ *    to a real route; no `/contact` fallback (the legacy
+ *    fallback is removed — see Sprint 3.7 routing RCA).
+ *  - `coursesLabel` / `gradesLabel`: pre-resolved via the
+ *    ICU plural rules in the `Levels` i18n namespace.
  */
-export default async function LevelsPage() {
-  const tLevels = await getTranslations('Levels');
-  const tHome = await getTranslations('Homepage');
-  const paths = getLearningPaths(tHome);
-
-  // The i18n cards (lycee / prepa / bts / licence) and the
-  // v2 `programs` table are NOT a 1:1 map. The DB has only
-  // the two programs we ship today (`high_school` and
-  // `preparatory`); the other two cards are forward-looking
-  // and have no catalog yet. We resolve the mapping once,
-  // server-side, so the per-card CTA either:
-  //   - jumps to the per-program page (`/levels/{slug}`) when
-  //     the program exists in the DB, OR
-  //   - falls back to `/contact` when the program does not
-  //     exist (BTS, Licence) so the user is never on a dead
-  //     button.
+export default async function LevelsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const tLevels = await getTranslations({ locale, namespace: 'Levels' });
   const programs = await getPublishedPrograms();
-  const programSlugByTrack: Record<string, string> = {
-    lycee: 'high_school',
-    prepa: 'preparatory',
-  };
-  const knownSlugs = new Set(programs.map((p) => p.slug));
+
+  // Pre-resolve per-program data on the server. The card is
+  // presentational; the page does the i18n and DB joins.
+  const cards = await Promise.all(
+    programs.map(async (p) => {
+      const [courses, withGrades] = await Promise.all([
+        getCoursesByProgram(p.id),
+        getProgramWithGrades(p.id),
+      ]);
+      const courseCount = courses.length;
+      const gradeCount = withGrades?.grades.length ?? 0;
+      return {
+        program: p,
+        courseCount,
+        gradeCount,
+        displayTitle: localizedTitle(p, locale as 'en' | 'fr'),
+        coursesLabel: tLevels('coursesCount', { n: courseCount }),
+        gradesLabel:
+          gradeCount > 0 ? tLevels('gradesCount', { n: gradeCount }) : undefined,
+        exploreLabel: tLevels('exploreCta'),
+        href: `/${locale}/levels/${p.slug}`,
+      };
+    }),
+  );
 
   return (
     <>
-      <Section spacing="default" aria-labelledby="levels-title">
-        <Container size="prose">
-          <SectionEyebrow label={tLevels('eyebrow')} />
-          <Heading id="levels-title" level="h1" className="mt-4">
-            {tLevels('h1')}
-          </Heading>
-          <p className="mt-5 text-base text-muted-foreground sm:text-lg">
-            {tLevels('intro')}
-          </p>
+      <Section spacing="tight" aria-labelledby="levels-title">
+        <Container>
+          <div className="mx-auto max-w-2xl text-center">
+            <SectionEyebrow label={tLevels('eyebrow')} />
+            <Heading id="levels-title" level="h1" className="mt-4 text-balance">
+              {tLevels('h1')}
+            </Heading>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+              {tLevels('intro')}
+            </p>
+          </div>
         </Container>
       </Section>
 
-      <Section spacing="default" tone="muted" aria-label={tLevels('sectionAria')}>
+      <Section
+        spacing="default"
+        tone="muted"
+        aria-label={tLevels('sectionAria')}
+      >
         <Container>
-          <ul role="list" className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            {paths.map((p) => (
-              <li
-                key={p.id}
-                className="flex flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm sm:p-8"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <LevelChip label={p.badge} />
-                  <span className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                    {p.headline}
-                  </span>
-                </div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  {p.level}
-                </h2>
-                <p className="text-pretty text-sm text-muted-foreground sm:text-base">
-                  {p.blurb}
-                </p>
-                <p className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
-                  {p.subjects}
-                </p>
-                <div className="mt-2">
-                  {(() => {
-                    const targetSlug = programSlugByTrack[p.id];
-                    const hasProgram = !!targetSlug && knownSlugs.has(targetSlug);
-                    const href = hasProgram
-                      ? `/levels/${targetSlug}`
-                      : '/contact';
-                    const label = hasProgram
-                      ? tLevels('browseProgram')
-                      : tLevels('requestQuote');
-                    return (
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={href}>
-                          {label}
-                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                        </Link>
-                      </Button>
-                    );
-                  })()}
-                </div>
-              </li>
-            ))}
-          </ul>
+          {cards.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{tLevels('noCoursesInProgram')}</p>
+          ) : (
+            <ul
+              role="list"
+              className="grid grid-cols-1 gap-6 sm:gap-7 md:grid-cols-2"
+            >
+              {cards.map(
+                ({
+                  program,
+                  courseCount,
+                  gradeCount,
+                  displayTitle,
+                  coursesLabel,
+                  gradesLabel,
+                  exploreLabel,
+                  href,
+                }) => (
+                  <li key={program.id} className="relative">
+                    <ProgramCard
+                      program={program}
+                      courseCount={courseCount}
+                      gradeCount={gradeCount}
+                      href={href}
+                      displayTitle={displayTitle}
+                      coursesLabel={coursesLabel}
+                      gradesLabel={gradesLabel}
+                      exploreLabel={exploreLabel}
+                    />
+                  </li>
+                ),
+              )}
+            </ul>
+          )}
         </Container>
       </Section>
 
@@ -132,12 +158,13 @@ export default async function LevelsPage() {
         data={{
           '@context': 'https://schema.org',
           '@type': 'ItemList',
-          name: `Programs offered by ${BRAND.name}`,
-          itemListElement: paths.map((p, i) => ({
+          name: tLevels('jsonLdName', { brand: BRAND.name }),
+          itemListElement: cards.map((c, i) => ({
             '@type': 'ListItem',
             position: i + 1,
-            name: p.level,
-            description: p.blurb,
+            name: c.displayTitle,
+            description: c.program.subtitle ?? c.program.description ?? '',
+            url: `/${locale}/levels/${c.program.slug}`,
           })),
         }}
       />

@@ -169,26 +169,28 @@ export const listResourcesForCurrentUser = cache(
  * Admin: list every resource, newest first. Uses the SSR client
  * with the admin role enforced by `requireAdminRoute()` in the
  * route handler.
+ *
+ * Throws on read failure so the calling page (admin/resources)
+ * can build an `AdminFetchResult` envelope through
+ * `safeAdminFetch()`. The student-side `listResourcesForCurrentUser`
+ * below keeps the original swallow-on-error behaviour because
+ * the student dashboard renders errors via the global error
+ * boundary rather than a destructive card.
  */
 export const listAllResources = cache(
   async (): Promise<ReadonlyArray<Resource>> => {
-    try {
-      const supabase = await createSupabaseServerClientUntyped();
-      const { data, error } = await supabase
-        .from('resources')
-        .select(RESOURCE_SELECT)
-        .order('created_at', { ascending: false });
-      if (error) {
-        logger.error('listAllResources failed', {
-          error: describeError(error),
-        });
-        return [];
-      }
-      return ((data ?? []) as unknown as ResourceRow[]).map(rowToResource);
-    } catch (e) {
-      logger.error('listAllResources threw', { error: describeError(e) });
-      return [];
+    const supabase = await createSupabaseServerClientUntyped();
+    const { data, error } = await supabase
+      .from('resources')
+      .select(RESOURCE_SELECT)
+      .order('created_at', { ascending: false });
+    if (error) {
+      logger.error('listAllResources failed', {
+        error: describeError(error),
+      });
+      throw error;
     }
+    return ((data ?? []) as unknown as ResourceRow[]).map(rowToResource);
   },
 );
 

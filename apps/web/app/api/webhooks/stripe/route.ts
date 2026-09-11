@@ -103,6 +103,11 @@ export async function POST(req: NextRequest) {
         // 2. Flip the session_grant to `active`. The
         //    `markSessionGrantPaid` service does this and
         //    also stamps `paid_at` and the Stripe ids.
+        //    Sprint 5 (Slice A): this same path is used for
+        //    Pack 10 pool rows (grant_type='pack') and
+        //    Monthly Support subscription rows
+        //    (grant_type='subscription', Slice C). The
+        //    service is `grant_type`-agnostic.
         await markSessionGrantPaid(
           sessionGrantId,
           session.id,

@@ -60,6 +60,7 @@ describe('POST /api/courses', () => {
   it('returns 201 for an admin with a well-formed body', async () => {
     mockRequireAdminRoute.mockResolvedValue({ supabase: { from: mockFrom } });
     let callIdx = 0;
+    let insertedPayload: unknown = null;
     mockFrom.mockImplementation(() => {
       callIdx++;
       if (callIdx === 1) {
@@ -75,7 +76,8 @@ describe('POST /api/courses', () => {
       }
       // courses insert
       return {
-        insert(_rows: unknown) {
+        insert(rows: unknown) {
+          insertedPayload = rows;
           const self: Record<string, unknown> = {};
           self.select = () => self;
           self.single = () =>
@@ -91,6 +93,19 @@ describe('POST /api/courses', () => {
     const body = (await res.json()) as { ok: boolean; data: { slug: string } };
     expect(body.ok).toBe(true);
     expect(body.data.slug).toBe('ok-slug');
+
+    // The v1 `courses` table has NOT NULL columns without DB
+    // defaults for `level` and `price_cents`. The current
+    // admin form does not surface those fields, so the API
+    // must default them so the manual create path works.
+    const row = insertedPayload as {
+      level: string;
+      price_cents: number;
+      subject: string;
+    };
+    expect(row.level).toBe('Lycée');
+    expect(row.price_cents).toBe(0);
+    expect(row.subject).toBe('X');
   });
 
   it('returns 409 on duplicate slug', async () => {
