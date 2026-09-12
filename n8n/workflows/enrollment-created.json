@@ -58,14 +58,14 @@
             {"name": "amount",     "value": "={{ $json.body.amount_cents }}"},
             {"name": "success_url","value": "={{ $json.body.success_url }}"},
             {"name": "cancel_url", "value": "={{ $json.body.cancel_url }}"},
-            {"name": "client_reference_id", "value": "={{ $json.body.enrollment_id }}"},
-            {"name": "metadata[enrollment_id]", "value": "={{ $json.body.enrollment_id }}"},
-            {"name": "metadata[student_id]",    "value": "={{ $json.body.student_id }}"},
-            {"name": "metadata[course_slug]",   "value": "={{ $json.body.course.slug }}"},
+            {"name": "client_reference_id",         "value": "={{ $json.body.session_grant_id }}"},
+            {"name": "metadata[session_grant_id]",  "value": "={{ $json.body.session_grant_id }}"},
+            {"name": "metadata[student_id]",        "value": "={{ $json.body.student_id }}"},
+            {"name": "metadata[session_id]",        "value": "={{ $json.body.session_id }}"},
             {"name": "line_items[0][quantity]", "value": "1"},
-            {"name": "line_items[0][price_data][currency]",       "value": "={{ $json.body.currency.toLowerCase() }}"},
-            {"name": "line_items[0][price_data][unit_amount]",    "value": "={{ $json.body.amount_cents }}"},
-            {"name": "line_items[0][price_data][product_data][name]","value": "={{ $json.body.course.title }}"}
+            {"name": "line_items[0][price_data][currency]",    "value": "={{ $json.body.currency.toLowerCase() }}"},
+            {"name": "line_items[0][price_data][unit_amount]", "value": "={{ $json.body.amount_cents }}"},
+            {"name": "line_items[0][price_data][product_data][name]", "value": "={{ $json.body.product_name }}"}
           ]
         },
         "options": {
@@ -92,12 +92,12 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",               "value": "enrollment_checkout_created"},
-            {"name": "session_grant_id",   "value": "={{ $json.body.enrollment_id }}"},
-            {"name": "stripe_session_id",  "value": "={{ $node['Create Stripe Checkout Session'].json.id }}"},
-            {"name": "checkout_url",       "value": "={{ $node['Create Stripe Checkout Session'].json.url }}"},
-            {"name": "amount_cents",       "value": "={{ $node['Create Stripe Checkout Session'].json.amount_total }}"},
-            {"name": "currency",           "value": "={{ $node['Create Stripe Checkout Session'].json.currency }}"}
+            {"name": "type",                "value": "session_grant_checkout_created"},
+            {"name": "session_grant_id",    "value": "={{ $json.body.session_grant_id }}"},
+            {"name": "stripe_session_id",   "value": "={{ $node['Create Stripe Checkout Session'].json.id }}"},
+            {"name": "checkout_url",        "value": "={{ $node['Create Stripe Checkout Session'].json.url }}"},
+            {"name": "amount_cents",        "value": "={{ $node['Create Stripe Checkout Session'].json.amount_total }}"},
+            {"name": "currency",            "value": "={{ $node['Create Stripe Checkout Session'].json.currency }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
@@ -105,7 +105,36 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [900, 300],
-      "name": "Notify Next.js: checkout created"
+      "name": "Notify Next.js: checkout created (session_grant_checkout_created)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/n8n/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",      "value": "email"},
+            {"name": "template",  "value": "session_grant_checkout_created"},
+            {"name": "to",        "value": "={{ $json.body.student_email }}"},
+            {"name": "locale",    "value": "={{ $json.body.locale ?? 'fr' }}"},
+            {"name": "props[workflow]",      "value": "enrollment-created"},
+            {"name": "props[studentName]",   "value": "={{ $json.body.student_name }}"},
+            {"name": "props[productName]",   "value": "={{ $json.body.product_name }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300],
+      "name": "Send checkout-started email (Next.js renderer)"
     },
     {
       "parameters": {
@@ -114,7 +143,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1120, 300],
+      "position": [1340, 300],
       "name": "Respond to Next.js"
     },
     {
@@ -131,9 +160,9 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",         "value": "workflow_failed"},
-            {"name": "workflow",     "value": "enrollment-created"},
-            {"name": "error",        "value": "={{ $json.error.message }}"},
+            {"name": "type",          "value": "workflow_failed"},
+            {"name": "workflow",      "value": "enrollment-created"},
+            {"name": "error",         "value": "={{ $json.error.message }}"},
             {"name": "original_event","value": "={{ $('Webhook: enrollment-created').first().json }}"}
           ]
         }
@@ -151,16 +180,22 @@
     "Verify webhook secret": {
       "main": [
         [{"node": "Create Stripe Checkout Session", "type": "main", "index": 0}],
-        [{"node": "Dead-letter on Stripe error",   "type": "main", "index": 0}]
+        [{"node": "Dead-letter on Stripe error",    "type": "main", "index": 0}]
       ]
     },
     "Create Stripe Checkout Session": {
       "main": [
-        [{"node": "Notify Next.js: checkout created", "type": "main", "index": 0}],
-        [{"node": "Dead-letter on Stripe error",       "type": "main", "index": 0}]
+        [{"node": "Notify Next.js: checkout created (session_grant_checkout_created)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Stripe error",                                        "type": "main", "index": 0}]
       ]
     },
-    "Notify Next.js: checkout created": {
+    "Notify Next.js: checkout created (session_grant_checkout_created)": {
+      "main": [
+        [{"node": "Send checkout-started email (Next.js renderer)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Stripe error",                    "type": "main", "index": 0}]
+      ]
+    },
+    "Send checkout-started email (Next.js renderer)": {
       "main": [[{"node": "Respond to Next.js", "type": "main", "index": 0}]]
     }
   },
@@ -170,8 +205,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "Next.js POST /api/enrollments/checkout → Stripe Checkout Session creation → Next.js is notified. Documented in n8n/docs/WORKFLOWS.md §2.1."
+    "description": "Sprint 10 — I-1: Next.js checkout route calls this webhook with session_grant_id. The workflow creates the Stripe Checkout Session (metadata session_grant_id, session_id, student_id), POSTs session_grant_checkout_created to the n8n webhook (so the session_grants.stripe_session_id is persisted), POSTs the checkout-started email to /api/n8n/notify, and returns the checkout URL to Next.js. Documented in n8n/docs/WORKFLOWS.md §2.1."
   }
 }

@@ -50,16 +50,16 @@
         "bodyParameters": {
           "parameters": [
             {"name": "type", "value": "email"},
-            {"name": "template", "value": "module_booking_confirmed"},
+            {"name": "template", "value": "session_booking_confirmed"},
             {"name": "to", "value": "={{ $json.body.to }}"},
             {"name": "locale", "value": "={{ $json.body.locale }}"},
+            {"name": "workflow", "value": "module-confirmation-email"},
             {"name": "props[studentName]",      "value": "={{ $json.body.student_name }}"},
-            {"name": "props[moduleTitle]",      "value": "={{ $json.body.module_title }}"},
-            {"name": "props[courseTitle]",      "value": "={{ $json.body.course_title }}"},
+            {"name": "props[sessionTitle]",    "value": "={{ $json.body.session_title ?? $json.body.module_title }}"},
+            {"name": "props[courseTitle]",     "value": "={{ $json.body.course_title }}"},
             {"name": "props[scheduledStartIso]","value": "={{ $json.body.scheduled_start }}"},
-            {"name": "props[durationMin]",      "value": "={{ $json.body.duration_min }}"},
-            {"name": "props[joinUrl]",          "value": "={{ $json.body.join_url }}"},
-            {"name": "props[dashboardUrl]",     "value": "={{ $json.body.dashboard_url }}"}
+            {"name": "props[joinUrl]",         "value": "={{ $json.body.join_url }}"},
+            {"name": "props[dashboardUrl]",    "value": "={{ $json.body.dashboard_url }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
@@ -67,7 +67,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300],
-      "name": "Ask Next.js to send the email"
+      "name": "Ask Next.js to send the email (session_booking_confirmed)"
     },
     {
       "parameters": {
@@ -95,8 +95,8 @@
           "parameters": [
             {"name": "type", "value": "email"},
             {"name": "template", "value": "admin_dead_letter"},
-            {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
             {"name": "locale", "value": "en"},
+            {"name": "workflow",     "value": "module-confirmation-email"},
             {"name": "props[workflow]",      "value": "module-confirmation-email"},
             {"name": "props[errorMessage]",  "value": "={{ $json.error.message }}"},
             {"name": "props[originalEvent]", "value": "={{ $('Webhook: confirmation email').first().json }}"}
@@ -106,7 +106,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 520],
-      "name": "Dead-letter: notify admin"
+      "name": "Dead-letter: notify admin (admin_dead_letter — recipient is hard-coded server-side)"
     }
   ],
   "connections": {
@@ -115,14 +115,14 @@
     },
     "Verify webhook secret": {
       "main": [
-        [{"node": "Ask Next.js to send the email", "type": "main", "index": 0}],
-        [{"node": "Dead-letter: notify admin",     "type": "main", "index": 0}]
+        [{"node": "Ask Next.js to send the email (session_booking_confirmed)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin (admin_dead_letter — recipient is hard-coded server-side)", "type": "main", "index": 0}]
       ]
     },
-    "Ask Next.js to send the email": {
+    "Ask Next.js to send the email (session_booking_confirmed)": {
       "main": [
-        [{"node": "Respond OK",            "type": "main", "index": 0}],
-        [{"node": "Dead-letter: notify admin", "type": "main", "index": 0}]
+        [{"node": "Respond OK", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin (admin_dead_letter — recipient is hard-coded server-side)", "type": "main", "index": 0}]
       ]
     }
   },
@@ -132,8 +132,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "Triggered after a Zoom meeting is created and persisted. Asks Next.js to render the module_booking_confirmed template and send via Resend. Documented in n8n/docs/WORKFLOWS.md §2.6."
+    "description": "Sprint 10 — I-1: Confirmation-only email render workflow. Triggered by other v2 workflows (e.g. module-booking-to-zoom) once the Zoom meeting + meeting_link are persisted. Asks Next.js to render the v2 session_booking_confirmed template and send via Resend. The dead-letter branch uses the admin_dead_letter template — the recipient is hard-coded server-side in /api/n8n/notify (ADMIN_NOTIFY_EMAIL constant), so the workflow no longer reads an env var. Documented in n8n/docs/WORKFLOWS.md §2.6."
   }
 }

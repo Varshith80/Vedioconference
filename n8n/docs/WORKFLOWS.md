@@ -1,15 +1,43 @@
 # n8n Workflow Plan
 
-> ⚠️ **Phase 1 + Sprint B2 + Sprint 3.5 deliverable** —
-> these workflows are **designed and documented but NOT yet
-> fully implemented**. The Phase 1 inventory has been
-> **replaced by the Sprint B2 module-based inventory**
-> below, which has itself been **extended in Sprint 3.5**
-> to use the v2 session-based hierarchy (per the
-> user-approved Sprint 3.5 plan, with field renames only
-> — no filename changes). Implementation begins in Phase 3
-> once the Supabase schema is fully live and the Stripe /
-> Calendly / Zoom credentials are provisioned.
+> ⚠️ **Phase 1 + Sprint B2 + Sprint 3.5 + Sprint 10 deliverable** —
+> the workflow JSONs in `n8n/workflows/` are now **authored against
+> the v2 schema** (Sprint 10 I-1). The Sprint B2 module-based
+> inventory below was extended in Sprint 3.5 to use the v2
+> session-based hierarchy, and the I-1 sprint rewrote the eight
+> v1-shaped JSONs to emit v2 event types and call the v2 Next.js
+> routes. The deprecated `module-reminder-scheduler.json` is
+> removed; `session-reminder-scheduler.json` (workflow 10) is the
+> only v2 live workflow and was not touched by Sprint 10.
+>
+> **Sprint 10 I-1 changes (summary, see §2 for per-workflow detail):**
+> - All eight v1-shaped JSONs (`enrollment-created`,
+>   `module-booking-to-zoom`, `module-completed`,
+>   `module-confirmation-email`, `module-reschedule`,
+>   `module-cancellation`, `admin-notification`, `tutor-notification`)
+>   rewritten to use the v2 field names (`session_grant_id`,
+>   `session_booking_id`, `session_id`) and to emit the v2 event
+>   types the Next.js handler now routes on
+>   (`session_grant_checkout_created`, `session_booking_cancelled`,
+>   `session_booking_rescheduled`, `session_completed`).
+> - The v1 event types `module_completed`, `module_cancelled`,
+>   `module_rescheduled`, `enrollment_checkout_created` are no
+>   longer emitted by any workflow.
+> - Two new Next.js routes back the v2 workflows:
+>   `POST /api/n8n/notify` (the email renderer; n8n is the
+>   orchestrator, Next.js owns the template + Resend call) and
+>   `POST /api/enrollments/by-calendly-invitee` (the booking-
+>   context resolver; the only safe way for n8n to learn the
+>   `session_booking_id` for a Calendly invitee without holding
+>   a Supabase service-role key).
+> - The admin recipient is **hard-coded** server-side in
+>   `lib/constants/ADMIN_NOTIFY_EMAIL`. The workflows therefore
+>   no longer read a `$env.ADMIN_NOTIFY_EMAIL` (that env var was
+>   the v1 leak path).
+> - The deprecated `module-reminder-scheduler.json` is removed
+>   (the v1 cron scanned `module_bookings`, which no longer
+>   exists; the v2 live workflow is `session-reminder-scheduler.json`,
+>   webhook-driven by `POST /api/cron/send-reminders`).
 
 This document describes every workflow that lives in n8n. n8n
 is the **automation layer** that wires together the third-party
@@ -62,20 +90,30 @@ resulting state back to Supabase.
 
 ---
 
-## 1. Workflow inventory (Sprint B2)
+## 1. Workflow inventory (Sprint B2 + Sprint 10 I-1)
 
 | # | Workflow                          | Trigger                              | Outputs (writes to)               |
 |---|-----------------------------------|--------------------------------------|-----------------------------------|
-| 1 | enrollment-created                | Stripe `checkout.session.completed`  | supabase `enrollments` (active), `module_progress` (not_started) |
-| 2 | module-booking-to-zoom            | Calendly `invitee.created`           | supabase `module_bookings`, `meeting_links` |
-| 3 | module-completed                  | Zoom `meeting.ended`                 | supabase `module_bookings` (completed), `module_progress` (completed), `enrollments` (completed if all modules done) |
-| 4 | module-confirmation-email         | n8n internal (chain from 2)          | resend, supabase `notifications`  |
-| 5 | module-reminder-scheduler         | n8n Cron (every 15 min) [v1 only — see §2.10] | resend, supabase `notifications` (v1, broken post-Sprint 3.5) |
-| 10 | session-reminder-scheduler       | Webhook from Next.js cron (`POST /api/cron/send-reminders`) [Sprint 5 Slice E] | resend, supabase `notifications` |
-| 6 | module-reschedule                 | Calendly `invitee.updated`           | supabase `module_bookings`, void old Zoom, create new |
-| 7 | module-cancellation               | Calendly `invitee.canceled` / `POST /api/module-bookings/[id]/cancel` | supabase `module_bookings` (cancelled), void Zoom |
-| 8 | admin-notification                | n8n internal (1, 2, 3, 5, 6, 7)      | resend to admin                   |
-| 9 | tutor-notification                | n8n internal (2)                     | resend to tutor (host `start_url`) |
+| 1 | enrollment-created                | Next.js checkout route (Sprint 10 — n8n receives the v2 `session_grant_id`) | Stripe Checkout Session, `POST /api/webhooks/n8n` `session_grant_checkout_created` (→ `session_grants.stripe_session_id`), `POST /api/n8n/notify` `session_grant_checkout_created` email |
+| 2 | module-booking-to-zoom            | Calendly `invitee.created`           | supabase `meeting_links` (`meeting_created` callback), `POST /api/n8n/notify` confirmation + tutor emails |
+| 3 | module-completed                  | n8n Cron / external trigger (Sprint 10 — I-1 emits `session_completed`) | `POST /api/webhooks/n8n` `session_completed` (→ `session_bookings.status='completed'`), `POST /api/n8n/notify` `session_completed` email |
+| 4 | module-confirmation-email         | n8n internal (chain from 2)          | `POST /api/n8n/notify` `session_booking_confirmed` template |
+| 10 | session-reminder-scheduler       | Webhook from Next.js cron (`POST /api/cron/send-reminders`) [Sprint 5 Slice E — UNTOUCHED by Sprint 10] | resend, supabase `notifications` |
+| 6 | module-reschedule                 | Calendly `invitee.updated`           | PATCH Zoom meeting, `POST /api/webhooks/n8n` `session_booking_rescheduled`, `POST /api/n8n/notify` `session_booking_rescheduled` |
+| 7 | module-cancellation               | Calendly `invitee.canceled` / Next.js cancel route | DELETE Zoom meeting, `POST /api/webhooks/n8n` `session_booking_cancelled`, `POST /api/n8n/notify` `session_booking_cancelled` |
+| 8 | admin-notification                | n8n internal (1, 2, 3, 6, 7)         | `POST /api/n8n/notify` `admin_*` template (recipient is hard-coded server-side — no `to` body field) |
+| 9 | tutor-notification                | n8n internal (2)                     | `POST /api/n8n/notify` `email_tutor` (subject + body built in n8n) |
+
+> **Sprint 10 — I-1:** workflow 5 (`module-reminder-scheduler.json`)
+> is REMOVED. The v1 cron scanned `module_bookings`, which no
+> longer exists; the v2 live workflow is workflow 10
+> (`session-reminder-scheduler.json`), webhook-driven by
+> `POST /api/cron/send-reminders` and out of scope for I-1.
+> The `enrollments` / `module_bookings` / `module_progress` table
+> references in the "Outputs" column are the v1 inventory rows
+> preserved here for historical reference; the v2 schemas are
+> `session_grants` / `session_bookings` / (none — the
+> `module_progress` table is gone in v2).
 
 ### 1.1 What replaced what (Sprint B2)
 
@@ -96,126 +134,170 @@ resulting state back to Supabase.
 
 ## 2. Workflow details
 
-### 2.1 enrollment-created  (`enrollment-created.json`)
+### 2.1 enrollment-created  (`enrollment-created.json`) — Sprint 10 I-1
 
-**Trigger:** Stripe Webhook — `checkout.session.completed`
+**Trigger:** Next.js checkout route — `POST` to this workflow's
+webhook with the v2 payload:
+- `session_grant_id` (UUID, the new `session_grants.id`)
+- `student_id` (UUID)
+- `session_id` (UUID, the new `session_id` of the v2
+  session-based hierarchy)
+- `amount_cents` (integer)
+- `currency` (3-letter ISO, e.g. `EUR`)
+- `product_name` (display string)
+- `student_email`, `student_name`, `locale` (optional, for the
+  confirmation email)
 
-**Inputs (from Stripe):**
-- `session.metadata.enrollment_id` : the new enrollment's id
-- `session.payment_intent`         : the Stripe payment intent
-- `session.amount_total`           : paid amount in cents
-- `session.customer_email`         : student's email (sanity check)
+> The Sprint 10 I-1 trigger is **Next.js → n8n**, not
+> Stripe → n8n directly. Next.js owns the v2 enrollment
+> creation (the v2 route inserts the `session_grants` row in
+> `pending_payment` state and then asks n8n to mint the
+> Stripe Checkout Session). The Stripe `checkout.session.completed`
+> callback lands on `POST /api/webhooks/stripe` and flips the
+> grant to `paid` via the v2 `markSessionGrantPaid` service
+> (out of scope for n8n).
 
-**Steps:**
-1. **Verify signature** with `STRIPE_WEBHOOK_SECRET`.
-2. **Lookup enrollment** by `session.metadata.enrollment_id`.
-3. **Update enrollment** (`status='active'`, store
-   `stripe_payment_intent_id`, `amount_cents`, `paid_at=now()`).
-4. **Create `module_progress` rows** for every published module
-   in the course, in `not_started` state (no-op if they already
-   exist).
-5. **Trigger admin notification** (workflow 8).
-6. **Trigger confirmation email** (the "you are enrolled" email;
-   distinct from the per-module confirmation email of 2.4).
-7. *(optional, Phase 3+)* **Trigger resource grant** for the
-   course's `enrolled`-visibility resources.
+**Steps (Sprint 10 I-1 v2):**
+1. **Verify webhook secret** (`x-webhook-secret` =
+   `$N8N_WEBHOOK_SECRET`).
+2. **Create Stripe Checkout Session** at
+   `POST https://api.stripe.com/v1/checkout/sessions` with
+   `mode=payment`, `client_reference_id=session_grant_id`, and
+   `metadata={ session_grant_id, student_id, session_id }`.
+3. **Notify Next.js** of the created checkout via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/webhooks/n8n` with body
+   `{ type: 'session_grant_checkout_created', session_grant_id,
+   stripe_session_id, checkout_url, amount_cents, currency }`.
+   Next.js persists `session_grants.stripe_session_id`.
+4. **Send confirmation email** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/n8n/notify` with
+   `{ type: 'email', template: 'session_grant_checkout_created',
+   to: <student_email>, props: { studentName, productName } }`.
+5. **Respond OK** to the Next.js checkout route with
+   `{ checkout_url, stripe_session_id }`.
 
 **Failure modes:**
-- Enrollment not found → admin notification + dead-letter row.
-- Module insert fails → admin notification + dead-letter row;
-  the enrollment is still `active` (the student is paid; an
-  admin can backfill `module_progress`).
+- Stripe Checkout creation fails → `workflow_failed` callback
+  to `/api/webhooks/n8n` (writes `n8n_dead_letters`).
+- Next.js notify or email step fails → same dead-letter path.
 
-**Idempotency:** the `enrollment_id` lookup is by primary key.
-A replayed Stripe event re-enters the same row; the module
-insert is `ON CONFLICT (enrollment_id, module_id) DO NOTHING`.
+**Idempotency:** the `client_reference_id` is the
+`session_grant_id`; Stripe re-uses the same session id on a
+retry of the same payment. The Next.js `session_grant_checkout_created`
+handler does an `update` on `session_grants` keyed by
+`session_grant_id` (replay-safe).
 
 ---
 
-### 2.2 module-booking-to-zoom  (`module-booking-to-zoom.json`)
+### 2.2 module-booking-to-zoom  (`module-booking-to-zoom.json`) — Sprint 10 I-1
 
-**Trigger:** Calendly Webhook — `invitee.created`
+**Trigger:** Calendly Webhook — `invitee.created` (forwarded
+to n8n by `POST /api/webhooks/calendly`).
 
 **Inputs (from Calendly):**
-- `payload.uri`              : `calendly_event_uri` (matches a module's `calendly_event_uri`)
-- `payload.invitee.uri`      : `calendly_invitee_uri` (UNIQUE on `module_bookings`)
-- `payload.invitee.name`, `payload.invitee.email`
-- `payload.scheduled_event.start_time`, `payload.scheduled_event.end_time`
-- `payload.tracking.utm_*`
+- `payload.uri`     : `calendly_invitee_uri` (UNIQUE on
+  `session_bookings`)
+- `payload.event`   : `calendly_event_uri` (matched for
+  defence-in-depth in the resolver; see step 2)
 
-**Steps:**
-1. **Validate** payload (Zod equivalent / `if` node).
-2. **Lookup module** in Supabase by `calendly_event_uri`.
-3. **Lookup enrollment** in Supabase by `invitee.email` + module
-   → course. The enrollment must be `active`.
-4. **Create / update `module_bookings` row** in
-   `status='scheduled'` with `scheduled_start`, `scheduled_end`
-   from the payload. The UNIQUE constraint on
-   `calendly_invitee_uri` ensures replays are no-ops.
-5. **Create Zoom meeting** via Zoom Server-to-Server OAuth
-   (`POST /users/{user_id}/meetings`) with
-   `topic = course title · module title`,
-   `start_time = module_bookings.scheduled_start`,
-   `duration = module.duration_min`.
-6. **Insert `meeting_links` row** in Supabase, keyed on
-   `module_booking_id` (UNIQUE).
-7. **Update `module_bookings`** to `status='confirmed'`.
-8. **Trigger module-confirmation-email** (workflow 4) with
-   the join URL.
-9. **Trigger tutor-notification** (workflow 9) with the host
-   `start_url`.
+**Steps (Sprint 10 I-1 v2):**
+1. **Verify webhook secret** + `event === 'invitee.created'`.
+2. **Resolve booking context** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/enrollments/by-calendly-invitee`
+   with body `{ calendly_invitee_uri, calendly_event_uri }`.
+   Next.js returns the full `BookingContext`:
+   `session_booking_id`, `session_id`, `session_grant_id`,
+   `student_id`, `tutor_id`, `session_title`, `course_title`,
+   `student_name`, `tutor_name`, `scheduled_start`,
+   `scheduled_end`, `timezone`, `duration_min`, `join_url`.
+   The route is `x-webhook-secret`-authenticated and uses the
+   service-role admin client (n8n is a trusted system, not a
+   student). The response does NOT include the student's email
+   — n8n resolves that elsewhere (e.g. from the
+   `session_grant_checkout_created` payload, or from a future
+   resolver extension).
+3. **Mint Zoom S2S access token** via
+   `GET https://zoom.us/oauth/token?grant_type=account_credentials`.
+4. **Create Zoom meeting** at
+   `POST https://api.zoom.us/v2/users/{ZOOM_DEFAULT_HOST_USER_ID}/meetings`
+   with `topic`, `start_time`, `duration`, `timezone` from
+   the resolver response, and `settings.join_before_host=false,
+   waiting_room=true, mute_upon_entry=true, audio=voip`.
+5. **Persist `meeting_link`** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/webhooks/n8n` with body
+   `{ type: 'meeting_created', session_booking_id, meeting_id,
+   join_url, start_url, passcode }`. Next.js upserts the
+   `meeting_links` row (UNIQUE on `session_booking_id`) and
+   flips `session_bookings.status='confirmed'`.
+6. **Send student confirmation email** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/n8n/notify` with
+   `{ type: 'email', template: 'session_booking_confirmed',
+   to: <student_email>, props: { studentName, sessionTitle,
+   scheduledStartIso, joinUrl, dashboardUrl } }`.
+7. **Send tutor notification** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/n8n/notify` with
+   `{ type: 'email_tutor', to: <tutor_email>, subject, body,
+   session_booking_id }`.
+8. **Respond OK** to the Calendly forwarder.
 
 **Failure modes:**
-- Module not found → admin notification + dead-letter row.
-- Enrollment not `active` (or not found) → admin notification +
-  dead-letter row. The Calendly invitee is emailed a polite
-  "we could not process your booking" message.
-- Zoom create fails → n8n retries with backoff (3 attempts);
-  on permanent failure → `n8n_dead_letters` row + admin email;
-  `module_bookings` stays `scheduled` (UI shows "meeting is
-  being prepared").
+- Resolver 404 (no `session_bookings` row for the invitee) →
+  the workflow short-circuits and responds OK; the Calendly
+  invitee was not yet bound to a v2 booking. The next Calendly
+  webhook will retry; the user-facing booking-create flow
+  (`POST /api/session-bookings`) must run first.
+- Resolver 409 (event URI mismatch) → admin notification +
+  dead-letter row.
+- Zoom create fails → dead-letter path; the
+  `session_bookings` row stays in its pre-confirmation state.
+- `meeting_created` callback fails → `meeting_links` is
+  not backfilled; the workflow retries 3×; permanent failure
+  → dead-letter.
+
+**Idempotency:** the `meeting_links.session_booking_id`
+UNIQUE index dedupes the Zoom create step on replay. The
+`webhook_events.event_id` UNIQUE index dedupes the
+`meeting_created` callback.
 
 ---
 
-### 2.3 module-completed  (`module-completed.json`)
+### 2.3 module-completed  (`module-completed.json`) — Sprint 10 I-1
 
-**Trigger:** Zoom Webhook — `meeting.ended`
+**Trigger:** n8n Cron / external trigger. The v1 trigger
+(Zoom `meeting.ended` webhook) is REMOVED in v2; Zoom
+recording.completed write-back is a separate Sprint 11 R-3
+item, not I-1.
 
-**Inputs (from Zoom):**
-- `payload.object.id`         : the Zoom `meeting_id`
-- `payload.object.start_time` : sanity check
-- `payload.object.end_time`   : sanity check (used to compute
-   the actual duration; the booking's `scheduled_start` /
-   `scheduled_end` are the contract)
+**Inputs:**
+- `session_booking_id` (UUID)
+- `session_id` (UUID)
+- `session_grant_id` (UUID)
+- `student_email`, `student_name`, `session_title`, `locale`
+  (for the email)
+- `completed_at` (optional ISO timestamp; defaults to `now()`)
 
-**Steps:**
-1. **Lookup `meeting_links`** by `meeting_id` (UNIQUE).
-2. **Lookup `module_bookings`** by `module_booking_id`.
-3. **Update `module_bookings`** to `status='completed'`.
-4. **Update `module_progress`** for the matching
-   `(enrollment_id, module_id)` to `status='completed'`,
-   `completed_at=now()`.
-5. **Check enrollment completion**: if every other
-   `module_progress` row for the same `enrollment_id` is
-   `completed`, set `enrollments.status='completed'`,
-   `completed_at=now()`. (The DB trigger
-   `enrollments_completion_trigger` enforces this atomically;
-   n8n's check is a defensive double-check.)
-6. **Trigger admin notification** (workflow 8) — the admin
-   dashboard can show "Module X of course Y completed by
-   student Z" in its activity feed.
+**Steps (Sprint 10 I-1 v2):**
+1. **Verify webhook secret.**
+2. **Notify Next.js** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/webhooks/n8n` with body
+   `{ type: 'session_completed', session_booking_id,
+   session_id, session_grant_id, completed_at }`. Next.js
+   flips `session_bookings.status='completed'` (guarded by
+   `status IN ('scheduled', 'confirmed')`, so a replay is a
+   no-op).
+3. **Send session-completed email** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/n8n/notify` with
+   `{ type: 'email', template: 'session_completed',
+   to: <student_email>, props: { studentName, sessionTitle,
+   dashboardUrl } }`.
 
 **Failure modes:**
-- Meeting link not found → admin notification + dead-letter
-  row.
-- Zoom webhook missed → a tutor / admin can mark the session
-  `completed` from the tutor dashboard (Phase 4), which
-  directly calls the same SQL update as step 3–4.
+- Notify or email step fails → dead-letter path; the booking
+  is still `completed` in the DB (the notify is observational).
 
-**Idempotency:** the `module_bookings` update is from
-`status IN ('scheduled', 'confirmed')` to `'completed'`; a
-replay of the same `meeting.ended` is a no-op because
-`status` is already `'completed'`.
+**Idempotency:** the v2 handler update is guarded by
+`status IN ('scheduled', 'confirmed')`. A replay hits the
+same row in `completed` state and the update is a no-op.
 
 ---
 
@@ -242,25 +324,16 @@ are guarded by `notifications` UNIQUE on
 
 ---
 
-### 2.5 module-reminder-scheduler  (`module-reminder-scheduler.json`)
+### 2.5 module-reminder-scheduler  — REMOVED in Sprint 10 I-1
 
-**Trigger:** n8n Cron — every 15 minutes.
-
-**Steps:**
-1. Query Supabase for `module_bookings` where:
-   - `status = 'confirmed'`
-   - `scheduled_start BETWEEN now()+24h AND now()+24h+15m`  (T-24h)
-   - **OR** `scheduled_start BETWEEN now()+1h AND now()+1h+15m`  (T-1h)
-   - **AND** no `notifications` row with
-     `type='reminder_24h'` / `reminder_1h` exists for the
-     `module_booking_id`.
-2. For each module booking, send a Resend email with the join
-   link.
-3. Insert a `notifications` row to mark the reminder as sent.
-
-**Idempotency:** the `NOT EXISTS` clause prevents
-double-sending. A replay of the same query 15 min later
-returns nothing.
+The v1 `module-reminder-scheduler.json` cron workflow is
+**deleted** in Sprint 10 I-1. It scanned `module_bookings`,
+which no longer exists in the v2 schema; its v1 emit types
+(`module_booking_confirmed`, `reminder_24h`, `reminder_1h`)
+are also gone. The v2 replacement is the **webhook-driven**
+`session-reminder-scheduler.json` (workflow 10, §2.10) —
+the Next.js cron `POST /api/cron/send-reminders` is the
+authoritative scheduler; n8n is the renderer.
 
 ---
 
@@ -318,13 +391,23 @@ replay is a no-op.
 
 ---
 
-### 2.8 admin-notification  (`admin-notification.json`)
+### 2.8 admin-notification  (`admin-notification.json`) — Sprint 10 I-1
 
-**Trigger:** Internal — called from 2.1, 2.2, 2.3, 2.5, 2.6, 2.7.
+**Trigger:** Internal — called from 2.1, 2.2, 2.3, 2.6, 2.7.
 
-**Steps:**
-1. Compose digest or per-event email.
-2. Send via Resend to `ADMIN_EMAIL` (env var on n8n).
+**Steps (Sprint 10 I-1 v2):**
+1. **Verify webhook secret.**
+2. **Send admin notification** via
+   `POST ${NEXT_PUBLIC_SITE_URL}/api/n8n/notify` with body
+   `{ type: 'email', template: 'admin_dead_letter' (or
+   'admin_booking_confirmed' / 'admin_booking_cancelled' /
+   'admin_booking_rescheduled'), locale: 'en', workflow: <name>,
+   props: { workflow, errorMessage, originalEvent } }`.
+   The workflow does NOT supply a `to` field — the recipient
+   is **hard-coded server-side** in
+   `apps/web/lib/constants/index.ts` (`ADMIN_NOTIFY_EMAIL`).
+   This eliminates the v1 attack class where a forged `to`
+   address on the body could leak a digest to an attacker.
 
 ---
 
@@ -437,6 +520,104 @@ longer exists post-Sprint-3.5 (the v2 table is
 `session_bookings`). The v1 workflow's `module_booking_id` and
 `/api/n8n/notify` paths are broken; this v2 workflow replaces
 them.
+
+---
+
+### 2.11 POST /api/enrollments/by-calendly-invitee (Next.js → resolver) — Sprint 10 I-1
+
+**Trigger:** n8n workflow 2 (`module-booking-to-zoom`) POSTs
+the Calendly `invitee.created` payload to this Next.js route
+to resolve the v2 `session_booking_id` for the invitee.
+
+**Auth:** `x-webhook-secret` must equal `N8N_WEBHOOK_SECRET`.
+The route is admin-client-backed (n8n is a trusted system, not
+a student).
+
+**Inputs:**
+- `calendly_invitee_uri` (URL, required)
+- `calendly_event_uri` (URL, optional — defence-in-depth
+  against a workflow bug that resolves to the wrong event)
+
+**Output (200):** the full `BookingContext`:
+`{ ok: true, data: { session_booking_id, session_id,
+session_grant_id, student_id, tutor_id, session_title,
+course_title, student_name, tutor_name, scheduled_start,
+scheduled_end, timezone, duration_min, join_url } }`.
+
+**Privacy:** the response does NOT include the student's
+email. n8n does not need it to create a Zoom meeting, and
+emitting it would create a needless PII surface.
+
+**Failure modes:**
+- 401 — `x-webhook-secret` mismatch.
+- 400 — body validation (Zod).
+- 404 — no `session_bookings` row matches the
+  `calendly_invitee_uri`. This is the normal case for a
+  brand-new invitee (the Calendly embed has not been wired
+  to `POST /api/session-bookings` yet). The workflow
+  short-circuits.
+- 409 — `calendly_event_uri` supplied but does not match the
+  row's `calendly_event_uri`. The workflow dead-letters.
+
+**Idempotency:** the lookup is keyed on the UNIQUE
+`session_bookings.calendly_invitee_uri`. A replay returns
+the same row.
+
+---
+
+### 2.12 POST /api/n8n/notify (Next.js → email renderer) — Sprint 10 I-1
+
+**Trigger:** any v2 n8n workflow that wants to send a
+booking-path email (workflows 1, 2, 3, 4, 6, 7, 8, 9).
+
+**Auth:** `x-webhook-secret` must equal `N8N_WEBHOOK_SECRET`.
+
+**Discriminated-union body:**
+- `{ type: 'email', template: <TEMPLATE>, to?: <email>,
+  locale: 'en' | 'fr', workflow?: <name>, props: { ... } }`
+  where `TEMPLATE` is one of the v2 templates
+  (`session_booking_confirmed`, `session_booking_cancelled`,
+  `session_booking_rescheduled`, `session_completed`,
+  `session_grant_checkout_created`,
+  `session_grant_payment_succeeded`,
+  `session_grant_refund_succeeded`, `admin_dead_letter`,
+  `admin_booking_confirmed`, `admin_booking_cancelled`,
+  `admin_booking_rescheduled`). v1 aliases
+  (`module_booking_confirmed`, `module_booking_cancelled`,
+  `module_booking_rescheduled`, `module_completed`,
+  `enrollment_checkout_created`, `enrollment_refund_succeeded`)
+  are accepted for one release so the v1-shaped workflows
+  that have not yet been re-authored still work.
+- `{ type: 'email_tutor', to: <email>, subject: <string>,
+  body: <string>, session_booking_id?: <uuid> }` — the
+  tutor email body is supplied verbatim by n8n; the route
+  only minimal-escapes for the HTML part.
+
+**Recipient safety (admin_* templates):** the recipient is
+hard-coded to `ADMIN_NOTIFY_EMAIL` (constant in
+`apps/web/lib/constants/index.ts`). The body's `to` field is
+IGNORED for these templates. The constant is a sibling of
+`SUPPORT_EMAIL` and is not a `process.env` lookup, so it
+is never influenced by a request body or by a misconfigured
+`.env`.
+
+**Resend configuration:** if `RESEND_API_KEY` or
+`RESEND_FROM_EMAIL` is unset, the route returns
+`200 { ok: true, skipped: 'resend_unset' | 'resend_from_unset' }`
+so a replay does not re-throw.
+
+**Failure modes:**
+- 401 — secret mismatch.
+- 400 — Zod validation (`type` discriminator, template
+  enum, missing `to` on non-admin template, missing
+  `subject` on `email_tutor`).
+- 502 — Resend 4xx/5xx.
+
+**Idempotency:** the route is **not** idempotent on its own
+(the dedup is upstream in `webhook_events` /
+`notifications`). Replays are tolerated because the
+notification row UNIQUE indices reject them; the renderer
+itself just re-attempts the Resend call.
 
 ---
 

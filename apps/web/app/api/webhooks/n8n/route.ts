@@ -187,6 +187,61 @@ export async function POST(req: NextRequest) {
           .eq('id', session_booking_id);
         break;
       }
+      case 'session_booking_rescheduled': {
+        // Sprint 10 — I-1: Calendly `invitee.updated`
+        // forwarded by the v2 `module-reschedule` n8n
+        // workflow. Flip the booking to `confirmed` with
+        // the new `scheduled_start` / `scheduled_end`.
+        // The booking is already in the DB; the workflow
+        // also PATCHes the Zoom meeting. We do NOT
+        // invalidate the existing `meeting_links` row —
+        // the meeting URL is unchanged (Zoom patches the
+        // same meeting with a new start_time).
+        const {
+          session_booking_id,
+          new_scheduled_start,
+          new_scheduled_end,
+        } = body;
+        if (!session_booking_id) break;
+        const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (typeof new_scheduled_start === 'string') updates['scheduled_start'] = new_scheduled_start;
+        if (typeof new_scheduled_end   === 'string') updates['scheduled_end']   = new_scheduled_end;
+        if (Object.keys(updates).length > 1) {
+          // Only flip status if the booking was in a
+          // pre-confirmation state (defensive — the
+          // workflow should not reschedule a `cancelled`
+          // booking).
+          await admin
+            .from('session_bookings')
+            .update({ ...updates, status: 'confirmed' } as never)
+            .eq('id', session_booking_id)
+            .in('status', ['scheduled', 'confirmed']);
+        }
+        break;
+      }
+      case 'session_completed': {
+        // Sprint 10 — I-1: v2 `module-completed` n8n
+        // workflow. The session has run to completion;
+        // flip the booking to `completed`. (The
+        // `manualCompleteSessionBooking` admin tool
+        // (Sprint 8 B-19) is the other path to
+        // `completed`; this branch is the n8n-driven
+        // path.) Idempotent: a replay hits the same
+        // row in `completed` state and the update is a
+        // no-op.
+        const { session_booking_id, completed_at } = body;
+        if (!session_booking_id) break;
+        const completedAt = typeof completed_at === 'string' ? completed_at : new Date().toISOString();
+        await admin
+          .from('session_bookings')
+          .update({
+            status: 'completed',
+            updated_at: completedAt,
+          } as never)
+          .eq('id', session_booking_id)
+          .in('status', ['scheduled', 'confirmed']);
+        break;
+      }
       case 'payment_succeeded': {
         const { payment_id, stripe_payment_intent_id, amount_cents, stripe_receipt_url } = body;
         const { error } = await admin.from('payments').update({

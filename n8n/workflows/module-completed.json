@@ -11,7 +11,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [240, 300],
-      "name": "Webhook: module-completed",
+      "name": "Webhook: session-completed",
       "webhookId": "module-completed-webhook"
     },
     {
@@ -49,10 +49,10 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",               "value": "module_completed"},
-            {"name": "session_booking_id", "value": "={{ $json.body.module_booking_id }}"},
-            {"name": "session_id",         "value": "={{ $json.body.module_id }}"},
-            {"name": "session_grant_id",   "value": "={{ $json.body.enrollment_id }}"},
+            {"name": "type",               "value": "session_completed"},
+            {"name": "session_booking_id", "value": "={{ $json.body.session_booking_id }}"},
+            {"name": "session_id",         "value": "={{ $json.body.session_id }}"},
+            {"name": "session_grant_id",   "value": "={{ $json.body.session_grant_id }}"},
             {"name": "completed_at",       "value": "={{ $json.body.completed_at }}"}
           ]
         },
@@ -61,12 +61,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300],
-      "name": "Persist module_progress (Next.js)"
+      "name": "Persist session_completed (Next.js)"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/n8n/notify",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -77,21 +77,26 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",             "value": "evaluate_completion"},
-            {"name": "session_grant_id", "value": "={{ $json.body.enrollment_id }}"}
+            {"name": "type",     "value": "email"},
+            {"name": "template", "value": "session_completed"},
+            {"name": "to",       "value": "={{ $json.body.student_email }}"},
+            {"name": "locale",   "value": "={{ $json.body.locale ?? 'fr' }}"},
+            {"name": "props[workflow]",    "value": "module-completed"},
+            {"name": "props[studentName]", "value": "={{ $json.body.student_name }}"},
+            {"name": "props[sessionTitle]","value": "={{ $json.body.session_title }}"},
+            {"name": "props[dashboardUrl]","value": "={{ $env.NEXT_PUBLIC_SITE_URL }}"}
           ]
-        },
-        "options": {"response": {"response": {"responseFormat": "json"}}}
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [900, 300],
-      "name": "Check enrollment completion (Next.js)"
+      "name": "Send session-completed email (Next.js renderer)"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"ok\": true,\n  \"enrollment_completed\": {{ $node['Check enrollment completion (Next.js)'].json.enrollment_completed }}\n}"
+        "responseBody": "={\n  \"ok\": true\n}"
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -115,7 +120,7 @@
             {"name": "type",          "value": "workflow_failed"},
             {"name": "workflow",      "value": "module-completed"},
             {"name": "error",         "value": "={{ $json.error.message }}"},
-            {"name": "original_event","value": "={{ $('Webhook: module-completed').first().json }}"}
+            {"name": "original_event","value": "={{ $('Webhook: session-completed').first().json }}"}
           ]
         }
       },
@@ -126,22 +131,22 @@
     }
   ],
   "connections": {
-    "Webhook: module-completed": {
+    "Webhook: session-completed": {
       "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
     },
     "Verify webhook secret": {
       "main": [
-        [{"node": "Persist module_progress (Next.js)", "type": "main", "index": 0}],
-        [{"node": "Dead-letter on error",               "type": "main", "index": 0}]
+        [{"node": "Persist session_completed (Next.js)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on error",                 "type": "main", "index": 0}]
       ]
     },
-    "Persist module_progress (Next.js)": {
+    "Persist session_completed (Next.js)": {
       "main": [
-        [{"node": "Check enrollment completion (Next.js)", "type": "main", "index": 0}],
-        [{"node": "Dead-letter on error",                  "type": "main", "index": 0}]
+        [{"node": "Send session-completed email (Next.js renderer)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on error",                            "type": "main", "index": 0}]
       ]
     },
-    "Check enrollment completion (Next.js)": {
+    "Send session-completed email (Next.js renderer)": {
       "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
     }
   },
@@ -151,8 +156,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "module-completed trigger → persist module_progress → evaluate enrollment completion (unlocks the next module, or flips enrollment.status to 'completed'). Documented in n8n/docs/WORKFLOWS.md §2.3."
+    "description": "Sprint 10 — I-1: v2 session-completed trigger → POST session_completed to /api/webhooks/n8n (Next.js flips session_bookings.status to 'completed' for the supplied session_booking_id, idempotent on replay) → POST session_completed template to /api/n8n/notify. The v1 `evaluate_completion` cascade is REMOVED: grant-level completion is now derived in Sprint 8 B-19 reporting, not here. Documented in n8n/docs/WORKFLOWS.md §2.3."
   }
 }

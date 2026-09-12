@@ -15,9 +15,40 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint 9 done (awaiting explicit user approval before Sprint 10)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 10 done (awaiting explicit user approval before Sprint 11)**.
 
 ## Current status
+
+🟢 **Sprint 10 (I-1 — n8n v2 webhook parity & admin recipient hard-code) is done.** A new
+`POST /api/n8n/notify` v2 email renderer + a new
+`POST /api/enrollments/by-calendly-invitee` Calendly → student resolver
+land behind the existing `X-Webhook-Secret` contract (matches `N8N_WEBHOOK_SECRET`).
+The 6 booking-path email templates now render server-side; the
+`admin_dead_letter` and `admin_booking_confirmed` templates **ignore the
+body `to` field** — the recipient is the new hard-coded
+`ADMIN_NOTIFY_EMAIL = 'admin@coursenligne.fr'` constant in
+`apps/web/lib/constants/index.ts`. 8 of 9 n8n workflow JSON exports were
+rewritten to the v2 shape (v1 `module_*` / `enrollment_*` discriminators
+gone, v1 `/api/meetings/by-booking/*` URL gone, `$env.ADMIN_NOTIFY_EMAIL`
+read gone); the 9th (`session-reminder-scheduler.json`) is the v2 live
+workflow and is **untouched** by design. The deprecated v1
+`module-reminder-scheduler.json` is deleted. The existing
+`/api/webhooks/n8n` route gains two new v2 event branches —
+`session_booking_rescheduled` and `session_completed` — both with the
+`status IN ('scheduled', 'confirmed')` in-band idempotency guard.
+**No migration, no new SaaS, no new env var, no `.env.example` key
+change, no new top-level folder, no service-role-key workaround, no RLS
+weakening, no remote Supabase touch, no production n8n touch.** R-3 is
+**not** implemented (the `meeting_links.recording_url` schema column is
+not added; the Zoom `recording.completed` write-back is not authored).
+All four quality gates are green: `pnpm type-check` ✓, `pnpm lint` ✓
+(1 pre-existing `lib/utils/logger.ts:31` warning unrelated to Sprint
+10), `pnpm test` ✓ (**609 / 609** across **65** files — **97 new I-1
+tests** across 5 new test files; Sprint 9 close-out ended at 512 / 512
+across 59), `pnpm build` ✓ (the 2 new routes are registered: 285 B +
+286 B). Full close-out: `docs/review/PHASE2_SPRINT_10_SUMMARY.md`.
+**Sprint 10 has not been committed, pushed, or tagged yet** — that is
+the next gated step on user approval.
 
 🟢 **Sprint 9 (Homepage Student Progress hero integration — Task #524-NEW) is done.** A new
 `apps/web/components/marketing/student-progress-hero-card.tsx` Server Component branches on the 5
@@ -80,7 +111,7 @@ a "Zoom link created" / "Awaiting Zoom link" status badge.
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 + 3.8 + 7 + 8 + 9 done | 2026-09-12 |
+| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 + 3.8 + 7 + 8 + 9 + 10 done | 2026-09-12 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ✅ Shipped in Sprint C | 2026-07-10 |
 | 4 | Admin dashboard + manual CRUD + Excel curriculum import | ✅ Shipped in Sprints 3.6 + 3.8 + 8 (S8-A / S8-B) | 2026-08-27 |
 | 5 | Resources, notifications, polish | ⏳ | — |
@@ -1071,6 +1102,68 @@ Per the Sprint 8 reconciliation report §B:
 ---
 
 ## Last updated
+
+**2026-09-12** by Sprint 10 close-out — I-1 n8n v2 webhook parity
+and admin recipient hard-code. New `/api/n8n/notify` v2 email
+renderer (admin_* templates ignore body `to`; recipient is the
+hard-coded `ADMIN_NOTIFY_EMAIL` constant in
+`apps/web/lib/constants/index.ts`). New
+`/api/enrollments/by-calendly-invitee` Calendly → student
+resolver. 8 of 9 n8n workflow JSON exports rewritten to the v2
+shape (the 9th, `session-reminder-scheduler.json`, is the v2
+live workflow and is **untouched** by design). Deprecated v1
+`module-reminder-scheduler.json` is deleted. Two new v2 event
+branches on `/api/webhooks/n8n` (`session_booking_rescheduled`,
+`session_completed`) with the `IN ('scheduled', 'confirmed')`
+idempotency guard. **R-3 is not implemented** (the
+`meeting_links.recording_url` schema column is not added; the
+Zoom `recording.completed` write-back is not authored) — the
+S8-D gate from the Sprint 8 close-out remains open. **No
+migration, no new SaaS, no new env var, no `.env.example`
+change, no remote Supabase touch, no production n8n touch.**
+All four quality gates are green: `pnpm type-check` ✓, `pnpm
+lint` ✓ (1 pre-existing `lib/utils/logger.ts:31` warning
+unrelated), `pnpm test` ✓ (**609 / 609** across **65** files,
+**97 new I-1 tests** across 5 new test files; Sprint 9 ended
+at 512 / 512 across 59), `pnpm build` ✓ (2 new routes
+registered: 285 B + 286 B). Full close-out:
+`docs/review/PHASE2_SPRINT_10_SUMMARY.md`. Tag
+`v1.9.0-phase2-sprint-10` pending user approval.
+
+### Sprint 10 — what landed (close-out summary)
+
+- **I-1 n8n v2 webhook parity.** Two new server routes
+  (`/api/n8n/notify` v2 email renderer +
+  `/api/enrollments/by-calendly-invitee` Calendly → student
+  resolver) replace the 6 workflow-managed Resend sends and
+  the n8n-side invitee → student derivation. The
+  `admin_dead_letter` + `admin_booking_confirmed` templates
+  ignore the body `to` and use the hard-coded
+  `ADMIN_NOTIFY_EMAIL` constant. **8 of 9** n8n workflow
+  JSON exports rewritten to the v2 shape (v1 `module_*` /
+  `enrollment_*` discriminators gone; v1
+  `/api/meetings/by-booking/*` URL gone; `$env.ADMIN_NOTIFY_EMAIL`
+  read gone). The 9th `session-reminder-scheduler.json` is
+  the v2 live workflow and is **untouched** by design. The
+  deprecated v1 `module-reminder-scheduler.json` is
+  deleted. `/api/webhooks/n8n` gains two new v2 branches
+  (`session_booking_rescheduled`, `session_completed`) with
+  the `IN ('scheduled', 'confirmed')` in-band idempotency
+  guard. **97 new I-1 tests** across 5 new test files
+  (`n8n-webhook-v2.test.ts` × 11, `webhooks-stripe.test.ts`
+  × 3, `webhooks-calendly.test.ts` × 5,
+  `n8n-notify-route.test.ts` × 16, `n8n-workflows-shape.test.ts`
+  × ~62, plus `by-calendly-invitee-route.test.ts`). Final
+  total: **65 test files / 609 tests**. All four quality
+  gates green. **No migration, no new SaaS, no new env
+  var, no `.env.example` change, no remote Supabase touch,
+  no production n8n touch.** **R-3 not implemented** — the
+  `meeting_links.recording_url` column is not added; the
+  Zoom `recording.completed` write-back workflow is not
+  authored. R-3 remains a forward-only schema change gated
+  on explicit user approval per CLAUDE §3.2.
+
+---
 
 **2026-08-27** by Sprint 8 close-out — Resources delivery
 surface (R-1 + R-2), Manual-complete session booking (B-19),

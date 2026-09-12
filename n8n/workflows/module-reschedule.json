@@ -11,7 +11,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [240, 300],
-      "name": "Webhook: module-reschedule",
+      "name": "Webhook: session-reschedule",
       "webhookId": "module-reschedule-webhook"
     },
     {
@@ -37,19 +37,36 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "https://zoom.us/oauth/token?grant_type=account_credentials&account_id={{ $env.ZOOM_ACCOUNT_ID }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Basic {{ Buffer.from($env.ZOOM_CLIENT_ID + ':' + $env.ZOOM_CLIENT_SECRET).toString('base64') }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 100],
+      "name": "Mint Zoom S2S access token"
+    },
+    {
+      "parameters": {
         "method": "PATCH",
         "url": "https://api.zoom.us/v2/meetings/{{ $json.body.zoom_meeting_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "Bearer {{ $json.zoom_access_token }}"},
+            {"name": "Authorization", "value": "Bearer {{ $node['Mint Zoom S2S access token'].json.access_token }}"},
             {"name": "Content-Type",  "value": "application/json"}
           ]
         },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "start_time", "value": "={{ $json.body.new_start_time }}"},
+            {"name": "start_time", "value": "={{ $json.body.new_scheduled_start }}"},
             {"name": "duration",   "value": "={{ $json.body.new_duration_min }}"},
             {"name": "timezone",   "value": "={{ $json.body.timezone }}"}
           ]
@@ -58,7 +75,7 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 300],
+      "position": [900, 100],
       "name": "Update Zoom meeting"
     },
     {
@@ -75,18 +92,50 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",               "value": "module_rescheduled"},
-            {"name": "session_booking_id", "value": "={{ $json.body.module_booking_id }}"},
-            {"name": "new_start_time",   "value": "={{ $json.body.new_start_time }}"},
-            {"name": "new_duration_min", "value": "={{ $json.body.new_duration_min }}"}
+            {"name": "type",                 "value": "session_booking_rescheduled"},
+            {"name": "session_booking_id",   "value": "={{ $json.body.session_booking_id }}"},
+            {"name": "new_scheduled_start",  "value": "={{ $json.body.new_scheduled_start }}"},
+            {"name": "new_scheduled_end",    "value": "={{ $json.body.new_scheduled_end }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 300],
-      "name": "Persist reschedule (Next.js)"
+      "position": [1120, 100],
+      "name": "Persist reschedule (Next.js: session_booking_rescheduled)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/n8n/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",     "value": "email"},
+            {"name": "template", "value": "session_booking_rescheduled"},
+            {"name": "to",       "value": "={{ $json.body.student_email }}"},
+            {"name": "locale",   "value": "={{ $json.body.locale ?? 'fr' }}"},
+            {"name": "workflow",       "value": "module-reschedule"},
+            {"name": "props[studentName]",     "value": "={{ $json.body.student_name }}"},
+            {"name": "props[sessionTitle]",    "value": "={{ $json.body.session_title }}"},
+            {"name": "props[scheduledStartIso]","value": "={{ $json.body.new_scheduled_start }}"},
+            {"name": "props[joinUrl]",         "value": "={{ $json.body.join_url }}"},
+            {"name": "props[dashboardUrl]",    "value": "={{ $env.NEXT_PUBLIC_SITE_URL }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 100],
+      "name": "Send student reschedule email (Next.js renderer)"
     },
     {
       "parameters": {
@@ -95,7 +144,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1120, 300],
+      "position": [1560, 100],
       "name": "Respond OK"
     },
     {
@@ -115,7 +164,7 @@
             {"name": "type",          "value": "workflow_failed"},
             {"name": "workflow",      "value": "module-reschedule"},
             {"name": "error",         "value": "={{ $json.error.message }}"},
-            {"name": "original_event","value": "={{ $('Webhook: module-reschedule').first().json }}"}
+            {"name": "original_event","value": "={{ $('Webhook: session-reschedule').first().json }}"}
           ]
         }
       },
@@ -126,22 +175,34 @@
     }
   ],
   "connections": {
-    "Webhook: module-reschedule": {
+    "Webhook: session-reschedule": {
       "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
     },
     "Verify webhook secret": {
       "main": [
-        [{"node": "Update Zoom meeting",     "type": "main", "index": 0}],
-        [{"node": "Dead-letter on Zoom error","type": "main", "index": 0}]
+        [{"node": "Mint Zoom S2S access token", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",  "type": "main", "index": 0}]
+      ]
+    },
+    "Mint Zoom S2S access token": {
+      "main": [
+        [{"node": "Update Zoom meeting",        "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",  "type": "main", "index": 0}]
       ]
     },
     "Update Zoom meeting": {
       "main": [
-        [{"node": "Persist reschedule (Next.js)", "type": "main", "index": 0}],
-        [{"node": "Dead-letter on Zoom error",     "type": "main", "index": 0}]
+        [{"node": "Persist reschedule (Next.js: session_booking_rescheduled)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",                                  "type": "main", "index": 0}]
       ]
     },
-    "Persist reschedule (Next.js)": {
+    "Persist reschedule (Next.js: session_booking_rescheduled)": {
+      "main": [
+        [{"node": "Send student reschedule email (Next.js renderer)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",                        "type": "main", "index": 0}]
+      ]
+    },
+    "Send student reschedule email (Next.js renderer)": {
       "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
     }
   },
@@ -151,8 +212,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "module-booking reschedule → PATCH Zoom meeting → persist new scheduled_start. Documented in n8n/docs/WORKFLOWS.md §2.5."
+    "description": "Sprint 10 — I-1: v2 session-booking reschedule (driven by Calendly invitee.updated) → mint Zoom S2S token → PATCH Zoom meeting with the new scheduled_start/duration/timezone → POST session_booking_rescheduled to /api/webhooks/n8n (Next.js flips session_bookings.scheduled_start + scheduled_end + status='confirmed') → send student reschedule email via /api/n8n/notify. The v1 input fields new_start_time / new_duration_min are renamed to new_scheduled_start / new_scheduled_end / new_duration_min to match the v2 schema. Documented in n8n/docs/WORKFLOWS.md §2.5."
   }
 }

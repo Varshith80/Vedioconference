@@ -53,7 +53,7 @@
             {"name": "to", "value": "={{ $json.body.tutor_email }}"},
             {"name": "subject", "value": "={{ $json.body.subject }}"},
             {"name": "body", "value": "={{ $json.body.body }}"},
-            {"name": "session_booking_id", "value": "={{ $json.body.module_booking_id }}"}
+            {"name": "session_booking_id", "value": "={{ $json.body.session_booking_id ?? $json.body.module_booking_id }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
@@ -61,7 +61,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300],
-      "name": "Send tutor notification"
+      "name": "Send tutor notification (email_tutor — Next.js renderer)"
     },
     {
       "parameters": {
@@ -89,8 +89,8 @@
           "parameters": [
             {"name": "type", "value": "email"},
             {"name": "template", "value": "admin_dead_letter"},
-            {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
             {"name": "locale", "value": "en"},
+            {"name": "workflow",     "value": "tutor-notification"},
             {"name": "props[workflow]",      "value": "tutor-notification"},
             {"name": "props[errorMessage]",  "value": "={{ $json.error.message }}"},
             {"name": "props[originalEvent]", "value": "={{ $('Webhook: tutor notification').first().json }}"}
@@ -100,7 +100,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 520],
-      "name": "Dead-letter: notify admin"
+      "name": "Dead-letter: notify admin (admin_dead_letter — recipient hard-coded server-side)"
     }
   ],
   "connections": {
@@ -109,14 +109,14 @@
     },
     "Verify webhook secret": {
       "main": [
-        [{"node": "Send tutor notification", "type": "main", "index": 0}],
-        [{"node": "Dead-letter: notify admin","type": "main", "index": 0}]
+        [{"node": "Send tutor notification (email_tutor — Next.js renderer)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin (admin_dead_letter — recipient hard-coded server-side)", "type": "main", "index": 0}]
       ]
     },
-    "Send tutor notification": {
+    "Send tutor notification (email_tutor — Next.js renderer)": {
       "main": [
-        [{"node": "Respond OK",                "type": "main", "index": 0}],
-        [{"node": "Dead-letter: notify admin", "type": "main", "index": 0}]
+        [{"node": "Respond OK", "type": "main", "index": 0}],
+        [{"node": "Dead-letter: notify admin (admin_dead_letter — recipient hard-coded server-side)", "type": "main", "index": 0}]
       ]
     }
   },
@@ -126,8 +126,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "Triggered by the tutor lifecycle events (booking, reschedule, cancellation). Asks Next.js to send a tutor notification email. Documented in n8n/docs/WORKFLOWS.md §2.9."
+    "description": "Sprint 10 — I-1: Tutor-lifecycle email render. Triggered by other v2 workflows (booking confirmation, reschedule, cancellation) to send a transactional email to the tutor. Asks Next.js to deliver an email_tutor payload (subject + body built in n8n). The recipient is the tutor_email resolved in the prior workflow step (which itself only read the address from Supabase, never from the public Calendly payload). The dead-letter branch uses the admin_dead_letter template with a hard-coded server-side recipient. The v1 input field module_booking_id is preserved as a fallback so callers still using the v1 name continue to work, but session_booking_id is the v2 source of truth. Documented in n8n/docs/WORKFLOWS.md §2.9."
   }
 }

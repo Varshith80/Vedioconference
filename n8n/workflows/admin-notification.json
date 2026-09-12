@@ -50,9 +50,9 @@
         "bodyParameters": {
           "parameters": [
             {"name": "type", "value": "email"},
-            {"name": "template", "value": "admin_dead_letter"},
-            {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
+            {"name": "template", "value": "={{ $json.body.template ?? 'admin_dead_letter' }}"},
             {"name": "locale", "value": "en"},
+            {"name": "workflow",     "value": "admin-notification"},
             {"name": "props[workflow]",      "value": "={{ $json.body.workflow }}"},
             {"name": "props[errorMessage]",  "value": "={{ $json.body.error_message }}"},
             {"name": "props[originalEvent]", "value": "={{ $json.body.original_event }}"}
@@ -63,7 +63,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300],
-      "name": "Send admin dead-letter"
+      "name": "Send admin notification (Next.js renderer — recipient hard-coded server-side)"
     },
     {
       "parameters": {
@@ -81,9 +81,9 @@
       "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
     },
     "Verify webhook secret": {
-      "main": [[{"node": "Send admin dead-letter", "type": "main", "index": 0}]]
+      "main": [[{"node": "Send admin notification (Next.js renderer — recipient hard-coded server-side)", "type": "main", "index": 0}]]
     },
-    "Send admin dead-letter": {
+    "Send admin notification (Next.js renderer — recipient hard-coded server-side)": {
       "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
     }
   },
@@ -93,8 +93,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "Catch-all dead-letter workflow. Triggered by any other workflow's error branch to send an admin notification email. Documented in n8n/docs/WORKFLOWS.md §2.8."
+    "description": "Sprint 10 — I-1: Catch-all dead-letter / admin-digest workflow. Triggered by any other workflow's error branch to send an admin notification. Asks Next.js to render the chosen admin_* template (default: admin_dead_letter) and send via Resend. The recipient is HARD-CODED server-side in /api/n8n/notify (ADMIN_NOTIFY_EMAIL constant in lib/constants) — the workflow does NOT read an env var and does NOT accept a `to` field in the body, eliminating the v1 attack class where a forged to= leaks a digest. Documented in n8n/docs/WORKFLOWS.md §2.8."
   }
 }

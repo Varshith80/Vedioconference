@@ -11,7 +11,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [240, 300],
-      "name": "Webhook: module-cancellation",
+      "name": "Webhook: session-cancellation",
       "webhookId": "module-cancellation-webhook"
     },
     {
@@ -38,35 +38,35 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/meetings/by-booking/{{ $json.body.module_booking_id }}",
+        "url": "https://zoom.us/oauth/token?grant_type=account_credentials&account_id={{ $env.ZOOM_ACCOUNT_ID }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+            {"name": "Authorization", "value": "Basic {{ Buffer.from($env.ZOOM_CLIENT_ID + ':' + $env.ZOOM_CLIENT_SECRET).toString('base64') }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 300],
-      "name": "Read meeting_link (Next.js)"
+      "position": [680, 100],
+      "name": "Mint Zoom S2S access token"
     },
     {
       "parameters": {
         "method": "DELETE",
-        "url": "https://api.zoom.us/v2/meetings/{{ $json.zoom_meeting_id }}",
+        "url": "https://api.zoom.us/v2/meetings/{{ $json.body.zoom_meeting_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "Bearer {{ $json.zoom_access_token }}"}
+            {"name": "Authorization", "value": "Bearer {{ $node['Mint Zoom S2S access token'].json.access_token }}"}
           ]
         },
         "options": {"timeout": 15000, "response": {"response": {"responseFormat": "json"}}}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 300],
+      "position": [900, 100],
       "name": "Delete Zoom meeting"
     },
     {
@@ -83,19 +83,49 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",              "value": "module_cancelled"},
-            {"name": "session_booking_id","value": "={{ $json.body.module_booking_id }}"},
-            {"name": "cancelled_reason", "value": "={{ $json.body.cancelled_reason }}"},
-            {"name": "cancelled_by",     "value": "={{ $json.body.cancelled_by }}"},
-            {"name": "refund_stripe",    "value": "={{ $json.body.refund_stripe ?? false }}"}
+            {"name": "type",               "value": "session_booking_cancelled"},
+            {"name": "session_booking_id", "value": "={{ $json.body.session_booking_id }}"},
+            {"name": "cancelled_reason",   "value": "={{ $json.body.cancelled_reason }}"},
+            {"name": "cancelled_by",       "value": "={{ $json.body.cancelled_by }}"},
+            {"name": "refund_stripe",      "value": "={{ $json.body.refund_stripe ?? false }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 300],
-      "name": "Persist cancellation (Next.js)"
+      "position": [1120, 100],
+      "name": "Persist cancellation (Next.js: session_booking_cancelled)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/n8n/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",     "value": "email"},
+            {"name": "template", "value": "session_booking_cancelled"},
+            {"name": "to",       "value": "={{ $json.body.student_email }}"},
+            {"name": "locale",   "value": "={{ $json.body.locale ?? 'fr' }}"},
+            {"name": "workflow",     "value": "module-cancellation"},
+            {"name": "props[studentName]",   "value": "={{ $json.body.student_name }}"},
+            {"name": "props[sessionTitle]",  "value": "={{ $json.body.session_title }}"},
+            {"name": "props[dashboardUrl]",  "value": "={{ $env.NEXT_PUBLIC_SITE_URL }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 100],
+      "name": "Send student cancellation email (Next.js renderer)"
     },
     {
       "parameters": {
@@ -104,7 +134,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1340, 300],
+      "position": [1560, 100],
       "name": "Respond OK"
     },
     {
@@ -124,7 +154,7 @@
             {"name": "type",          "value": "workflow_failed"},
             {"name": "workflow",      "value": "module-cancellation"},
             {"name": "error",         "value": "={{ $json.error.message }}"},
-            {"name": "original_event","value": "={{ $('Webhook: module-cancellation').first().json }}"}
+            {"name": "original_event","value": "={{ $('Webhook: session-cancellation').first().json }}"}
           ]
         }
       },
@@ -135,28 +165,34 @@
     }
   ],
   "connections": {
-    "Webhook: module-cancellation": {
+    "Webhook: session-cancellation": {
       "main": [[{"node": "Verify webhook secret", "type": "main", "index": 0}]]
     },
     "Verify webhook secret": {
       "main": [
-        [{"node": "Read meeting_link (Next.js)", "type": "main", "index": 0}],
-        [{"node": "Dead-letter on Zoom error",    "type": "main", "index": 0}]
+        [{"node": "Mint Zoom S2S access token", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",  "type": "main", "index": 0}]
       ]
     },
-    "Read meeting_link (Next.js)": {
+    "Mint Zoom S2S access token": {
       "main": [
-        [{"node": "Delete Zoom meeting",     "type": "main", "index": 0}],
-        [{"node": "Dead-letter on Zoom error","type": "main", "index": 0}]
+        [{"node": "Delete Zoom meeting",        "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",  "type": "main", "index": 0}]
       ]
     },
     "Delete Zoom meeting": {
       "main": [
-        [{"node": "Persist cancellation (Next.js)", "type": "main", "index": 0}],
-        [{"node": "Dead-letter on Zoom error",      "type": "main", "index": 0}]
+        [{"node": "Persist cancellation (Next.js: session_booking_cancelled)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",                                  "type": "main", "index": 0}]
       ]
     },
-    "Persist cancellation (Next.js)": {
+    "Persist cancellation (Next.js: session_booking_cancelled)": {
+      "main": [
+        [{"node": "Send student cancellation email (Next.js renderer)", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",                          "type": "main", "index": 0}]
+      ]
+    },
+    "Send student cancellation email (Next.js renderer)": {
       "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
     }
   },
@@ -166,8 +202,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "module-booking cancellation → read meeting_link → DELETE Zoom meeting → persist cancellation. Documented in n8n/docs/WORKFLOWS.md §2.4."
+    "description": "Sprint 10 — I-1: v2 session-booking cancellation → mint Zoom S2S token → DELETE Zoom meeting → POST session_booking_cancelled to /api/webhooks/n8n (Next.js flips session_bookings.status to 'cancelled') → send student cancellation email via /api/n8n/notify. The v1 read of /api/meetings/by-booking/<id> is REMOVED: n8n now receives the zoom_meeting_id directly in the trigger body (it already knows it from the Calendly invitee payload or from a prior module-booking-to-zoom execution). The v1 type module_cancelled is RENAMED to session_booking_cancelled to match the v2 Next.js webhook handler. Documented in n8n/docs/WORKFLOWS.md §2.4."
   }
 }

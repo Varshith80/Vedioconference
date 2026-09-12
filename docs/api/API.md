@@ -111,9 +111,16 @@ no new code reads it.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/webhooks/stripe`   | Stripe signature (`stripe-signature`) | Inbound from Stripe; idempotent via `webhook_events`. Handles `checkout.session.completed` (`metadata.enrollment_id`), `payment_intent.payment_failed`, `charge.refunded`. |
-| `POST` | `/api/webhooks/calendly` | Calendly signature (`Calendly-Webhook-Signature`) | Inbound from Calendly (`invitee.created`, `invitee.updated`, `invitee.canceled`); idempotent |
-| `POST` | `/api/webhooks/n8n`      | shared secret (`X-Webhook-Secret`) | Inbound from n8n: `module_booking_created`, `meeting_created`, `payment_succeeded`, `reminder_sent`, `workflow_failed` |
+| `POST` | `/api/webhooks/stripe`   | Stripe signature (`stripe-signature`) | Inbound from Stripe; idempotent via `webhook_events`. v2: handles `checkout.session.completed` (keys on `metadata.session_grant_id` and delegates to `markSessionGrantPaid`), `payment_intent.payment_failed`, `charge.refunded`. |
+| `POST` | `/api/webhooks/calendly` | Calendly signature (`Calendly-Webhook-Signature`) | Inbound from Calendly (`invitee.created`, `invitee.updated`, `invitee.canceled`); idempotent. v2: forwards to `NEXT_PUBLIC_N8N_BOOKING_WEBHOOK` (fire-and-forget) which triggers the n8n `module-booking-to-zoom` workflow. |
+| `POST` | `/api/webhooks/n8n`      | shared secret (`x-webhook-secret`) | Inbound from n8n. v2 event types: `meeting_created`, `session_grant_checkout_created`, `session_grant_refund_succeeded`, `session_booking_confirmed`, `session_booking_cancelled`, `session_booking_rescheduled`, `session_completed`, `payment_succeeded`, `payment_failed`, `reminder_dispatch`, `reminder_sent`, `workflow_failed`. The v1 event types `module_booking_*`, `module_completed`, `module_cancelled`, `module_rescheduled`, `enrollment_checkout_created`, `enrollment_refund_succeeded` were REMOVED in Sprint 3.6. |
+
+### 2.10.1 n8n-internal routes (Sprint 10 I-1)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/n8n/notify`                  | shared secret (`x-webhook-secret`) | Email renderer. Discriminated union: `{ type: 'email', template: <TEMPLATE>, to?: <email>, locale: 'en'\|'fr', workflow?, props: { ... } }` or `{ type: 'email_tutor', to, subject, body, session_booking_id? }`. Templates: `session_booking_confirmed` / `session_booking_cancelled` / `session_booking_rescheduled` / `session_completed` / `session_grant_checkout_created` / `session_grant_payment_succeeded` / `session_grant_refund_succeeded` / `admin_dead_letter` / `admin_booking_confirmed` / `admin_booking_cancelled` / `admin_booking_rescheduled` (v1 aliases `module_*` / `enrollment_*` accepted for one release). The `admin_*` template set ignores the body's `to` and uses the hard-coded `ADMIN_NOTIFY_EMAIL` constant (`apps/web/lib/constants/index.ts`). Returns `200 { ok: true, skipped: 'resend_unset' \| 'resend_from_unset' }` when `RESEND_API_KEY` / `RESEND_FROM_EMAIL` is unset (replay-safe). |
+| `POST` | `/api/enrollments/by-calendly-invitee` | shared secret (`x-webhook-secret`) | Booking-context resolver. Body: `{ calendly_invitee_uri, calendly_event_uri? }`. Returns the full `BookingContext`: `{ session_booking_id, session_id, session_grant_id, student_id, tutor_id, session_title, course_title, student_name, tutor_name, scheduled_start, scheduled_end, timezone, duration_min, join_url }`. The student's email is **NOT** included in the response. Defensive 409 when the supplied `calendly_event_uri` does not match the row's `calendly_event_uri`. |
 
 ### 2.11 Health
 

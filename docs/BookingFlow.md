@@ -5,6 +5,28 @@
 > external service, failure scenario, retry, and rollback for each
 > step.
 >
+> **Sprint 10 — I-1 update.** The v1 walkthrough below is
+> preserved as a historical record of the Sprint B2 model
+> (course-level enrollment + per-module booking). The **current
+> authoritative reference for the v2 booking path is**:
+> - `n8n/docs/WORKFLOWS.md` §1, §2.1, §2.2, §2.3, §2.6, §2.7,
+>   §2.8, §2.9, §2.10, §2.11, §2.12 — the v2 workflow inventory
+>   and per-workflow detail.
+> - `docs/api/API.md` §2.10 / §2.10.1 — the v2 webhook routes
+>   and the new `/api/n8n/notify` / `/api/enrollments/by-calendly-invitee`
+>   resolver.
+>
+> The v2 schema is `session_grants` + `session_bookings` (the
+> `enrollments` + `module_bookings` + `module_progress` tables
+> referenced below were dropped in Sprint 3.6). v2 field names:
+> `session_grant_id`, `session_booking_id`, `session_id`. v2
+> event types the Next.js webhook routes on: `meeting_created`,
+> `session_grant_checkout_created`,
+> `session_grant_refund_succeeded`, `session_booking_confirmed`,
+> `session_booking_cancelled`, `session_booking_rescheduled`,
+> `session_completed`, `payment_succeeded`, `payment_failed`,
+> `reminder_dispatch`, `reminder_sent`, `workflow_failed`.
+>
 > **Sprint B2 change.** The flow is now **two-tier**:
 >
 > 1. **Course enrollment** — the student pays for the **whole

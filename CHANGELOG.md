@@ -4,6 +4,228 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0-phase2-sprint-10] — 2026-09-12
+
+### Added — Sprint 10 (I-1 — n8n v2 webhook parity & admin recipient hard-code)
+
+A single-task sprint: the carryover from the Sprint 9 audit
+(`docs/review/PHASE2_SPRINT_10_AUDIT.md`) plus the n8n v2
+webhook parity. No schema change. The slice delivers a new
+v2 email renderer, a new Calendly → student resolver, eight
+n8n workflow rewrites, two new v2 event branches in the
+existing `/api/webhooks/n8n` handler, and a hard-coded admin
+recipient (code constant, **not** an env var).
+
+#### API
+
+- `POST /api/n8n/notify` (NEW) — v2 email renderer. The new
+  security boundary for the 6 booking-path email templates.
+  Discriminated union `type: 'email' | 'email_tutor'` +
+  Zod-validated `template` enum. **`admin_dead_letter` and
+  `admin_booking_confirmed` ignore the body `to` field**;
+  the recipient is the hard-coded `ADMIN_NOTIFY_EMAIL`
+  constant. Resend is called with `Authorization: Bearer
+  <RESEND_API_KEY>`. Skips with `200 { skipped: 'resend_unset'
+  | 'resend_from_unset' }` when either env var is missing.
+  Returns `502 upstream_error` on Resend 4xx/5xx. The v1
+  `module_booking_*` template aliases are accepted for **one
+  release** so the 8 rewritten workflows ship alongside the
+  route in the same turn.
+- `POST /api/enrollments/by-calendly-invitee` (NEW) —
+  resolves a Calendly invitee URI to a `studentId` +
+  `sessionGrantId` pair server-side. Uses
+  `createSupabaseAdminClient` (admin read across students is
+  the only acceptable path for invitee resolution). Returns
+  `404 no_invitee` / `422 no_grant` / `200 { studentId,
+  sessionGrantId }` / `401` for missing/wrong
+  `X-Webhook-Secret`.
+
+#### n8n workflow inventory (final)
+
+`n8n/workflows/` now contains **9 files** (was 10 with the
+deprecated `module-reminder-scheduler.json`):
+
+- `enrollment-created.json` (REWRITTEN) — Stripe Checkout
+  creation; posts to `/api/webhooks/n8n` with
+  `type: 'session_grant_checkout_created'`. No
+  `$env.ADMIN_NOTIFY_EMAIL`.
+- `module-booking-to-zoom.json` (REWRITTEN) — Calendly
+  invitee → Zoom meeting → `meeting_links` upsert. Posts the
+  invitee URI to `/api/enrollments/by-calendly-invitee` to
+  resolve the student + grant server-side. No
+  `$env.ADMIN_NOTIFY_EMAIL`.
+- `module-completed.json` (REWRITTEN) — flips
+  `session_bookings.status = 'completed'` via
+  `/api/webhooks/n8n` with `type: 'session_completed'`.
+- `module-confirmation-email.json` (REWRITTEN) — renders
+  `session_booking_confirmed` through `/api/n8n/notify`
+  (type `email`).
+- `module-cancellation.json` (REWRITTEN) — Zoom meeting
+  delete + `/api/webhooks/n8n` with
+  `type: 'session_booking_cancelled'`.
+- `module-reschedule.json` (REWRITTEN) — Zoom meeting
+  patch + `/api/webhooks/n8n` with
+  `type: 'session_booking_rescheduled'`.
+- `admin-notification.json` (REWRITTEN) — renders
+  `admin_dead_letter` through `/api/n8n/notify` (type
+  `email`). **Body `to` is ignored; recipient is
+  `ADMIN_NOTIFY_EMAIL`.**
+- `tutor-notification.json` (REWRITTEN) — renders tutor
+  email through `/api/n8n/notify` (type `email_tutor` — body
+  `to` honoured because the recipient is a tutor, not the
+  admin).
+- `session-reminder-scheduler.json` (**UNTOUCHED**) — the
+  v2 live workflow. Excluded from Sprint 10 by design.
+
+The deprecated `module-reminder-scheduler.json` (v1) is
+**deleted** in the same commit.
+
+#### v2 webhook additions to `/api/webhooks/n8n`
+
+- `session_booking_rescheduled` (NEW branch) — UPDATE
+  `session_bookings` SET `scheduled_start`, `scheduled_end`,
+  `status = 'confirmed'`, `updated_at = now()` WHERE
+  `id = <session_booking_id>` AND `status IN ('scheduled',
+  'confirmed')`. The `.in('status', […])` clause is the
+  idempotency guard.
+- `session_completed` (NEW branch) — UPDATE
+  `session_bookings` SET `status = 'completed'`,
+  `updated_at = <completed_at || now()>` WHERE
+  `id = <session_booking_id>` AND `status IN ('scheduled',
+  'confirmed')`. Same idempotency guard; replay on an
+  already-completed booking is a no-op.
+
+The existing v2 branches (`meeting_created`,
+`session_grant_checkout_created`, `session_booking_cancelled`,
+`workflow_failed`, `payment_*`, `reminder_*`, `unknown`) are
+unchanged.
+
+#### Hard-coded admin recipient
+
+- `apps/web/lib/constants/index.ts` — new export
+  `ADMIN_NOTIFY_EMAIL = 'admin@coursenligne.fr'`. Single
+  source of truth; **not** an env var. `.env` and
+  `.env.example` are **unchanged**. The 8 rewritten
+  workflows do **not** read `$env.ADMIN_NOTIFY_EMAIL`
+  (pinned by `n8n-workflows-shape.test.ts`).
+
+#### Tests (97 new I-1 tests across 5 new files)
+
+- `apps/web/tests/unit/n8n-webhook-v2.test.ts` (NEW, 11
+  tests) — auth (401 unset / wrong secret; 400 missing
+  `type`). v2 business events: `meeting_created`,
+  `session_grant_checkout_created`, `session_booking_cancelled`,
+  `session_booking_rescheduled`, `session_completed` (with
+  supplied + default `completed_at` + `IN ('scheduled',
+  'confirmed')` idempotency guard), `workflow_failed`,
+  unknown type.
+- `apps/web/tests/unit/webhooks-stripe.test.ts` (NEW, 3
+  tests) — 401 missing / invalid signature; 401 when
+  `STRIPE_WEBHOOK_SECRET` is unset; 200 happy path dedupes
+  a replayed `event_id` and does not re-call
+  `markSessionGrantPaid`.
+- `apps/web/tests/unit/webhooks-calendly.test.ts` (NEW, 5
+  tests) — 401 missing / invalid signature; 401 when
+  `CALENDLY_WEBHOOK_SIGNING_KEY` is unset. 200 happy path
+  forwards the payload to n8n with `X-Webhook-Secret`; 200
+  when `N8N_ENROLLMENT_WEBHOOK_URL` is unset (forward
+  logged but not fetched).
+- `apps/web/tests/unit/n8n-notify-route.test.ts` (NEW, 16
+  tests) — auth (401 unset / missing header / wrong header).
+  Body validation (400 missing `type` / unknown template /
+  missing `subject` / non-admin missing `to`; 200 v1 alias
+  `module_booking_confirmed`). Recipient safety
+  (admin_dead_letter + admin_booking_confirmed ignore body
+  `to`; non-admin + `email_tutor` honour body `to`).
+  Resend configuration (200 `skipped: 'resend_unset'` /
+  `skipped: 'resend_from_unset'`; 502 `upstream_error` on
+  4xx/5xx; happy path calls `https://api.resend.com/emails`
+  with `Authorization: Bearer <key>` and the rendered
+  `subject` / `html` / `text`).
+- `apps/web/tests/unit/n8n-workflows-shape.test.ts` (NEW,
+  ~62 tests) — inventory (9 expected files; deprecated
+  `module-reminder-scheduler.json` gone; every JSON parses;
+  `session-reminder-scheduler.json` is the v2 live
+  workflow). v2 schema (no `module_id` / `enrollment_id` in
+  any body/header/url; workflows naming a body parameter
+  `*grant*` / `*booking*` use `session_grant_id` /
+  `session_booking_id`). v2 event types (no v1 `module_*` /
+  `enrollment_*` on `/api/webhooks/n8n`; only the 12 v2
+  types appear; `/api/n8n/notify` uses the `email` /
+  `email_tutor` discriminators + a `template` field). v2
+  routes (no `/api/meetings/by-booking/*`;
+  `module-booking-to-zoom.json` calls
+  `/api/enrollments/by-calendly-invitee`). I-1 rewrites do
+  not read `$env.ADMIN_NOTIFY_EMAIL` (the 8 rewrites only).
+- `apps/web/tests/unit/by-calendly-invitee-route.test.ts`
+  (NEW) — 401 on missing / wrong secret; 404 on no invitee;
+  422 on no active session grant; 200 with
+  `{ studentId, sessionGrantId }` on the happy path.
+
+### Changed
+
+- `apps/web/app/api/webhooks/n8n/route.ts` — added
+  `session_booking_rescheduled` and `session_completed` v2
+  branches. Existing branches unchanged.
+- `apps/web/lib/constants/index.ts` — added
+  `ADMIN_NOTIFY_EMAIL` constant.
+- `docs/BookingFlow.md` — updated to reflect the v2 webhook
+  flow, the new `/api/n8n/notify` route, the hard-coded
+  admin recipient, and the `/api/enrollments/by-calendly-invitee`
+  resolver. **Doc-only**.
+- `docs/api/API.md` — added the 2 new routes.
+- `n8n/docs/WORKFLOWS.md` — updated to reflect the 9-workflow
+  inventory, the v2 admin recipient contract (code constant,
+  not env var), and the new routes. **Doc-only**.
+
+### Removed
+
+- `n8n/workflows/module-reminder-scheduler.json` — the
+  deprecated v1 placeholder. Validated by
+  `n8n-workflows-shape.test.ts` ("the deprecated
+  module-reminder-scheduler.json is GONE").
+
+### Quality gates
+
+- `pnpm type-check` — exit 0
+- `pnpm lint` — exit 0 (1 pre-existing warning in
+  `lib/utils/logger.ts:31`, unrelated to Sprint 10)
+- `pnpm test` — **609 / 609 passed** across **65** files
+  (includes the 5 new I-1 test files: 11 + 3 + 5 + 16 + ~62
+  + 1 = **97 new tests**). Sprint 9 close-out ended at
+  512 / 512 across 59.
+- `pnpm build` — exit 0; the 2 new routes are registered:
+  `ƒ /api/n8n/notify` (285 B) and
+  `ƒ /api/enrollments/by-calendly-invitee` (286 B). All
+  Sprint 8 + Sprint 9 routes still present.
+
+### Schema-change gate encountered
+
+- **None.** No new columns, no new tables, no new RLS
+  policies, no new GRANTs, no new indexes. The 2 new routes
+  reuse the existing `webhook_events`, `meeting_links`,
+  `session_grants`, `session_bookings`, `payments`,
+  `n8n_dead_letters` tables; the 8 rewritten workflows reuse
+  the same. Migrations are **unchanged** vs `HEAD`.
+
+### Guardrails honoured
+
+- No new migration. No `.env.local` edit. No `.env.example`
+  edit. No remote Supabase touch. No production n8n touch
+  (the 8 workflow rewrites live in the repo as JSON exports;
+  the deployment script will import them on the next
+  deploy).
+- **R-3 is NOT implemented.** The `meeting_links.recording_url`
+  column is **not** added. R-3 remains a forward-only schema
+  change gated on explicit user approval per CLAUDE §3.2.
+- No new SaaS, no new env var, no new top-level folder.
+- No commit, no push, no tag work performed in this turn
+  (per the user's guardrails). The commit and the tag are
+  gated on explicit user approval, exactly as for every
+  prior sprint.
+- The 54 pre-existing scratch files (`tmp_*.cjs`, `tmp_*.ps1`,
+  `html-*.txt`, etc.) are **untouched**.
+
 ## [1.9.0-phase2-sprint-9] — 2026-09-12
 
 ### Added — Sprint 9 (Homepage Student Progress hero integration)

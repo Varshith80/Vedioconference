@@ -4,15 +4,15 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "calendly",
+        "path": "module-booking-to-zoom",
         "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
       "position": [240, 300],
-      "name": "Webhook: calendly invitee.created",
-      "webhookId": "calendly-invitee-created-webhook"
+      "name": "Webhook: module-booking-to-zoom",
+      "webhookId": "module-booking-to-zoom-webhook"
     },
     {
       "parameters": {
@@ -64,38 +64,79 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [680, 300],
-      "name": "Resolve booking context (Next.js)"
+      "name": "Resolve booking context (Next.js)",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "if-resolved",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {"type": "boolean", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300],
+      "name": "If resolver returned a row"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://zoom.us/oauth/token?grant_type=account_credentials&account_id={{ $env.ZOOM_ACCOUNT_ID }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Basic {{ Buffer.from($env.ZOOM_CLIENT_ID + ':' + $env.ZOOM_CLIENT_SECRET).toString('base64') }}"}
+          ]
+        },
+        "options": {"response": {"response": {"responseFormat": "json"}}}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 100],
+      "name": "Mint Zoom S2S access token"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.zoom.us/v2/users/{{ $json.zoom_user_id }}/meetings",
+        "url": "https://api.zoom.us/v2/users/{{ $env.ZOOM_DEFAULT_HOST_USER_ID }}/meetings",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "Authorization", "value": "Bearer {{ $json.zoom_access_token }}"},
+            {"name": "Authorization", "value": "Bearer {{ $node['Mint Zoom S2S access token'].json.access_token }}"},
             {"name": "Content-Type",  "value": "application/json"}
           ]
         },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "topic",      "value": "={{ $json.module_title }} — {{ $json.student_name }}"},
+            {"name": "topic",      "value": "={{ $node['Resolve booking context (Next.js)'].json.data.course_title }} — {{ $node['Resolve booking context (Next.js)'].json.data.session_title }} — {{ $node['Resolve booking context (Next.js)'].json.data.student_name }}"},
             {"name": "type",       "value": "2"},
-            {"name": "start_time", "value": "={{ $json.scheduled_start }}"},
-            {"name": "duration",   "value": "={{ $json.duration_min }}"},
-            {"name": "timezone",   "value": "={{ $json.timezone }}"},
+            {"name": "start_time", "value": "={{ $node['Resolve booking context (Next.js)'].json.data.scheduled_start }}"},
+            {"name": "duration",   "value": "={{ $node['Resolve booking context (Next.js)'].json.data.duration_min }}"},
+            {"name": "timezone",   "value": "={{ $node['Resolve booking context (Next.js)'].json.data.timezone }}"},
             {"name": "settings[join_before_host]", "value": "false"},
             {"name": "settings[waiting_room]",     "value": "true"},
             {"name": "settings[mute_upon_entry]",  "value": "true"},
-            {"name": "settings[audio]",            "value": "voip"}
+            {"name": "settings[audio]",            "value": "voip"},
+            {"name": "tracking_fields[field_name][session_grant_id]", "value": "={{ $node['Resolve booking context (Next.js)'].json.data.session_grant_id }}"},
+            {"name": "tracking_fields[field_name][session_booking_id]", "value": "={{ $node['Resolve booking context (Next.js)'].json.data.session_booking_id }}"}
           ]
         },
         "options": {"timeout": 20000, "response": {"response": {"responseFormat": "json"}}}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 300],
+      "position": [1340, 100],
       "name": "Create Zoom meeting"
     },
     {
@@ -112,20 +153,80 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            {"name": "type",               "value": "meeting_created"},
-            {"name": "session_booking_id", "value": "={{ $json.module_booking_id }}"},
-            {"name": "zoom_meeting_id", "value": "={{ $node['Create Zoom meeting'].json.id }}"},
-            {"name": "join_url",        "value": "={{ $node['Create Zoom meeting'].json.join_url }}"},
-            {"name": "start_url",       "value": "={{ $node['Create Zoom meeting'].json.start_url }}"},
-            {"name": "passcode",        "value": "={{ $node['Create Zoom meeting'].json.password }}"}
+            {"name": "type",                "value": "meeting_created"},
+            {"name": "session_booking_id",  "value": "={{ $node['Resolve booking context (Next.js)'].json.data.session_booking_id }}"},
+            {"name": "meeting_id",          "value": "={{ $node['Create Zoom meeting'].json.id }}"},
+            {"name": "join_url",            "value": "={{ $node['Create Zoom meeting'].json.join_url }}"},
+            {"name": "start_url",           "value": "={{ $node['Create Zoom meeting'].json.start_url }}"},
+            {"name": "passcode",            "value": "={{ $node['Create Zoom meeting'].json.password }}"},
+            {"name": "host_url",            "value": "={{ $node['Create Zoom meeting'].json.start_url }}"}
           ]
         },
         "options": {"response": {"response": {"responseFormat": "json"}}}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 300],
+      "position": [1560, 100],
       "name": "Persist meeting_link (Next.js)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/n8n/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",      "value": "email"},
+            {"name": "template",  "value": "session_booking_confirmed"},
+            {"name": "to",        "value": "={{ $node['Resolve booking context (Next.js)'].json.data.student_email }}"},
+            {"name": "locale",    "value": "fr"},
+            {"name": "props[workflow]",         "value": "module-booking-to-zoom"},
+            {"name": "props[studentName]",      "value": "={{ $node['Resolve booking context (Next.js)'].json.data.student_name }}"},
+            {"name": "props[sessionTitle]",     "value": "={{ $node['Resolve booking context (Next.js)'].json.data.session_title }}"},
+            {"name": "props[scheduledStartIso]","value": "={{ $node['Resolve booking context (Next.js)'].json.data.scheduled_start }}"},
+            {"name": "props[joinUrl]",          "value": "={{ $node['Create Zoom meeting'].json.join_url }}"},
+            {"name": "props[dashboardUrl]",     "value": "={{ $env.NEXT_PUBLIC_SITE_URL }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 100],
+      "name": "Send student confirmation email (Next.js renderer)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/n8n/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type",      "value": "email_tutor"},
+            {"name": "to",        "value": "={{ $node['Resolve booking context (Next.js)'].json.data.tutor_email }}"},
+            {"name": "subject",   "value": "Nouvelle session réservée"},
+            {"name": "body",      "value": "Bonjour {{ $node['Resolve booking context (Next.js)'].json.data.tutor_name }},\n\nUne nouvelle session a été réservée.\n\nÉlève : {{ $node['Resolve booking context (Next.js)'].json.data.student_name }}\nCours : {{ $node['Resolve booking context (Next.js)'].json.data.course_title }}\nSession : {{ $node['Resolve booking context (Next.js)'].json.data.session_title }}\nDate : {{ $node['Resolve booking context (Next.js)'].json.data.scheduled_start }}\n\nLien hôte : {{ $node['Create Zoom meeting'].json.start_url }}"},
+            {"name": "session_booking_id", "value": "={{ $node['Resolve booking context (Next.js)'].json.data.session_booking_id }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300],
+      "name": "Send tutor notification (Next.js renderer)"
     },
     {
       "parameters": {
@@ -134,7 +235,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1340, 300],
+      "position": [2000, 200],
       "name": "Respond OK"
     },
     {
@@ -154,7 +255,7 @@
             {"name": "type",          "value": "workflow_failed"},
             {"name": "workflow",      "value": "module-booking-to-zoom"},
             {"name": "error",         "value": "={{ $json.error.message }}"},
-            {"name": "original_event","value": "={{ $('Webhook: calendly invitee.created').first().json }}"}
+            {"name": "original_event","value": "={{ $('Webhook: module-booking-to-zoom').first().json }}"}
           ]
         }
       },
@@ -165,7 +266,7 @@
     }
   ],
   "connections": {
-    "Webhook: calendly invitee.created": {
+    "Webhook: module-booking-to-zoom": {
       "main": [[{"node": "Verify secret + event type", "type": "main", "index": 0}]]
     },
     "Verify secret + event type": {
@@ -176,7 +277,19 @@
     },
     "Resolve booking context (Next.js)": {
       "main": [
-        [{"node": "Create Zoom meeting",       "type": "main", "index": 0}],
+        [{"node": "If resolver returned a row", "type": "main", "index": 0}],
+        [{"node": "Dead-letter on Zoom error",  "type": "main", "index": 0}]
+      ]
+    },
+    "If resolver returned a row": {
+      "main": [
+        [{"node": "Mint Zoom S2S access token", "type": "main", "index": 0}],
+        [{"node": "Respond OK",                  "type": "main", "index": 0}]
+      ]
+    },
+    "Mint Zoom S2S access token": {
+      "main": [
+        [{"node": "Create Zoom meeting", "type": "main", "index": 0}],
         [{"node": "Dead-letter on Zoom error", "type": "main", "index": 0}]
       ]
     },
@@ -187,6 +300,15 @@
       ]
     },
     "Persist meeting_link (Next.js)": {
+      "main": [
+        [{"node": "Send student confirmation email (Next.js renderer)", "type": "main", "index": 0}],
+        [{"node": "Send tutor notification (Next.js renderer)",         "type": "main", "index": 0}]
+      ]
+    },
+    "Send student confirmation email (Next.js renderer)": {
+      "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
+    },
+    "Send tutor notification (Next.js renderer)": {
       "main": [[{"node": "Respond OK", "type": "main", "index": 0}]]
     }
   },
@@ -196,8 +318,8 @@
     "saveExecutionProgress": true,
     "saveManualExecutions": true
   },
-  "tags": [{"name": "phase-3"}],
+  "tags": [{"name": "phase-3"}, {"name": "sprint-10"}],
   "meta": {
-    "description": "Calendly invitee.created → resolve booking context → create Zoom meeting → persist meeting_link via Next.js. Documented in n8n/docs/WORKFLOWS.md §2.2."
+    "description": "Sprint 10 — I-1: Calendly invitee.created → resolve booking context via /api/enrollments/by-calendly-invitee (returns session_booking_id, student, tutor, session title, scheduled_start, duration, timezone) → mint Zoom S2S token → POST Zoom meeting → persist meeting_link via /api/webhooks/n8n (type: meeting_created, session_booking_id) → send student confirmation via /api/n8n/notify (template: session_booking_confirmed) and tutor notification (type: email_tutor). Documented in n8n/docs/WORKFLOWS.md §2.2."
   }
 }
