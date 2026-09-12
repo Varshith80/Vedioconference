@@ -371,6 +371,7 @@ export type Database = {
           metadata: Json
           passcode: string | null
           provider: string
+          recording_url: string | null
           session_booking_id: string | null
           start_url: string | null
           updated_at: string
@@ -384,6 +385,7 @@ export type Database = {
           metadata?: Json
           passcode?: string | null
           provider?: string
+          recording_url?: string | null
           session_booking_id?: string | null
           start_url?: string | null
           updated_at?: string
@@ -397,6 +399,7 @@ export type Database = {
           metadata?: Json
           passcode?: string | null
           provider?: string
+          recording_url?: string | null
           session_booking_id?: string | null
           start_url?: string | null
           updated_at?: string
@@ -770,6 +773,13 @@ export type Database = {
             foreignKeyName: "resources_tutor_id_fkey"
             columns: ["tutor_id"]
             isOneToOne: false
+            referencedRelation: "public_tutors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_tutor_id_fkey"
+            columns: ["tutor_id"]
+            isOneToOne: false
             referencedRelation: "tutors"
             referencedColumns: ["id"]
           },
@@ -870,6 +880,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_bookings_tutor_id_fkey"
+            columns: ["tutor_id"]
+            isOneToOne: false
+            referencedRelation: "public_tutors"
             referencedColumns: ["id"]
           },
           {
@@ -1038,6 +1055,13 @@ export type Database = {
             foreignKeyName: "sessions_tutor_id_fkey"
             columns: ["tutor_id"]
             isOneToOne: false
+            referencedRelation: "public_tutors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessions_tutor_id_fkey"
+            columns: ["tutor_id"]
+            isOneToOne: false
             referencedRelation: "tutors"
             referencedColumns: ["id"]
           },
@@ -1112,6 +1136,100 @@ export type Database = {
           },
           {
             foreignKeyName: "subscriptions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tutor_change_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          current_tutor_id: string
+          id: string
+          proposed_alternative_tutor_ids: string[]
+          requested_at: string
+          responded_at: string | null
+          selected_tutor_id: string | null
+          session_booking_id: string
+          sla_deadline: string
+          status: string
+          student_id: string
+          student_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          current_tutor_id: string
+          id?: string
+          proposed_alternative_tutor_ids?: string[]
+          requested_at?: string
+          responded_at?: string | null
+          selected_tutor_id?: string | null
+          session_booking_id: string
+          sla_deadline: string
+          status?: string
+          student_id: string
+          student_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          current_tutor_id?: string
+          id?: string
+          proposed_alternative_tutor_ids?: string[]
+          requested_at?: string
+          responded_at?: string | null
+          selected_tutor_id?: string | null
+          session_booking_id?: string
+          sla_deadline?: string
+          status?: string
+          student_id?: string
+          student_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutor_change_requests_current_tutor_id_fkey"
+            columns: ["current_tutor_id"]
+            isOneToOne: false
+            referencedRelation: "public_tutors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutor_change_requests_current_tutor_id_fkey"
+            columns: ["current_tutor_id"]
+            isOneToOne: false
+            referencedRelation: "tutors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutor_change_requests_selected_tutor_id_fkey"
+            columns: ["selected_tutor_id"]
+            isOneToOne: false
+            referencedRelation: "public_tutors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutor_change_requests_selected_tutor_id_fkey"
+            columns: ["selected_tutor_id"]
+            isOneToOne: false
+            referencedRelation: "tutors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutor_change_requests_session_booking_id_fkey"
+            columns: ["session_booking_id"]
+            isOneToOne: false
+            referencedRelation: "session_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutor_change_requests_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -1208,7 +1326,30 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_tutors: {
+        Row: {
+          bio: string | null
+          full_name: string | null
+          id: string | null
+          subject: string | null
+          years_experience: number | null
+        }
+        Insert: {
+          bio?: never
+          full_name?: string | null
+          id?: string | null
+          subject?: never
+          years_experience?: number | null
+        }
+        Update: {
+          bio?: never
+          full_name?: string | null
+          id?: string | null
+          subject?: never
+          years_experience?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       citext:

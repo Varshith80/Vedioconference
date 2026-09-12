@@ -1,6 +1,6 @@
 import * as React from 'react';
 import Link from 'next/link';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, PlayCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,15 @@ interface SessionBookingCardProps {
    *  When the booking is `confirmed` and has a meeting URL,
    *  the route passes this prop. */
   joinHref?: string;
+  /**
+   * Sprint 11 — 11-E read-path UI. Localised "Recording" badge
+   * copy. When the booking's meeting has a `recording_url`, the
+   * card renders an inline badge next to the status badge with
+   * this text. When `recordingUrl` is null, the prop is ignored.
+   */
+  recordingLabel?: string;
+  /** `aria-label` for the inline recording badge. */
+  recordingLabelAria?: string;
 }
 
 /**
@@ -26,7 +35,13 @@ interface SessionBookingCardProps {
  * `/dashboard/sessions` and `/dashboard/bookings` from Sprint
  * 3.5 onward.
  */
-export function SessionBookingCard({ booking, viewHref, joinHref }: SessionBookingCardProps) {
+export function SessionBookingCard({
+  booking,
+  viewHref,
+  joinHref,
+  recordingLabel,
+  recordingLabelAria,
+}: SessionBookingCardProps) {
   const start = new Date(booking.scheduled_start);
   const formatted = start.toLocaleString(undefined, {
     weekday: 'short',
@@ -35,6 +50,14 @@ export function SessionBookingCard({ booking, viewHref, joinHref }: SessionBooki
     hour: '2-digit',
     minute: '2-digit',
   });
+  // Sprint 11 — R-3 read-path. The `meeting_links.recording_url`
+  // column is on the typed `MeetingLink` row directly after
+  // 11-F's local migration apply + `pnpm db:types` regen
+  // (no boundary cast needed). The `.trim()` defence is a
+  // runtime safety net against whitespace-padded payloads.
+  const rawRecordingUrl = booking.meeting?.recording_url ?? null;
+  const hasRecording =
+    typeof rawRecordingUrl === 'string' && rawRecordingUrl.trim().length > 0;
   return (
     <Card className="flex h-full flex-col">
       <CardHeader>
@@ -48,9 +71,25 @@ export function SessionBookingCard({ booking, viewHref, joinHref }: SessionBooki
               {formatted}
             </CardDescription>
           </div>
-          <Badge variant={variantForStatus(booking.status)} className="shrink-0 text-[10px]">
-            {labelForStatus(booking.status)}
-          </Badge>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            <Badge variant={variantForStatus(booking.status)} className="text-[10px]">
+              {labelForStatus(booking.status)}
+            </Badge>
+            {hasRecording ? (
+              <Badge
+                variant="outline"
+                className="inline-flex items-center gap-1 text-[10px]"
+                aria-label={recordingLabelAria}
+                data-testid="recording-badge"
+              >
+                <PlayCircle
+                  className="h-3 w-3 text-[color:var(--brand-accent)]"
+                  aria-hidden="true"
+                />
+                {recordingLabel ?? 'Recording'}
+              </Badge>
+            ) : null}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="mt-auto flex items-center justify-between gap-3 text-sm">

@@ -15,9 +15,18 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint 10 done (awaiting explicit user approval before Sprint 11)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 11 (R-3 — Zoom recording write-back & read path) implementation complete locally; awaiting explicit user approval before Sprint 11 Git commit / tag / push and before any production/operator action**.
 
 ## Current status
+
+🟢 **Sprint 11 (R-3 — Zoom `recording.completed` → `meeting_links.recording_url` write-back + student + admin read path) is implementation-complete locally.** Six slices (11-A through 11-F) ship:
+- **11-A** — `n8n/workflows/session-reminder-scheduler.json` dead-letter body no longer carries `$env.ADMIN_NOTIFY_EMAIL`.
+- **11-B** — `meeting_links.recording_url text NULL` migration (forward-only, no index, no RLS, no GRANT, no trigger) + `ZOOM_WEBHOOK_SECRET` in `apps/web/lib/env.ts` and `apps/web/.env.example` (server-side only, never `NEXT_PUBLIC_*`, never in n8n, never logged).
+- **11-C** — `POST /api/webhooks/zoom/` (the **Zoom trust boundary**). Raw body + `v0:{ts}:{raw}` HMAC-SHA256 + `crypto.timingSafeEqual` + ±5 min replay window + `endpoint.url_validation` echo + `webhook_events(provider, event_id)` UNIQUE idempotency + service-role admin client used **only** inside this route.
+- **11-D** — `n8n/workflows/zoom-recording-completed.json` (10th workflow). **Transparent transport**: forwards the raw body + the original `x-zm-signature` and `x-zm-request-timestamp` headers verbatim. No awareness of `ZOOM_WEBHOOK_SECRET`. Does NOT verify, does NOT re-sign. Trust boundary stays at the route.
+- **11-E** — student + admin read path. New `RecordingLinkCard` on `/dashboard/sessions/[id]`, inline `Badge` on `/dashboard/sessions`, and an inline pill on `/admin/bookings` (mirrored muted "Recording not available yet" pill for the null state; `data-recording-state="available" | "pending"` for symmetric test queries). EN + FR. The 10-cell admin row contract is preserved (no new column, no layout change).
+- **11-F** — local Supabase migration apply via `supabase db push --local` (the project's `pnpm db:push` script targets the remote project and was NOT run); `pnpm db:types` regeneration (`meeting_links.recording_url: string | null` now in the generated `Row` / `Insert` / `Update`); 5 pre-migration defensive casts removed (the `as never` cast on the route's `update` is gone; the dashboard's `as unknown` casts on `booking.meeting.recording_url` are gone; `.trim()` runtime defence preserved). Close-out docs landed.
+**No new SaaS, no new top-level folder, no new env var beyond the pre-authorized `ZOOM_WEBHOOK_SECRET`, no service-role-key workaround outside `app/api/webhooks/**`, no RLS change, no schema change beyond the single nullable column.** **The migration is applied to LOCAL Supabase only.** Remote Supabase, Zoom Marketplace, Vercel secrets, and production n8n are **operator actions** that remain separately gated. All four quality gates are green: `pnpm type-check` ✓, `pnpm lint` ✓ (1 pre-existing `lib/utils/logger.ts:31` warning unchanged), `pnpm test` ✓ (**688 / 688** across **69** files — +20 tests in Sprint 11: 23 new in `zoom-webhook-route.test.ts`, 15 new in `n8n-workflows-shape.test.ts`, 14 new in `recording-link-card.test.tsx` (incl. L/M/N admin dual-state), 6 new in `recording-link-i18n.test.ts`), `pnpm build` ✓ (the 11-C `/api/webhooks/zoom` route is registered; no other route table change). Full close-out: `docs/review/PHASE2_SPRINT_11_SUMMARY.md`. **Sprint 11 is UNSTAGED in the working tree**; the final `feat(sprint-11): …` commit, the `v1.11.0-phase2-sprint-11` tag, and the push to `origin/main` remain pending a separate explicit user authorization.
 
 🟢 **Sprint 10 (I-1 — n8n v2 webhook parity & admin recipient hard-code) is done.** A new
 `POST /api/n8n/notify` v2 email renderer + a new

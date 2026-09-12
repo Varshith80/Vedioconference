@@ -170,7 +170,6 @@
           "parameters": [
             {"name": "type", "value": "email"},
             {"name": "template", "value": "admin_dead_letter"},
-            {"name": "to", "value": "={{ $env.ADMIN_NOTIFY_EMAIL }}"},
             {"name": "locale", "value": "en"},
             {"name": "props[workflow]",      "value": "session-reminder-scheduler"},
             {"name": "props[errorMessage]",  "value": "={{ $json.error.message }}"},

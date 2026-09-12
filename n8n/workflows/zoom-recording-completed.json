@@ -1,0 +1,139 @@
+{
+  "name": "zoom-recording-completed",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zoom-recording-completed",
+        "responseMode": "onReceived",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "name": "Webhook: Zoom (raw body)",
+      "webhookId": "zoom-recording-completed-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/zoom/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "x-zm-signature",           "value": "={{ $json.headers['x-zm-signature'] }}"},
+            {"name": "x-zm-request-timestamp",   "value": "={{ $json.headers['x-zm-request-timestamp'] }}"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 20000,
+          "retry": {
+            "maxTries": 3
+          },
+          "response": {"response": {"responseFormat": "json"}}
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "name": "Forward to /api/webhooks/zoom/ (Next.js)",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "if-failed",
+              "leftValue": "={{ $json.error !== undefined }}",
+              "rightValue": true,
+              "operator": {"type": "boolean", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [680, 300],
+      "name": "If forwarding failed"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type",     "value": "application/json"},
+            {"name": "x-webhook-secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "type", "value": "email"},
+            {"name": "template", "value": "admin_dead_letter"},
+            {"name": "locale", "value": "en"},
+            {"name": "props[workflow]",         "value": "zoom-recording-completed"},
+            {"name": "props[errorMessage]",     "value": "={{ $json.error.message }}"},
+            {"name": "props[originalEvent]",    "value": "={{ $('Webhook: Zoom (raw body)').first().json }}"}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "name": "Dead-letter: notify admin",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300],
+      "name": "Respond OK to Zoom"
+    }
+  ],
+  "connections": {
+    "Webhook: Zoom (raw body)": {
+      "main": [[{"node": "Forward to /api/webhooks/zoom/ (Next.js)", "type": "main", "index": 0}]]
+    },
+    "Forward to /api/webhooks/zoom/ (Next.js)": {
+      "main": [
+        [{"node": "Respond OK to Zoom",         "type": "main", "index": 0}],
+        [{"node": "If forwarding failed",       "type": "main", "index": 0}]
+      ]
+    },
+    "If forwarding failed": {
+      "main": [
+        [{"node": "Dead-letter: notify admin",  "type": "main", "index": 0}],
+        [{"node": "Respond OK to Zoom",         "type": "main", "index": 0}]
+      ]
+    },
+    "Dead-letter: notify admin": {
+      "main": [[{"node": "Respond OK to Zoom", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true
+  },
+  "tags": [{"name": "phase-3"}, {"name": "sprint-11"}],
+  "meta": {
+    "description": "Sprint 11 — R-3: Zoom inbound webhook forwarder. n8n is a TRANSPORT layer only: it receives the original Zoom signed request and forwards the raw body + x-zm-signature + x-zm-request-timestamp headers to /api/webhooks/zoom/. The Next.js route is the Zoom trust boundary and verifies the original HMAC. n8n does NOT know ZOOM_WEBHOOK_SECRET, does NOT recompute the signature, does NOT parse+restringify the body, and does NOT filter events (endpoint.url_validation, recording.completed, meeting.ended, and future event types are all forwarded). On a forwarding failure, the existing admin dead-letter mechanism notifies the operator; recipient is hard-coded server-side in /api/n8n/notify (no body 'to' field per Sprint 11-A). Documented in n8n/docs/WORKFLOWS.md §2.10."
+  }
+}

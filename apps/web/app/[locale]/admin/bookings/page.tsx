@@ -63,6 +63,7 @@ export default async function AdminBookingsPage({
 
   const t = await getTranslations('Admin.bookings');
   const tCommon = await getTranslations('Admin.common');
+  const tRecording = await getTranslations('Admin.bookings.recording');
 
   // Each read is wrapped independently so one failure does not
   // short-circuit the others. The bookings envelope is the
@@ -179,6 +180,9 @@ export default async function AdminBookingsPage({
               bookingStatusLabels={bookingStatusLabels}
               paymentStatusLabels={paymentStatusLabels}
               columns={columns}
+              recordingCta={tRecording('cta')}
+              recordingAriaLabel={tRecording('cardLabel')}
+              recordingPending={tRecording('pending')}
             />
           )}
         </AdminDataState>

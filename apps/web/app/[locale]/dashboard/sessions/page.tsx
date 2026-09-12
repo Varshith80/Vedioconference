@@ -37,6 +37,7 @@ export default async function DashboardSessionsPage({
   setRequestLocale(locale);
   const t = await getTranslations('Dashboard.sessions');
   const tNav = await getTranslations('Nav');
+  const tRecording = await getTranslations('Dashboard.bookings.recording');
 
   const user = await getCurrentUser();
   const bookings = user ? await getStudentSessionBookings(user.id) : [];
@@ -76,6 +77,8 @@ export default async function DashboardSessionsPage({
                     booking={b}
                     viewHref={`/${locale}/dashboard/sessions/${b.id}`}
                     joinHref={b.meeting?.join_url ?? undefined}
+                    recordingLabel={tRecording('badge')}
+                    recordingLabelAria={tRecording('badgeAriaLabel')}
                   />
                 </li>
               ))}

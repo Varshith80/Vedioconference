@@ -51,6 +51,24 @@ interface BookingsFilterProps {
   paymentStatusLabels: Record<PaymentStatus, string>;
   // Columns config used by the parent AdminListPage chrome.
   columns: ReadonlyArray<{ key: string; label: string; className?: string }>;
+  /**
+   * Sprint 11 — 11-E read-path UI. Localised CTA label for the
+   * inline recording pill rendered inside the session cell when
+   * a booking has a `recording_url`.
+   */
+  recordingCta?: string;
+  /**
+   * `aria-label` for the inline recording pill. Falls back to
+   * `recordingCta` when omitted.
+   */
+  recordingAriaLabel?: string;
+  /**
+   * Sprint 11 — 11-E fix-up. Localised "Recording not available
+   * yet" notice rendered as a muted pill when the booking has
+   * no `recording_url`. Comes from
+   * `Admin.bookings.recording.pending`.
+   */
+  recordingPending?: string;
 }
 
 const BOOKING_STATUSES: ReadonlyArray<BookingStatus> = [
@@ -82,6 +100,9 @@ export function BookingsFilteredList({
   bookingStatusLabels,
   paymentStatusLabels,
   columns,
+  recordingCta,
+  recordingAriaLabel,
+  recordingPending,
 }: BookingsFilterProps) {
   // Local filter state.
   const [query, setQuery] = React.useState('');
@@ -292,6 +313,9 @@ export function BookingsFilteredList({
                     b,
                     bookingStatusLabels,
                     paymentStatusLabels,
+                    recordingCta,
+                    recordingAriaLabel,
+                    recordingPending,
                   });
                   return (
                     <tr
@@ -326,6 +350,9 @@ export function BookingsFilteredList({
                   b,
                   bookingStatusLabels,
                   paymentStatusLabels,
+                  recordingCta,
+                  recordingAriaLabel,
+                  recordingPending,
                 });
                 return (
                   <li key={b.id} className="rounded-md border bg-card p-3 text-sm">

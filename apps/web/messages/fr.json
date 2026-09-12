@@ -748,7 +748,14 @@
         "rescheduled": "Replanifié"
       },
       "joinSession": "Rejoindre la séance",
-      "bookAgain": "Réserver à nouveau"
+      "bookAgain": "Réserver à nouveau",
+      "recording": {
+        "cardLabel": "Enregistrement de la séance",
+        "badge": "Enregistrement",
+        "badgeAriaLabel": "Enregistrement disponible",
+        "cta": "Voir l'enregistrement",
+        "pending": "Enregistrement bientôt disponible"
+      }
     },
     "programs": {
       "title": "Mes programmes",
@@ -1202,6 +1209,11 @@
         "failed": "Échouée",
         "refunded": "Remboursée",
         "partially_refunded": "Partielle"
+      },
+      "recording": {
+        "cardLabel": "Enregistrement de la séance",
+        "cta": "Voir l'enregistrement",
+        "pending": "Enregistrement bientôt disponible"
       }
     },
     "bookingDetail": {

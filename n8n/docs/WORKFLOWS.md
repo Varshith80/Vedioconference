@@ -103,6 +103,7 @@ resulting state back to Supabase.
 | 7 | module-cancellation               | Calendly `invitee.canceled` / Next.js cancel route | DELETE Zoom meeting, `POST /api/webhooks/n8n` `session_booking_cancelled`, `POST /api/n8n/notify` `session_booking_cancelled` |
 | 8 | admin-notification                | n8n internal (1, 2, 3, 6, 7)         | `POST /api/n8n/notify` `admin_*` template (recipient is hard-coded server-side — no `to` body field) |
 | 9 | tutor-notification                | n8n internal (2)                     | `POST /api/n8n/notify` `email_tutor` (subject + body built in n8n) |
+| 11 | zoom-recording-completed          | Zoom webhook (Sprint 11 — R-3)       | `POST /api/webhooks/zoom/` (raw body + `x-zm-signature` + `x-zm-request-timestamp`); dead-letter on forwarding failure |
 
 > **Sprint 10 — I-1:** workflow 5 (`module-reminder-scheduler.json`)
 > is REMOVED. The v1 cron scanned `module_bookings`, which no
@@ -492,7 +493,18 @@ host).
 - `RESEND_API_KEY` — Resend credential (not the same as
   Next.js's `RESEND_API_KEY`; n8n has its own).
 - `RESEND_FROM_EMAIL` — sender.
-- `ADMIN_NOTIFY_EMAIL` — destination for dead-letter.
+
+**Dead-letter recipient (Sprint 11 — 11-A).** The
+`admin_dead_letter` template's recipient is **hard-coded
+server-side** in
+`apps/web/lib/constants/index.ts` (`ADMIN_NOTIFY_EMAIL`); the
+Next.js `/api/n8n/notify` route **ignores** any `to` field on
+the body for `admin_*` templates (see
+`apps/web/tests/unit/n8n-notify-route.test.ts`). The
+`session-reminder-scheduler.json` dead-letter node no longer
+sets a body `to` field for that reason — to make the
+dependency on the server-side constant explicit. n8n does NOT
+read an `ADMIN_NOTIFY_EMAIL` env var.
 
 **Why this lives in n8n (and not in Next.js)**
 ---------------------------------------------
@@ -523,7 +535,110 @@ them.
 
 ---
 
-### 2.11 POST /api/enrollments/by-calendly-invitee (Next.js → resolver) — Sprint 10 I-1
+### 2.11 zoom-recording-completed  (`zoom-recording-completed.json`) — Sprint 11 R-3
+
+**Trigger:** Zoom inbound webhook — `POST /webhook/zoom-recording-completed`,
+called by Zoom itself after the operator registers the webhook
+URL in the Zoom Marketplace. This is the only workflow that
+receives traffic directly from a vendor (the others receive
+from Next.js or from n8n's own cron).
+
+**Architecture — n8n is a transport layer only:**
+
+```
+Zoom
+  │ signed raw request
+  ▼
+n8n  (zoom-recording-completed)
+  │ forwards raw body + x-zm-signature + x-zm-request-timestamp
+  ▼
+/api/webhooks/zoom/  (Next.js — Zoom trust boundary)
+  │ verifies signature, idempotency, then writes meeting_links.recording_url
+  ▼
+Supabase
+```
+
+n8n does **not** know `ZOOM_WEBHOOK_SECRET`, does **not**
+recompute the signature, does **not** parse-and-restringify the
+body, and does **not** filter events. The Next.js route is the
+sole trust boundary for Zoom's HMAC.
+
+**Why this matters.** If n8n became the trust boundary — i.e.
+if it owned the Zoom secret and re-signed the request before
+forwarding — then a compromise of the n8n credentials or a
+self-signed forged payload from n8n would be accepted by the
+Next.js route. The locked architecture (CLAUDE.md §2.3) keeps
+n8n as the orchestration layer; the locked Sprint 11 trust
+model keeps the Next.js route as the HMAC verifier.
+
+**Steps:**
+
+1. **Receive Zoom webhook.** The n8n `Webhook` node is configured
+   with `responseMode: "onReceived"` (respond immediately, do
+   not wait for downstream) and `options.rawBody: true`. The
+   `rawBody` flag is what makes `$json.body` a **string**
+   (the original raw body), not a parsed JSON object. n8n
+   does not need to call `JSON.parse`/`JSON.stringify` on the
+   body — that would invalidate Zoom's signature.
+
+2. **Forward to Next.js.** The `HttpRequest` node POSTs
+   `${NEXT_PUBLIC_SITE_URL}/api/webhooks/zoom/` with three
+   header parameters:
+
+   | Header                       | Value                                        |
+   |------------------------------|----------------------------------------------|
+   | `Content-Type`               | `application/json`                           |
+   | `x-zm-signature`             | `={{ $json.headers['x-zm-signature'] }}`     |
+   | `x-zm-request-timestamp`     | `={{ $json.headers['x-zm-request-timestamp'] }}` |
+
+   The body is set with `specifyBody: "string"` to
+   `={{ $json.body }}` — the original raw body string from
+   step 1. The route at `/api/webhooks/zoom/` recomputes
+   `v0:${ts}:${rawBody}` and verifies it against
+   `x-zm-signature` with `crypto.timingSafeEqual`.
+
+   **The HttpRequest must NOT carry `x-webhook-secret`.** The
+   Zoom route does not use the n8n shared secret; it verifies
+   the original Zoom signature. Sending `x-webhook-secret`
+   here would imply a second authentication mechanism and is
+   forbidden.
+
+   **Retry policy:** `options.retry.maxTries = 3`. After
+   3 failed attempts, the `continueOnFail: true` flag on the
+   HttpRequest causes the error output of the node to be
+   populated; the connection graph routes that to the
+   `If forwarding failed` If node, which routes to the
+   `Dead-letter: notify admin` node (see step 3).
+
+3. **Dead-letter on forwarding failure.** The dead-letter
+   HttpRequest posts the existing v2 `email` +
+   `admin_dead_letter` template to
+   `${NEXT_PUBLIC_SITE_URL}/api/webhooks/n8n` (handled by
+   `/api/n8n/notify`). The body carries the workflow name,
+   the error message, and a redacted snapshot of the original
+   event. **The body does NOT carry a `to` field** — the
+   recipient is hard-coded server-side in
+   `apps/web/lib/constants/index.ts:ADMIN_NOTIFY_EMAIL`, per
+   the Sprint 11-A contract (see §2.10 for the same pattern
+   in `session-reminder-scheduler.json`).
+
+**Events forwarded.** Every Zoom event is forwarded. The
+route handles:
+
+- `endpoint.url_validation` — the operator-registration
+  challenge. n8n forwards it; the route returns
+  `{ plainToken, encryptedToken }`. n8n does not
+  short-circuit or filter this.
+- `recording.completed` — the route updates
+  `meeting_links.recording_url` from the `share_url` field.
+- `meeting.ended` — the route records the event in
+  `webhook_events`; no `recording_url` is fabricated.
+- Future / unknown events — the route returns 200
+  with the event recorded for observability.
+
+---
+
+### 2.13 POST /api/enrollments/by-calendly-invitee (Next.js → resolver) — Sprint 10 I-1
 
 **Trigger:** n8n workflow 2 (`module-booking-to-zoom`) POSTs
 the Calendly `invitee.created` payload to this Next.js route
@@ -565,7 +680,7 @@ the same row.
 
 ---
 
-### 2.12 POST /api/n8n/notify (Next.js → email renderer) — Sprint 10 I-1
+### 2.14 POST /api/n8n/notify (Next.js → email renderer) — Sprint 10 I-1
 
 **Trigger:** any v2 n8n workflow that wants to send a
 booking-path email (workflows 1, 2, 3, 4, 6, 7, 8, 9).

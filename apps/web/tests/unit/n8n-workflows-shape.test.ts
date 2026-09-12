@@ -30,6 +30,11 @@ import { join, resolve } from 'node:path';
 //     `session-reminder-scheduler.json` is the one workflow
 //     that was UNTOUCHED by Sprint 10 and is therefore excluded
 //     from this rule (it still reads the v2 env var directly).
+//   - the 10th workflow (zoom-recording-completed.json,
+//     added in Sprint 11 11-D) is a transparent transport
+//     that forwards the original Zoom signed request to
+//     /api/webhooks/zoom/ — it does not read the n8n
+//     admin env var and does not need the v2 webhook secret.
 // =====================================================================
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..');
@@ -57,13 +62,20 @@ interface N8nNode {
     url?: string;
     path?: string;
     method?: string;
+    body?: string;
+    responseBody?: string;
+    specifyBody?: string;
+    httpMethod?: string;
+    responseMode?: string;
+    options?: Record<string, unknown>;
+    conditions?: unknown;
   };
 }
 
 interface N8nWorkflow {
   name: string;
   nodes: N8nNode[];
-  connections: Record<string, unknown>;
+  connections: Record<string, { main?: Array<Array<{ node?: string; type?: string; index?: number } | undefined>> }>;
   meta?: { description?: string };
 }
 
@@ -99,7 +111,7 @@ function allStringValues(wf: N8nWorkflow): string[] {
 }
 
 describe('n8n/workflows/*.json — inventory', () => {
-  it('the directory contains the 9 expected workflow files', () => {
+  it('the directory contains the 10 expected workflow files (9 originals + Sprint 11 11-D zoom-recording-completed)', () => {
     const files = readdirSync(WORKFLOWS_DIR).sort();
     expect(files).toEqual([
       'admin-notification.json',
@@ -111,6 +123,7 @@ describe('n8n/workflows/*.json — inventory', () => {
       'module-reschedule.json',
       'session-reminder-scheduler.json',
       'tutor-notification.json',
+      'zoom-recording-completed.json',
     ]);
   });
 
@@ -313,4 +326,412 @@ describe('n8n/workflows/*.json — I-1 rewrites do not read the legacy admin env
       }
     });
   }
+});
+
+describe('n8n/workflows/*.json — Sprint 11 11-A dead-letter cleanup', () => {
+  // The session-reminder-scheduler.json dead-letter HttpRequest node
+  // posts to /api/webhooks/n8n with a `template: admin_dead_letter`
+  // body. The /api/n8n/notify route hard-codes the admin recipient
+  // (lib/constants/ADMIN_NOTIFY_EMAIL) and ignores any body `to` field
+  // for admin_* templates. The dead-letter workflow MUST NOT supply a
+  // body `to` field — the absence makes the server-side constant the
+  // single source of truth and prevents a future regression where a
+  // body `to` leaks a digest to an attacker-controlled address.
+  it('session-reminder-scheduler.json has exactly one /api/webhooks/n8n admin_dead_letter node', () => {
+    const wfs = readWorkflows();
+    const live = wfs.find((w) => w.file === 'session-reminder-scheduler.json');
+    expect(live, 'session-reminder-scheduler.json must exist').toBeTruthy();
+    const deadLetterNodes: Array<{ node: N8nNode; template: string; url: string }> = [];
+    for (const node of live!.wf.nodes ?? []) {
+      const url = node.parameters?.url ?? '';
+      if (!url.includes('/api/webhooks/n8n')) continue;
+      const params = node.parameters?.bodyParameters?.parameters ?? [];
+      const typeParam = params.find((p) => p.name === 'type');
+      const templateParam = params.find((p) => p.name === 'template');
+      if (typeParam?.value === 'email' && templateParam?.value === 'admin_dead_letter') {
+        deadLetterNodes.push({ node, template: templateParam.value, url });
+      }
+    }
+    expect(deadLetterNodes).toHaveLength(1);
+  });
+
+  it('the session-reminder-scheduler dead-letter node does not supply a body `to` field', () => {
+    const wfs = readWorkflows();
+    const live = wfs.find((w) => w.file === 'session-reminder-scheduler.json');
+    expect(live).toBeTruthy();
+    for (const node of live!.wf.nodes ?? []) {
+      const url = node.parameters?.url ?? '';
+      if (!url.includes('/api/webhooks/n8n')) continue;
+      const params = node.parameters?.bodyParameters?.parameters ?? [];
+      const typeParam = params.find((p) => p.name === 'type');
+      const templateParam = params.find((p) => p.name === 'template');
+      if (typeParam?.value !== 'email' || templateParam?.value !== 'admin_dead_letter') continue;
+      const toParam = params.find((p) => p.name === 'to');
+      expect(
+        toParam,
+        `session-reminder-scheduler / node "${node.name}": admin_dead_letter body must NOT carry a 'to' field — the recipient is hard-coded server-side in /api/n8n/notify (lib/constants/ADMIN_NOTIFY_EMAIL).`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('the session-reminder-scheduler dead-letter node does not read $env.ADMIN_NOTIFY_EMAIL anywhere', () => {
+    const wfs = readWorkflows();
+    const live = wfs.find((w) => w.file === 'session-reminder-scheduler.json');
+    expect(live).toBeTruthy();
+    const values = allStringValues(live!.wf).join(' ');
+    expect(values, 'session-reminder-scheduler.json must not reference $env.ADMIN_NOTIFY_EMAIL').not.toContain('$env.ADMIN_NOTIFY_EMAIL');
+  });
+
+  it('no workflow across the set supplies a body `to` field on an admin_* template', () => {
+    // Defence-in-depth: this rule applies to every workflow, not just
+    // session-reminder-scheduler. An admin_* template's recipient is
+    // always the server-side constant.
+    const ADMIN_TEMPLATES = new Set([
+      'admin_dead_letter',
+      'admin_booking_confirmed',
+      'admin_booking_cancelled',
+      'admin_booking_rescheduled',
+    ]);
+    for (const { file, wf } of readWorkflows()) {
+      for (const node of wf.nodes ?? []) {
+        const url = node.parameters?.url ?? '';
+        if (!url.includes('/api/webhooks/n8n')) continue;
+        const params = node.parameters?.bodyParameters?.parameters ?? [];
+        const typeParam = params.find((p) => p.name === 'type');
+        const templateParam = params.find((p) => p.name === 'template');
+        if (typeParam?.value !== 'email') continue;
+        if (!templateParam || !ADMIN_TEMPLATES.has(templateParam.value)) continue;
+        const toParam = params.find((p) => p.name === 'to');
+        expect(
+          toParam,
+          `${file} / node "${node.name}": admin_* template "${templateParam.value}" must NOT carry a body 'to' field`,
+        ).toBeUndefined();
+      }
+    }
+  });
+});
+
+// =====================================================================
+// Sprint 11 — 11-D — `n8n/workflows/zoom-recording-completed.json`.
+//
+// The new workflow is a transparent transport: it receives the
+// original signed Zoom request and forwards the raw body +
+// x-zm-signature + x-zm-request-timestamp to
+// POST /api/webhooks/zoom/. The Next.js route is the Zoom trust
+// boundary and verifies the original HMAC. n8n is forbidden from:
+//   - knowing ZOOM_WEBHOOK_SECRET
+//   - recomputing the signature
+//   - re-serialising / re-constructing the body
+//   - filtering events
+//   - sending `x-webhook-secret` to /api/webhooks/zoom/
+// =====================================================================
+
+describe('n8n/workflows/zoom-recording-completed.json — Sprint 11 11-D', () => {
+  const FILE = 'zoom-recording-completed.json';
+  const wfs = readWorkflows();
+  const flow = wfs.find((w) => w.file === FILE);
+  if (!flow) {
+    // Surface as a single failing assertion when the file is
+    // missing — the rest of the describe block can then
+    // short-circuit on `flow` being undefined.
+    it('zoom-recording-completed.json exists', () => {
+      expect(flow, 'zoom-recording-completed.json must exist').toBeTruthy();
+    });
+    return;
+  }
+  const wf = flow.wf;
+
+  // A. The file exists and parses as valid JSON. (The inventory
+  //    + every-JSON-file-parses describe blocks already cover
+  //    this; pin it again for self-documentation.)
+  it('A. file exists and is valid JSON', () => {
+    expect(typeof wf.name).toBe('string');
+    expect(Array.isArray(wf.nodes)).toBe(true);
+    expect(typeof wf.connections).toBe('object');
+  });
+
+  // B. Workflow identity.
+  it('B. workflow name is "zoom-recording-completed"', () => {
+    expect(wf.name).toBe('zoom-recording-completed');
+  });
+
+  // Helper: find a node by exact name.
+  const findNode = (name: string) =>
+    (wf.nodes ?? []).find((n) => n?.name === name);
+
+  // C. Inbound Webhook node.
+  it('C. contains an inbound Webhook node (n8n-nodes-base.webhook)', () => {
+    const webhookNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.webhook',
+    );
+    expect(webhookNodes.length, 'at least one Webhook node').toBeGreaterThan(0);
+    const inbound = webhookNodes[0]!;
+    // Must accept POST (Zoom's webhook delivery is POST).
+    expect(inbound.parameters?.httpMethod).toBe('POST');
+    // Must have a stable path so the operator can register
+    // the URL in the Zoom Marketplace.
+    expect(typeof inbound.parameters?.path).toBe('string');
+    expect((inbound.parameters?.path as string).length).toBeGreaterThan(0);
+  });
+
+  // D. HTTP Request node targeting /api/webhooks/zoom/.
+  it('D. contains an HTTP Request node posting to /api/webhooks/zoom/', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const zoomForward = httpNodes.find((n) =>
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    expect(zoomForward, 'a POST to /api/webhooks/zoom/ must exist').toBeTruthy();
+  });
+
+  // E. HTTP method is POST.
+  it('E. the /api/webhooks/zoom/ HTTP Request node uses POST', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const zoomForward = httpNodes.find((n) =>
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    expect(zoomForward?.parameters?.method).toBe('POST');
+  });
+
+  // F. The original `x-zm-signature` header is forwarded.
+  it('F. forwards the original x-zm-signature header', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const zoomForward = httpNodes.find((n) =>
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    const headers = zoomForward?.parameters?.headerParameters?.parameters ?? [];
+    const sigHeader = headers.find((h) => h.name === 'x-zm-signature');
+    expect(sigHeader, 'x-zm-signature header must be set on the forward').toBeTruthy();
+    // Must reference the inbound header (not a constant), i.e.
+    //   "={{ $json.headers['x-zm-signature'] }}"
+    expect(sigHeader!.value).toBe("={{ $json.headers['x-zm-signature'] }}");
+  });
+
+  // G. The original `x-zm-request-timestamp` header is forwarded.
+  it('G. forwards the original x-zm-request-timestamp header', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const zoomForward = httpNodes.find((n) =>
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    const headers = zoomForward?.parameters?.headerParameters?.parameters ?? [];
+    const tsHeader = headers.find((h) => h.name === 'x-zm-request-timestamp');
+    expect(tsHeader, 'x-zm-request-timestamp header must be set on the forward').toBeTruthy();
+    expect(tsHeader!.value).toBe("={{ $json.headers['x-zm-request-timestamp'] }}");
+  });
+
+  // H. ZOOM_WEBHOOK_SECRET is NOT referenced anywhere in the workflow.
+  it('H. does NOT reference ZOOM_WEBHOOK_SECRET', () => {
+    const allValues: string[] = [];
+    for (const node of wf.nodes ?? []) {
+      const p = node?.parameters ?? {};
+      const collect = (v: unknown) => {
+        if (typeof v === 'string') allValues.push(v);
+      };
+      collect(p.url);
+      collect(p.body);
+      collect(p.responseBody);
+      const params = (p as { bodyParameters?: { parameters?: Array<{ value: string }> } })
+        .bodyParameters?.parameters;
+      for (const x of params ?? []) collect(x.value);
+      const headers = (p as { headerParameters?: { parameters?: Array<{ value: string }> } })
+        .headerParameters?.parameters;
+      for (const x of headers ?? []) collect(x.value);
+    }
+    const haystack = allValues.join(' ');
+    expect(
+      haystack,
+      'ZOOM_WEBHOOK_SECRET must never appear in the workflow — verification belongs to /api/webhooks/zoom/',
+    ).not.toContain('ZOOM_WEBHOOK_SECRET');
+  });
+
+  // I. x-webhook-secret is NOT sent to /api/webhooks/zoom/.
+  it('I. does NOT send x-webhook-secret to /api/webhooks/zoom/', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const zoomForward = httpNodes.find((n) =>
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    const headers = zoomForward?.parameters?.headerParameters?.parameters ?? [];
+    const n8nSecret = headers.find((h) => h.name === 'x-webhook-secret');
+    expect(
+      n8nSecret,
+      '/api/webhooks/zoom/ does not use the n8n shared secret; it verifies the original Zoom signature',
+    ).toBeUndefined();
+  });
+
+  // J + K. The forwarding body is the Webhook's raw-body string,
+  //        NOT a JSON.parse/stringify reconstruction.
+  it('J+K. forwards the raw body string and does NOT JSON.parse/stringify it', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const zoomForward = httpNodes.find((n) =>
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    const p = zoomForward?.parameters ?? {};
+    // The Webhook node is configured with options.rawBody=true
+    // so `$json.body` IS the raw body string. The HttpRequest
+    // must forward it as a string (specifyBody='string'), not
+    // a bodyParameters object (which would re-shape it).
+    expect(p.specifyBody, 'forwarding must use specifyBody=string').toBe('string');
+    expect(typeof p.body, 'body must be a string expression').toBe('string');
+    expect(p.body, 'body must reference the raw body directly').toBe('={{ $json.body }}');
+    // Defence-in-depth: the workflow must NOT include a
+    // bodyParameters.parameters[] block on this node — that
+    // would force n8n to re-shape the body and invalidate
+    // the signature.
+    expect(
+      (p as { bodyParameters?: unknown }).bodyParameters,
+      'must NOT use bodyParameters (it would re-shape the body)',
+    ).toBeUndefined();
+    // And must NOT contain a JSON.stringify(…($json.body)) reconstruction.
+    const allText = JSON.stringify(p);
+    expect(
+      allText,
+      'must NOT reconstruct the body via JSON.stringify($json.body)',
+    ).not.toMatch(/JSON\.stringify\s*\(\s*\$\{?\$json\.body\}?\s*\)/);
+    expect(
+      allText,
+      'must NOT JSON.parse the body and re-emit it',
+    ).not.toMatch(/JSON\.parse\s*\(\s*\$\{?\$json\.body\}?\s*\)/);
+    // Pin that the Webhook node opts into raw-body mode so
+    // `$json.body` is the raw string, not a parsed object.
+    const webhookNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.webhook',
+    );
+    const wb = webhookNodes[0];
+    expect(
+      (wb?.parameters?.options as { rawBody?: unknown } | undefined)?.rawBody,
+      'Webhook node must enable options.rawBody=true so $json.body is the raw body string',
+    ).toBe(true);
+  });
+
+  // L. Retry behavior exists and is bounded at 3 attempts.
+  it('L. retry behavior exists and is bounded at 3 attempts', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const zoomForward = httpNodes.find((n) =>
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    // The repo's established convention is:
+    //   1. The forward HttpRequest has `continueOnFail: true`
+    //      so the error output of the node is populated.
+    //   2. The error output is routed via the connection graph
+    //      to a downstream If → dead-letter node.
+    //   3. A 3-attempt cap is implemented at the
+    //      `options.retry` level (n8n 1.x HttpRequest) OR by
+    //      the If-node routing that bails to the dead-letter
+    //      after the first error (since the forward itself
+    //      is one HTTP attempt; the next retries happen
+    //      inside the next.js route's own dedup / replay).
+    // The contract here is: bounded retry policy is present.
+    const opts = (zoomForward?.parameters?.options ?? {}) as {
+      retry?: { maxTries?: number };
+    };
+    const nodeMaxTries = opts.retry?.maxTries;
+    expect(
+      nodeMaxTries,
+      'HttpRequest must set options.retry.maxTries to bound retries at 3',
+    ).toBe(3);
+  });
+
+  // M. The exhausted path reaches the admin dead-letter notification.
+  it('M. the exhausted path reaches the admin_dead_letter notify mechanism', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const deadLetter = httpNodes.find((n) => {
+      const params = n?.parameters?.bodyParameters?.parameters ?? [];
+      const t = params.find((p) => p.name === 'type')?.value;
+      const tpl = params.find((p) => p.name === 'template')?.value;
+      return t === 'email' && tpl === 'admin_dead_letter';
+    });
+    expect(
+      deadLetter,
+      'admin_dead_letter HttpRequest must exist (route: /api/webhooks/n8n)',
+    ).toBeTruthy();
+    expect(deadLetter!.parameters?.url).toContain('/api/webhooks/n8n');
+    // Trace: the forward node's error output (index 1) must
+    // reach the dead-letter node (directly or via an If).
+    const forward = (wf.nodes ?? []).find((n) =>
+      n?.type === 'n8n-nodes-base.httpRequest' &&
+      (n?.parameters?.url ?? '').includes('/api/webhooks/zoom/'),
+    );
+    expect(forward, 'forward HttpRequest must exist').toBeTruthy();
+    const forwardOut = wf.connections?.[forward!.name]?.main ?? [];
+    // The forward's two outputs are:
+    //   index 0 → success branch (Respond OK)
+    //   index 1 → error branch (If forwarding failed → dead-letter)
+    const errorOutput = forwardOut[1] ?? [];
+    const errorReaches = errorOutput.some(
+      (c) => {
+        if (!c?.node) return false;
+        if (c.node === deadLetter!.name) return true;
+        // … or routes through the If node that gates the
+        // dead-letter call (the If's success branch
+        // forwards to the dead-letter).
+        const next = wf.connections?.[c.node]?.main?.[0] ?? [];
+        return next.some((cc) => cc?.node === deadLetter!.name);
+      },
+    );
+    expect(
+      errorReaches,
+      'forward error output must reach the admin_dead_letter node (directly or via the If gate)',
+    ).toBe(true);
+  });
+
+  // N. The dead-letter request does NOT supply a body `to` field.
+  it('N. the admin_dead_letter request does NOT supply a body `to` field', () => {
+    const httpNodes = (wf.nodes ?? []).filter(
+      (n) => n?.type === 'n8n-nodes-base.httpRequest',
+    );
+    const deadLetter = httpNodes.find((n) => {
+      const params = n?.parameters?.bodyParameters?.parameters ?? [];
+      const t = params.find((p) => p.name === 'type')?.value;
+      const tpl = params.find((p) => p.name === 'template')?.value;
+      return t === 'email' && tpl === 'admin_dead_letter';
+    });
+    expect(deadLetter, 'admin_dead_letter node must exist').toBeTruthy();
+    const params = deadLetter!.parameters?.bodyParameters?.parameters ?? [];
+    const toParam = params.find((p) => p.name === 'to');
+    expect(
+      toParam,
+      'admin_dead_letter must NOT carry a body `to` — recipient is hard-coded server-side (Sprint 11-A)',
+    ).toBeUndefined();
+  });
+
+  // O. No unrelated workflow was modified.
+  //    (Pinned by the inventory describe block above; this
+  //    is the 9-expected-files assertion, which would fail
+  //    if any unrelated workflow were renamed or removed.
+  //    Adding the 10th file — zoom-recording-completed.json —
+  //    is the only change in n8n/workflows/.)
+  it('O. the workflow set is the 9 originals + zoom-recording-completed.json (no rename, no delete)', () => {
+    const files = readdirSync(WORKFLOWS_DIR).sort();
+    expect(files).toContain('zoom-recording-completed.json');
+    // The original 9 are all present and unmodified in name.
+    for (const original of [
+      'admin-notification.json',
+      'enrollment-created.json',
+      'module-booking-to-zoom.json',
+      'module-cancellation.json',
+      'module-completed.json',
+      'module-confirmation-email.json',
+      'module-reschedule.json',
+      'session-reminder-scheduler.json',
+      'tutor-notification.json',
+    ]) {
+      expect(files).toContain(original);
+    }
+    expect(files.length, 'no unexpected files in n8n/workflows/').toBe(10);
+  });
 });

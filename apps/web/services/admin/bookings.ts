@@ -161,6 +161,18 @@ export interface BookingWithDetails {
     join_url: string;
     passcode: string | null;
     start_url: string | null;
+    /**
+     * Sprint 11 — R-3 read-path. The Zoom `recording.completed`
+     * webhook (route `app/api/webhooks/zoom/route.ts`, 11-C) writes
+     * the share URL here via
+     * `20260912000002_add_meeting_links_recording_url.sql` (applied
+     * in 11-F to local Supabase). The read path (student detail
+     * page, sessions list, admin bookings row) reads this field
+     * and renders the URL when non-null; the absence of a URL is
+     * a valid steady state (host has not enabled cloud recording,
+     * or the recording is still processing).
+     */
+    recording_url: string | null;
   } | null;
 }
 
@@ -207,7 +219,7 @@ const BOOKINGS_SELECT = `
     id, grant_type, status, total_credits, consumed_credits, expires_at, amount_cents, currency
   ),
   meeting:meeting_links!meeting_links_session_booking_id_fkey (
-    id, provider, meeting_id, join_url, passcode, start_url
+    id, provider, meeting_id, join_url, passcode, start_url, recording_url
   )
 `;
 
@@ -268,6 +280,7 @@ interface RawBookingRow {
     join_url: string;
     passcode: string | null;
     start_url: string | null;
+    recording_url: string | null;
   } | null;
 }
 
@@ -369,6 +382,10 @@ function toBookingWithDetails(
           join_url: row.meeting.join_url,
           passcode: row.meeting.passcode,
           start_url: row.meeting.start_url,
+          recording_url:
+            typeof row.meeting.recording_url === 'string'
+              ? row.meeting.recording_url
+              : null,
         }
       : null,
   };

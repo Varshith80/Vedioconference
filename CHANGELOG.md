@@ -4,6 +4,169 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Sprint 11 (R-3 — Zoom recording.completed → meeting_links.recording_url)
+
+### Added — Sprint 11 (R-3 — Zoom recording write-back & read path)
+
+Six slices delivering R-3, the Zoom `recording.completed` →
+`meeting_links.recording_url` write-back and a student + admin
+read path. R-3 was deferred from the Sprint 9 audit and Sprint
+10. Architecture is the locked Option A: Zoom → n8n
+(`zoom-recording-completed`) → `POST /api/webhooks/zoom/`. n8n
+is the **transparent transport**; the Next.js route is the
+**trust boundary** (the only place that verifies the original
+Zoom HMAC).
+
+#### Database
+
+- `meeting_links.recording_url text NULL` (forward-only, no
+  index, no RLS, no GRANT change, no trigger). Migration file:
+  `supabase/migrations/20260912000002_add_meeting_links_recording_url.sql`.
+  **Applied to local Supabase** via `supabase db push --local`
+  in Slice 11-F. **NOT applied to remote** — that is a
+  separately gated operator action.
+
+#### Route handlers
+
+- `POST /api/webhooks/zoom/` (NEW) — the Zoom trust boundary.
+  Reads the **raw** request body (so the HMAC matches the bytes
+  Zoom signed), verifies the
+  `v0:{x-zm-request-timestamp}:{raw_request_body}` HMAC-SHA256
+  with `ZOOM_WEBHOOK_SECRET` using `crypto.timingSafeEqual`,
+  enforces the ±5 min replay window, echoes the
+  `endpoint.url_validation` challenge, and inserts
+  `webhook_events(provider='zoom', event_id)` for idempotency
+  (UNIQUE constraint at the database level). On
+  `recording.completed` it resolves the share URL via a
+  documented selection rule (`object.share_url` → first MP4
+  `share_url` → first file `share_url` → null + log) and
+  updates `meeting_links.recording_url` for the matching
+  `meeting_id`. `meeting.ended` is recorded in
+  `webhook_events` only (no `recording_url` written). Unknown
+  events return 200 — the route is forward-compatible. The
+  service-role admin client is used **only** inside this
+  route, per the existing layer rule.
+
+#### n8n
+
+- `n8n/workflows/zoom-recording-completed.json` (NEW, 10th
+  workflow) — transparent transport. Captures the **raw**
+  request body + the original `x-zm-signature` and
+  `x-zm-request-timestamp` headers and POSTs them verbatim to
+  the Next.js route. Has no awareness of `ZOOM_WEBHOOK_SECRET`.
+  Does NOT verify, does NOT re-sign. The trust boundary stays
+  at the route.
+- `n8n/workflows/session-reminder-scheduler.json` (MODIFIED)
+  — the 11-A dead-letter fix: the body no longer carries
+  `$env.ADMIN_NOTIFY_EMAIL`; the route hard-codes the
+  recipient.
+
+#### Read path (student + admin)
+
+- **Student session detail** (`/dashboard/sessions/[id]`) —
+  new `RecordingLinkCard` in the right-hand aside. Renders
+  the share URL when present; renders the localized
+  "Recording not available yet" / "Enregistrement bientôt
+  disponible" notice when null. EN + FR.
+- **Student sessions list** (`/dashboard/sessions`) — inline
+  `Badge` next to the status badge when a `recording_url` is
+  set.
+- **Admin bookings row** (`/admin/bookings`) — inline pill in
+  the same `session` cell. When the URL is set, links to the
+  share URL with `target="_blank" rel="noopener noreferrer"`
+  and the `data-recording-state="available"` testid. When the
+  URL is null, a mirrored muted
+  `data-recording-state="pending"` pill shows the localized
+  pending notice. The 10-cell row contract is preserved (no
+  new column, no layout change).
+
+#### i18n
+
+- `Dashboard.bookings.recording.{cardLabel, badge,
+  badgeAriaLabel, cta, pending}` (NEW) and
+  `Admin.bookings.recording.{cardLabel, cta, pending}` (NEW)
+  in `apps/web/messages/en.json` and `fr.json`.
+
+#### Env
+
+- `ZOOM_WEBHOOK_SECRET` added to `apps/web/lib/env.ts` and
+  `apps/web/.env.example` (server-side only, never
+  `NEXT_PUBLIC_*`, never in n8n, never logged).
+
+#### Type regeneration
+
+- `apps/web/types/database.generated.ts` regenerated via
+  `pnpm db:types` (= `supabase gen types typescript --local`).
+  `meeting_links.Row.recording_url: string | null` (and the
+  matching optional fields on `Insert` / `Update`).
+
+#### Tests (close-out)
+
+- `apps/web/tests/unit/zoom-webhook-route.test.ts` (NEW, 23
+  tests)
+- `apps/web/tests/unit/zoom-webhook-contract.test.ts` (NEW)
+- `apps/web/tests/unit/recording-link-card.test.tsx` (NEW, 14
+  tests including the L / M / N admin dual-state cases)
+- `apps/web/tests/unit/recording-link-i18n.test.ts` (NEW, 6
+  tests)
+- `apps/web/tests/unit/n8n-workflows-shape.test.ts` (MODIFIED,
+  +15 cases for the 10th workflow)
+
+### Changed
+
+- `apps/web/services/admin/bookings.ts` — JSDoc on
+  `meeting.recording_url` reflects the applied column and
+  the post-11-F R-3 read path.
+- `apps/web/components/admin/bookings-row.tsx` — comment
+  refresh to reflect the applied column; the `typeof ===
+  'string'` runtime guard is preserved as a runtime safety
+  net.
+- `apps/web/app/[locale]/dashboard/sessions/[id]/page.tsx`
+  and `apps/web/components/dashboard/session-booking-card.tsx`
+  — pre-migration defensive casts removed; the `.trim()`
+  runtime defence is preserved.
+- `apps/web/app/api/webhooks/zoom/route.ts` — the `as never`
+  cast on the `meeting_links.update({ recording_url })` was
+  removed; the typed `Update` is now used directly.
+
+### Removed
+
+- None.
+
+### Quality gates
+
+- `pnpm type-check` → exit 0
+- `pnpm lint` → exit 0 (1 pre-existing
+  `lib/utils/logger.ts:31:8` no-console warning, unchanged)
+- `pnpm test` → **688 / 688 pass across 69 files** (no skip,
+  no `.only`, no suppressed failures)
+- `pnpm build` → exit 0; route table unchanged (the only
+  Sprint 11 route handler is the 11-C `/api/webhooks/zoom`)
+
+### Production / operator actions still pending (NOT done in 11-F)
+
+The Sprint 11 implementation is **locally complete**. The
+following are operator actions that require separate
+authorization and are **NOT** in scope for 11-F:
+
+- Zoom Marketplace webhook registration
+  (`https://<prod-host>/api/webhooks/zoom/`,
+  `recording.completed` + `meeting.ended` opt-in,
+  `endpoint.url_validation` challenge).
+- Vercel `ZOOM_WEBHOOK_SECRET` set in production (and
+  `staging` if needed).
+- Production n8n: import `zoom-recording-completed.json` and
+  configure the n8n credentials block.
+- Remote Supabase migration apply
+  (`20260912000002_add_meeting_links_recording_url.sql`).
+
+### Git
+
+Sprint 11 is **UNSTAGED in the working tree**. The final
+`feat(sprint-11): …` commit, the
+`v1.11.0-phase2-sprint-11` tag, and the push to `origin/main`
+are pending a separate explicit user authorization.
+
 ## [1.9.0-phase2-sprint-10] — 2026-09-12
 
 ### Added — Sprint 10 (I-1 — n8n v2 webhook parity & admin recipient hard-code)

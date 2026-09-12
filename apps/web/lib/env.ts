@@ -123,6 +123,15 @@ const serverSchema = z.object({
   ZOOM_CLIENT_ID:            z.string().min(1).optional(),
   ZOOM_CLIENT_SECRET:        z.string().min(1).optional(),
   ZOOM_DEFAULT_HOST_USER_ID: z.string().min(1).optional(),
+  // Sprint 11 — R-3: the secret used to verify the
+  // `x-zm-signature` HMAC on the inbound
+  // `POST /api/webhooks/zoom/` route. Distinct from the
+  // S2S-OAuth credentials above (which are read by n8n
+  // per ADR-003). The route refuses the request when this
+  // var is unset, the same pattern as the Stripe and
+  // Calendly routes' `STRIPE_WEBHOOK_SECRET` /
+  // `CALENDLY_WEBHOOK_SIGNING_KEY` checks.
+  ZOOM_WEBHOOK_SECRET:       z.string().min(1).optional(),
   CALENDLY_PERSONAL_TOKEN:   z.string().min(1).optional(),
   CALENDLY_WEBHOOK_SIGNING_KEY: z.string().min(1).optional(),
   RESEND_API_KEY:            z.string().min(1).optional(),
@@ -166,6 +175,7 @@ export function serverEnv(): ServerEnv {
     ZOOM_CLIENT_ID:               process.env.ZOOM_CLIENT_ID,
     ZOOM_CLIENT_SECRET:           process.env.ZOOM_CLIENT_SECRET,
     ZOOM_DEFAULT_HOST_USER_ID:    process.env.ZOOM_DEFAULT_HOST_USER_ID,
+    ZOOM_WEBHOOK_SECRET:          process.env.ZOOM_WEBHOOK_SECRET,
     CALENDLY_PERSONAL_TOKEN:      process.env.CALENDLY_PERSONAL_TOKEN,
     CALENDLY_WEBHOOK_SIGNING_KEY: process.env.CALENDLY_WEBHOOK_SIGNING_KEY,
     RESEND_API_KEY:               process.env.RESEND_API_KEY,

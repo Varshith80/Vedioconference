@@ -9,6 +9,7 @@ import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { RecordingLinkCard } from '@/components/dashboard/recording-link-card';
 import { BRAND } from '@/lib/constants/brand';
 import { getCurrentUser } from '@/services/auth';
 import { getSessionBookingWithDetails } from '@/services/curriculum/session-bookings';
@@ -43,6 +44,7 @@ export default async function DashboardSessionDetailPage({
   const tNav = await getTranslations('Nav');
   const tBookings = await getTranslations('Dashboard.bookings');
   const tLabels = await getTranslations('Dashboard.labels');
+  const tRecording = await getTranslations('Dashboard.bookings.recording');
 
   const user = await getCurrentUser();
   if (!user) notFound();
@@ -76,6 +78,27 @@ export default async function DashboardSessionDetailPage({
         : 'secondary';
 
   const joinUrl = booking.meeting?.join_url ?? null;
+
+  // Sprint 11 — R-3 read-path. The `meeting_links.recording_url`
+  // column is the destination of the Zoom `recording.completed`
+  // webhook write-back (route: `app/api/webhooks/zoom/route.ts`,
+  // 11-C). After 11-F's local migration apply + `pnpm db:types`
+  // regen, the typed `MeetingLink` row in
+  // `apps/web/types/domain.ts` carries the column directly
+  // (`Database['public']['Tables']['meeting_links']['Row']`), so
+  // no boundary cast is needed here. The `.trim()` defence below
+  // is a runtime safety net against a future payload that returns
+  // a whitespace-padded string — not a type workaround.
+  const rawRecordingUrl = booking.meeting?.recording_url ?? null;
+  const recordingUrl =
+    typeof rawRecordingUrl === 'string' && rawRecordingUrl.trim().length > 0
+      ? rawRecordingUrl
+      : null;
+  // Show the recording surface only when the booking is completed
+  // OR a URL is already on the row (e.g. a replay). For scheduled
+  // / cancelled / no_show sessions the recording is not relevant.
+  const showRecording =
+    recordingUrl !== null || booking.status === 'completed';
 
   // Pre-resolve the localized titles on the server so the
   // breadcrumb, heading, and chapter label all reflect the
@@ -181,6 +204,20 @@ export default async function DashboardSessionDetailPage({
                 ) : null}
               </CardContent>
             </Card>
+            {showRecording ? (
+              <Card className="mt-4">
+                <CardContent className="pt-6">
+                  <RecordingLinkCard
+                    recordingUrl={recordingUrl}
+                    copy={{
+                      cardLabel: tRecording('cardLabel'),
+                      cta: tRecording('cta'),
+                      pending: tRecording('pending'),
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
           </aside>
         </div>
       </Container>

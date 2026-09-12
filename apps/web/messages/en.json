@@ -748,7 +748,14 @@
         "rescheduled": "Rescheduled"
       },
       "joinSession": "Join the session",
-      "bookAgain": "Book again"
+      "bookAgain": "Book again",
+      "recording": {
+        "cardLabel": "Session recording",
+        "badge": "Recording",
+        "badgeAriaLabel": "Recording available",
+        "cta": "Watch the recording",
+        "pending": "Recording not available yet"
+      }
     },
     "programs": {
       "title": "My programs",
@@ -1202,6 +1209,11 @@
         "failed": "Failed",
         "refunded": "Refunded",
         "partially_refunded": "Partial"
+      },
+      "recording": {
+        "cardLabel": "Session recording",
+        "cta": "Watch the recording",
+        "pending": "Recording not available yet"
       }
     },
     "bookingDetail": {
