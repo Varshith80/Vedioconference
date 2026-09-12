@@ -13,8 +13,8 @@
 - **Repository root:** `C:\Vedioconference` (pnpm monorepo: `apps/web`, `supabase/`, `n8n/`, `docs/`, `scripts/`).
 - **Business objective:** Production-grade online tutoring and video-conferencing platform for French high-school (*lycée*) and *classes préparatoires* students. One-to-one, individual, scheduled video sessions between a student and a verified tutor. The platform owns the catalog, the booking, the payment, the video meeting, and the post-session resources — end to end.
 - **Current phase:** **Phase 2 — Marketing & Onboarding**.
-- **Current sprint:** **Sprint A — done (awaiting explicit user approval before Sprint B).**
-- **Overall progress:** ~25 % (Phase 1 = 17 %, Sprint A of Phase 2 = +8 %).
+- **Current sprint:** **Sprint 8 done (awaiting explicit user approval before Sprint 9).**
+- **Overall progress:** ~97 % (Phase 1 = 17 %, Phase 2 = 33 % across Sprints A + B1 + i18n + B2 + C + 3.5 + 3.6 + 3.8 + 7 + 8, Phase 3 = 25 %, Phase 4 = 17 %, Phases 5/6 deferred).
 
 The single source of truth for "where the project is right now" is `PROJECT_STATE.md`. Read it before doing anything else.
 
@@ -244,7 +244,7 @@ A sprint is **done** when, and only when:
 | `n8n/workflows/*.json` | The 8 n8n workflow JSON exports. Placeholders today, real flows in Phase 3. |
 | `n8n/docs/WORKFLOWS.md` | Workflow-by-workflow documentation (triggers, actions, credentials, retries, dead-letter). |
 | `n8n/credentials/` | Credential reference (no real secrets). |
-| `scripts/db-push.sh` / `db-types.sh` / `db-url.sh` / `deploy-n8n.sh` | Local-DB and n8n helper scripts. |
+| `scripts/db-push.sh` / `db-types.sh` / `db-url.sh` / `deploy-n8n.sh` / `rls-smoke.sh` | Local-DB, n8n, and RLS-smoke helper scripts. |
 | `apps/web/` | The Next.js 15 application. App Router, RSC, Route Handlers, components, services, types. |
 | `apps/web/types/domain.ts` | The strong domain types (`Course`, `Tutor`, `Profile`, `Booking`, `Payment`, `Resource`, `MeetingLink`, `Notification`). |
 | `apps/web/types/database.generated.ts` | The permissive `Database` stand-in. Replaced by `pnpm db:types` output against a live database. |

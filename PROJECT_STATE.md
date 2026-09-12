@@ -15,9 +15,22 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint 3.8 done + standalone-tutor refactor done (awaiting approval)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 8 done (awaiting explicit user approval before Sprint 9)**.
 
 ## Current status
+
+🟢 **Sprint 8 (Resources delivery + Manual-Complete + Cursor pagination) is done.** Three sub-sprints
+landed end-to-end (S8-A Resources delivery surface R-1 + R-2, S8-B Manual-complete session B-19, S8-C
+Cursor-based pagination N-3); one sub-sprint (S8-D Recordings dashboard read-path) was **dropped** pending
+explicit user authorisation of a forward-only `meeting_links.recording_url` schema change per
+CLAUDE.md §3.2. No migration, no new SaaS, no new env var, no `.env.example` key change, no new
+top-level folder were introduced by Sprint 8. All four quality gates are green: `pnpm type-check` ✓,
+`pnpm lint` ✓ (1 pre-existing `lib/utils/logger.ts` warning unrelated to Sprint 8), `pnpm test` ✓
+(454 / 454 across 53 files), `pnpm build` ✓. Full close-out:
+`docs/review/PHASE2_SPRINT_8_SUMMARY.md`. The
+commit (`06a3a4d feat: complete Sprint 8 close-out`) is on `main` and pushed to `origin/main` as
+fast-forward (`3297c6e..06a3a4d`). The Sprint 8 tag `v1.9.0-phase2-sprint-8` already exists locally
+and on `origin` (per `git tag -l` + `git ls-remote`). **Sprint 9 has not started.**
 
 🟢 **Sprint 3.8 (Admin Manual CRUD) is done.** A post-sprint debug
 + i18n audit + Create-tutor pass is also done. The admin dashboard
@@ -50,9 +63,9 @@ a "Zoom link created" / "Awaiting Zoom link" status badge.
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 done | 2026-07-15 |
+| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 + 3.8 + 7 + 8 done | 2026-08-27 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ✅ Shipped in Sprint C | 2026-07-10 |
-| 4 | Admin dashboard + manual CRUD + Excel curriculum import | ✅ Shipped in Sprints 3.6 + 3.8 | 2026-07-19 |
+| 4 | Admin dashboard + manual CRUD + Excel curriculum import | ✅ Shipped in Sprints 3.6 + 3.8 + 8 (S8-A / S8-B) | 2026-08-27 |
 | 5 | Resources, notifications, polish | ⏳ | — |
 | 6 | E2E tests, observability, deploy | ⏳ | — |
 
