@@ -15,9 +15,26 @@ Repository: `C:\Vedioconference`
 
 ## Current phase
 
-**Phase 2 — Marketing & Onboarding** → **Sprint 8 done (awaiting explicit user approval before Sprint 9)**.
+**Phase 2 — Marketing & Onboarding** → **Sprint 9 done (awaiting explicit user approval before Sprint 10)**.
 
 ## Current status
+
+🟢 **Sprint 9 (Homepage Student Progress hero integration — Task #524-NEW) is done.** A new
+`apps/web/components/marketing/student-progress-hero-card.tsx` Server Component branches on the 5
+product states (visitor, 0 %, partial, 100 %, no-enrollment) and replaces the existing decorative
+`<HeroCurve />` only when the visitor is an authenticated student with real learning data. Visitors
+keep the curve unchanged. The new card reuses the existing `getStudentProgress` service
+(RLS-respecting, `React.cache`-wrapped), the existing `ProgressBar` component, and a new
+`Homepage.progress` sub-namespace in `messages/{en,fr}.json`. `<Hero />` gained a single optional
+`progressCard?: React.ReactNode` prop with a `progressCard ?? <HeroCurve />` ternary — no other
+change. The marketing layout's `revalidate = 60` is preserved (no `force-dynamic` switch). Two new
+test files lock the contract: 12 `student-progress-hero-card` tests + 6 `homepage-progress-i18n`
+tests. **No migration, no new SaaS, no new env var, no `.env.example` key change, no new top-level
+folder, no service-role-key workaround, no RLS weakening, no remote Supabase touch.** All four
+quality gates are green: `pnpm type-check` ✓, `pnpm lint` ✓ (same 1 pre-existing
+`lib/utils/logger.ts:31` warning unrelated to Sprint 9), `pnpm test` ✓ (**512 / 512** across
+**59** files), `pnpm build` ✓. Full close-out: `docs/review/PHASE2_SPRINT_9_SUMMARY.md`. **Sprint 9
+has not been committed, pushed, or tagged yet** — that is the next gated step on user approval.
 
 🟢 **Sprint 8 (Resources delivery + Manual-Complete + Cursor pagination) is done.** Three sub-sprints
 landed end-to-end (S8-A Resources delivery surface R-1 + R-2, S8-B Manual-complete session B-19, S8-C
@@ -30,7 +47,7 @@ top-level folder were introduced by Sprint 8. All four quality gates are green: 
 `docs/review/PHASE2_SPRINT_8_SUMMARY.md`. The
 commit (`06a3a4d feat: complete Sprint 8 close-out`) is on `main` and pushed to `origin/main` as
 fast-forward (`3297c6e..06a3a4d`). The Sprint 8 tag `v1.9.0-phase2-sprint-8` already exists locally
-and on `origin` (per `git tag -l` + `git ls-remote`). **Sprint 9 has not started.**
+and on `origin` (per `git tag -l` + `git ls-remote`).
 
 🟢 **Sprint 3.8 (Admin Manual CRUD) is done.** A post-sprint debug
 + i18n audit + Create-tutor pass is also done. The admin dashboard
@@ -63,7 +80,7 @@ a "Zoom link created" / "Awaiting Zoom link" status badge.
 | Phase | Scope | Status | Date |
 |---|---|---|---|
 | **1** | Foundation, schema, docs, n8n plan | ✅ Approved | 2026-07-07 |
-| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 + 3.8 + 7 + 8 done | 2026-08-27 |
+| **2** | Marketing site, auth UI, dashboard shell | ✅ Sprint A + B1 + i18n + B2 + C + 3.5 + 3.6 + 3.8 + 7 + 8 + 9 done | 2026-09-12 |
 | 3 | n8n workflows, Stripe, Calendly, Zoom | ✅ Shipped in Sprint C | 2026-07-10 |
 | 4 | Admin dashboard + manual CRUD + Excel curriculum import | ✅ Shipped in Sprints 3.6 + 3.8 + 8 (S8-A / S8-B) | 2026-08-27 |
 | 5 | Resources, notifications, polish | ⏳ | — |

@@ -4,6 +4,94 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0-phase2-sprint-9] — 2026-09-12
+
+### Added — Sprint 9 (Homepage Student Progress hero integration)
+
+A new `apps/web/components/marketing/student-progress-hero-card.tsx`
+Server Component branches on 5 product states (visitor / 0 % /
+partial / 100 % / no-enrollment) and replaces the existing
+decorative `<HeroCurve />` **only** when the visitor is an
+authenticated student with real learning data. Visitors keep
+the curve unchanged. The card reuses the existing
+`getStudentProgress` service, the existing `ProgressBar`
+component, and a new `Homepage.progress` i18n sub-namespace.
+
+- `apps/web/components/marketing/student-progress-hero-card.tsx`
+  (NEW) — pure presentational Server Component. Includes a
+  defence-in-depth `clampPercent()` that re-clamps to `0..100`
+  if the upstream service ever returns a malformed number. No
+  `"use client"` directive.
+- `apps/web/components/marketing/hero.tsx` (EDIT) — added a
+  single optional `progressCard?: React.ReactNode` prop and a
+  `progressCard ?? <HeroCurve />` ternary in the right-hand
+  card slot. `HeroCurve` import preserved. No other change.
+- `apps/web/app/[locale]/(marketing)/page.tsx` (EDIT) — calls
+  `getCurrentUser()` + `getStudentProgress(user.id)` (only when
+  `user != null`), `getLocale()` (for the CTA href), and
+  `getTranslations('Homepage.progress')`. Mounts
+  `<StudentProgressHeroCard />` via `<Hero progressCard={…} />`
+  for authenticated students. `revalidate = 60` is preserved —
+  the homepage is **not** switched to `force-dynamic`.
+- `apps/web/messages/en.json` + `apps/web/messages/fr.json`
+  (EDIT) — new `Homepage.progress` sub-namespace under the
+  existing `Homepage` object. 8 flat keys + a `ctaNoEnrollment`
+  block. ICU variables `{percent}` and `{count}` are real
+  (not single-quote-escaped) because the homepage always has
+  the values at call time.
+- `apps/web/tests/unit/student-progress-hero-card.test.tsx`
+  (NEW) — 12 tests across 2 `describe` blocks. Pins all 5
+  product states, EN + FR copy, the accessibility contract
+  (`role="progressbar"`, `aria-valuemin="0"`,
+  `aria-valuemax="100"`, `aria-valuenow="<expected>"`), the
+  CTA href to `/{locale}/courses`, percent clamping under a
+  malformed summary, the absence of a `"use client"`
+  directive, and the visitor path (HeroCurve kept, no
+  `data-progress-state`).
+- `apps/web/tests/unit/homepage-progress-i18n.test.ts` (NEW) —
+  6 source-level contract tests. Pins the sub-namespace in
+  BOTH locales, the real ICU variables, the
+  `ctaNoEnrollment` block, and a regression guard that the
+  existing `Homepage.headline / subheadline / ctaPrimary /
+  ctaSecondary / socialProof` strings are unchanged in both
+  locales.
+
+### Changed
+
+- None to existing services, RLS, auth, schema, or pricing.
+- `Hero` consumers that do not pass `progressCard` are
+  behaviourally identical to before (the optional prop defaults
+  to `undefined`, so the existing `<HeroCurve />` keeps
+  rendering).
+
+### Quality gates
+
+- `pnpm type-check` — exit 0
+- `pnpm lint` — exit 0 (1 pre-existing warning in
+  `lib/utils/logger.ts:31`, unrelated to Sprint 9)
+- `pnpm test` — **512 / 512 passed** across **59** files
+  (includes the 2 new Sprint 9 test files)
+- `pnpm build` — exit 0; compiled successfully; First Load
+  JS shared by all = 99.3 kB (unchanged vs Sprint 8 baseline)
+
+### Schema-change gate encountered
+
+- **None.** The existing `getStudentProgress` service, the
+  existing `ProgressBar` component, and the existing
+  `Homepage.*` + `Dashboard.home.progress` i18n keys were
+  sufficient to render all 5 product states. No new columns,
+  no new tables, no new RLS policies, no new GRANTs, no new
+  indexes. Migrations are **unchanged** vs `HEAD`.
+
+### Memory
+
+- `vedioconference-homepage-progress-hero-card.md` written to
+  the long-lived memory store, indexed in `MEMORY.md`. Captures
+  the visitor-vs-authed branching at the marketing edge, the
+  `revalidate = 60` decision (do NOT flip to `force-dynamic`),
+  and the `progressCard ?? <HeroCurve />` ternary as the new
+  extension point for future hero-side replacements.
+
 ## [1.9.0-phase2-sprint-8] — 2026-08-27
 
 ### Added — Sprint 8 (Resources + Manual-Complete + Cursor Pagination)
