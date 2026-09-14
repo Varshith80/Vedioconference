@@ -6,6 +6,18 @@ import { renderReminder24hEmail, type Reminder24hProps } from './reminder-24h';
 import { renderReminder1hEmail, type Reminder1hProps } from './reminder-1h';
 import { renderSessionCancelledEmail, type SessionCancelledProps } from './session-cancelled';
 import { renderAdminDeadLetterEmail, type AdminDeadLetterProps } from './admin-dead-letter';
+import {
+  renderMonthlyPaymentFailedEmail,
+  type MonthlyPaymentFailedProps,
+} from './monthly-payment-failed';
+import {
+  renderMonthlyPaymentRecoveredEmail,
+  type MonthlyPaymentRecoveredProps,
+} from './monthly-payment-recovered';
+import {
+  renderMonthlySuspendedEmail,
+  type MonthlySuspendedProps,
+} from './monthly-suspended';
 
 /**
  * `lib/email/templates/index.ts` — typed dispatcher. Adding a
@@ -28,7 +40,10 @@ export type EmailTemplateName =
   | 'reminder_24h'
   | 'reminder_1h'
   | 'session_cancelled'
-  | 'admin_dead_letter';
+  | 'admin_dead_letter'
+  | 'monthly_payment_failed'
+  | 'monthly_payment_recovered'
+  | 'monthly_suspended';
 
 export type EmailTemplateProps =
   | { name: 'enrollment_confirmed';        props: EnrollmentConfirmedProps }
@@ -36,7 +51,10 @@ export type EmailTemplateProps =
   | { name: 'reminder_24h';                props: Reminder24hProps }
   | { name: 'reminder_1h';                 props: Reminder1hProps }
   | { name: 'session_cancelled';           props: SessionCancelledProps }
-  | { name: 'admin_dead_letter';           props: AdminDeadLetterProps };
+  | { name: 'admin_dead_letter';           props: AdminDeadLetterProps }
+  | { name: 'monthly_payment_failed';      props: MonthlyPaymentFailedProps }
+  | { name: 'monthly_payment_recovered';   props: MonthlyPaymentRecoveredProps }
+  | { name: 'monthly_suspended';           props: MonthlySuspendedProps };
 
 export async function renderEmailTemplate(
   locale: EmailLocale,
@@ -55,5 +73,11 @@ export async function renderEmailTemplate(
       return renderSessionCancelledEmail(locale, template.props);
     case 'admin_dead_letter':
       return renderAdminDeadLetterEmail(locale, template.props);
+    case 'monthly_payment_failed':
+      return renderMonthlyPaymentFailedEmail(locale, template.props);
+    case 'monthly_payment_recovered':
+      return renderMonthlyPaymentRecoveredEmail(locale, template.props);
+    case 'monthly_suspended':
+      return renderMonthlySuspendedEmail(locale, template.props);
   }
 }

@@ -80,6 +80,10 @@ const TEMPLATE_NAMES = [
   'module_completed',
   'enrollment_checkout_created',
   'enrollment_refund_succeeded',
+  // TASK 3 / Feature C — Monthly Support lifecycle
+  'monthly_payment_failed',
+  'monthly_payment_recovered',
+  'monthly_suspended',
 ] as const;
 
 const notifyBodySchema = z.discriminatedUnion('type', [
@@ -268,6 +272,56 @@ function renderTemplate(template: string, props: Record<string, unknown>, locale
         (errorMessage ? `<p><strong>error:</strong> ${escapeHtml(errorMessage)}</p>` : '') +
         `<pre style="background:${BRAND.velin};padding:12px;border-radius:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(JSON.stringify(props, null, 2))}</pre>`;
       const text = [lead, `template: ${template}`, `workflow: ${workflow}`, errorMessage ? `error: ${errorMessage}` : '', JSON.stringify(props, null, 2)].filter(Boolean).join('\n\n');
+      return { subject, html: htmlShell({ title: subject, body }), text };
+    }
+    case 'monthly_payment_failed': {
+      const failureReason = typeof props['failureReason'] === 'string' ? (props['failureReason'] as string)
+                          : (fr ? 'Raison non précisée' : 'Reason not specified');
+      const periodEnd = typeof props['periodEnd'] === 'string' ? (props['periodEnd'] as string) : '';
+      const amountEur = typeof props['amountEur'] === 'number' ? (props['amountEur'] as number) : 109;
+      const subject = fr
+        ? 'Échec du paiement — Soutien mensuel'
+        : 'Payment failed — Monthly Support';
+      const lead = fr
+        ? `Bonjour ${studentName}, le prélèvement de votre Soutien mensuel a échoué.`
+        : `Hi ${studentName}, your Monthly Support payment failed.`;
+      const tail = fr
+        ? `Vos crédits restent utilisables jusqu'à la fin de la période de facturation en cours. Pour éviter une suspension, veuillez mettre à jour votre moyen de paiement.`
+        : `Your credits remain usable until the end of the current billing period. To avoid a suspension, please update your payment method.`;
+      const body = `<p>${lead}</p>` +
+        `<p><strong>${escapeHtml(failureReason)}</strong></p>` +
+        `<p>${escapeHtml(tail)}</p>` +
+        `<p style="color:${BRAND.muted};font-size:13px;">${escapeHtml(periodEnd)} · ${amountEur.toFixed(2)} €</p>`;
+      const text = [lead, failureReason, tail, `${periodEnd} · ${amountEur.toFixed(2)} €`].join('\n\n');
+      return { subject, html: htmlShell({ title: subject, body }), text };
+    }
+    case 'monthly_payment_recovered': {
+      const subject = fr
+        ? 'Paiement rétabli — Soutien mensuel'
+        : 'Payment recovered — Monthly Support';
+      const lead = fr
+        ? `Bonjour ${studentName}, votre paiement a été traité avec succès et votre Soutien mensuel est rétabli.`
+        : `Hi ${studentName}, your payment was successfully processed and your Monthly Support is active again.`;
+      const body = `<p>${lead}</p>`;
+      const text = lead;
+      return { subject, html: htmlShell({ title: subject, body }), text };
+    }
+    case 'monthly_suspended': {
+      const reason = typeof props['reason'] === 'string' ? (props['reason'] as string)
+                   : (fr ? 'Raison non précisée' : 'Reason not specified');
+      const subject = fr
+        ? 'Soutien mensuel suspendu'
+        : 'Monthly Support suspended';
+      const lead = fr
+        ? `Bonjour ${studentName}, votre Soutien mensuel a été suspendu.`
+        : `Hi ${studentName}, your Monthly Support has been suspended.`;
+      const tail = fr
+        ? `Pour le réactiver, merci de nous contacter.`
+        : `To reactivate, please contact us.`;
+      const body = `<p>${lead}</p>` +
+        `<p><strong>${escapeHtml(reason)}</strong></p>` +
+        `<p>${escapeHtml(tail)}</p>`;
+      const text = [lead, reason, tail].join('\n\n');
       return { subject, html: htmlShell({ title: subject, body }), text };
     }
   }

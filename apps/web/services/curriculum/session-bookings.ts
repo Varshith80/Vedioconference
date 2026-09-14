@@ -102,9 +102,16 @@ export const getSessionBookingWithDetails = cache(
  * have already validated that:
  *   1. The session_grant is `active` (or `pending_payment`,
  *      but `active` is the normal case).
- *   2. The session_id matches the session covered by the
- *      grant (the API route does this check before calling
- *      here).
+ *   2. For PAYG (`grant_type='individual'`) grants: the
+ *      `session_id` matches the session covered by the grant.
+ *      For POOL grants (`grant_type in ('pack', 'subscription')`):
+ *      the `session_id` IS NULL on the grant row by design —
+ *      the booking's `session_id` is the student's chosen
+ *      session, NOT the pool's session (the pool has none).
+ *      Feature C — TASK 3 / D-3: subscription pool consumed
+ *      FIRST when both subscription + pack pools exist;
+ *      `pickSubscriptionPoolFirst` picks the pool id before
+ *      this service is called.
  *
  * `tutorId` is optional. When the caller does not pass one
  * (or passes `null`), the new booking's `tutor_id` defaults
@@ -130,8 +137,7 @@ export async function createSessionBooking(args: {
   try {
     const supabase = await createSupabaseServerClientUntyped();
 
-    // Defensive sanity check: the session must exist and be
-    // the same one the grant covers.
+    // Defensive sanity check: the session must exist.
     const { data: session, error: sErr } = await supabase
       .from('sessions')
       .select('*')
@@ -148,10 +154,22 @@ export async function createSessionBooking(args: {
     if (gErr) throw gErr;
     if (!grant) return { kind: 'grant_not_active' };
 
-    const grantRow = grant as unknown as { session_id: string; status: string };
-    if (grantRow.session_id !== args.sessionId) {
-      return { kind: 'session_not_in_grant' };
+    const grantRow = grant as unknown as {
+      session_id: string | null;
+      status: string;
+      grant_type: 'individual' | 'pack' | 'subscription' | string;
+    };
+
+    // PAYG (individual) grants MUST be linked to the chosen
+    // session — the grant's session_id IS the booked session.
+    // Pool grants (pack / subscription) have session_id=NULL
+    // by design — the booking carries the chosen session.
+    if (grantRow.grant_type === 'individual') {
+      if (grantRow.session_id !== args.sessionId) {
+        return { kind: 'session_not_in_grant' };
+      }
     }
+
     if (!['active', 'pending_payment', 'completed'].includes(grantRow.status)) {
       return { kind: 'grant_not_active' };
     }
@@ -304,6 +322,83 @@ export async function manualCompleteSessionBooking(
       ...describeError(e),
     });
     throw e;
+  }
+}
+
+/**
+ * D-3 (Feature C — Monthly Support): pick the pool to consume
+ * from. Subscription pool FIRST when active and has remaining
+ * credits (it expires sooner — at `current_period_end` — than
+ * a Pack pool which has a 6-month horizon). Pack pool SECOND.
+ * Returns `null` when neither pool exists (the caller falls back
+ * to PAYG `createPendingSessionGrant`).
+ *
+ * The existing `fn_consume_pack_credit` BEFORE INSERT trigger
+ * (migration `20260825000001`) atomically debits 1 credit from
+ * the chosen pool id; this function only PICKS the pool id —
+ * it does not debit.
+ *
+ * RLS-respecting: the student sees their own pool rows only.
+ */
+export async function pickSubscriptionPoolFirst(
+  studentId: string,
+): Promise<{ grantId: string; source: 'subscription' | 'pack' } | null> {
+  try {
+    const supabase = await createSupabaseServerClient();
+
+    // 1. Subscription pool — only if the parent subscription is active.
+    const { data: subPool, error: subErr } = await supabase
+      .from('session_grants')
+      .select('id, total_credits, consumed_credits, status')
+      .eq('student_id', studentId)
+      .eq('grant_type', 'subscription')
+      .eq('status', 'active')
+      .gt('total_credits', 0) // belt-and-braces (CHECK also enforces)
+      .maybeSingle();
+    if (subErr) throw subErr;
+    const subRow = subPool as unknown as {
+      id: string;
+      total_credits: number | null;
+      consumed_credits: number;
+      status: string;
+    } | null;
+    if (subRow
+        && subRow.status === 'active'
+        && (subRow.total_credits ?? 0) > subRow.consumed_credits) {
+      return { grantId: subRow.id, source: 'subscription' };
+    }
+
+    // 2. Pack pool — only if active AND not expired.
+    const { data: packPool, error: packErr } = await supabase
+      .from('session_grants')
+      .select('id, total_credits, consumed_credits, status, expires_at')
+      .eq('student_id', studentId)
+      .eq('grant_type', 'pack')
+      .eq('status', 'active')
+      .gt('total_credits', 0)
+      .maybeSingle();
+    if (packErr) throw packErr;
+    const packRow = packPool as unknown as {
+      id: string;
+      total_credits: number | null;
+      consumed_credits: number;
+      expires_at: string | null;
+      status: string;
+    } | null;
+    if (packRow
+        && packRow.status === 'active'
+        && (packRow.total_credits ?? 0) > packRow.consumed_credits
+        && (packRow.expires_at === null || new Date(packRow.expires_at).getTime() > Date.now())) {
+      return { grantId: packRow.id, source: 'pack' };
+    }
+
+    return null;
+  } catch (e) {
+    logger.error('pickSubscriptionPoolFirst failed', {
+      studentId,
+      ...describeError(e),
+    });
+    return null;
   }
 }
 

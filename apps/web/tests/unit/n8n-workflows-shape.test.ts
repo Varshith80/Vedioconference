@@ -735,3 +735,124 @@ describe('n8n/workflows/zoom-recording-completed.json — Sprint 11 11-D', () =>
     expect(files.length, 'no unexpected files in n8n/workflows/').toBe(10);
   });
 });
+
+// =====================================================================
+// TASK 3 — Feature C — `enrollment-created.json` carries a
+// `kind: 'monthly'` branch.
+//
+// The `Create Stripe Checkout Session` node (or a downstream If /
+// Switch node) MUST handle `kind: 'monthly'` from the inbound
+// body and emit `mode: 'subscription'` with
+// `line_items[0][price]` set from the inbound `stripe_price_id`.
+// The PAYG `mode: 'payment'` branch must remain unchanged.
+//
+// The contract here is structural: the workflow reads `kind` from
+// the inbound body, branches on it, and the monthly branch
+// references `STRIPE_PRICE_SUBSCRIPTION`. We do NOT assert the
+// exact node topology (a Switch node is the cleanest, but an If
+// with two branches is also acceptable). We only assert that
+// `STRIPE_PRICE_SUBSCRIPTION` is read SOMEWHERE in the workflow
+// and that `kind` is referenced SOMEWHERE in the workflow.
+//
+// D-6 invariant: the monthly branch reads Stripe's price id from
+// env (the canonical Stripe-side source); no 30-day computation
+// happens in the workflow.
+// =====================================================================
+
+describe('n8n/workflows/enrollment-created.json — Feature C monthly branch', () => {
+  const FILE = 'enrollment-created.json';
+  const wfs = readWorkflows();
+  const flow = wfs.find((w) => w.file === FILE);
+  if (!flow) {
+    it('enrollment-created.json exists', () => {
+      expect(flow, 'enrollment-created.json must exist').toBeTruthy();
+    });
+    return;
+  }
+  const wf = flow.wf;
+
+  it('reads STRIPE_PRICE_SUBSCRIPTION somewhere in the workflow (D-6: Stripe price id is canonical)', () => {
+    const allValues: string[] = [];
+    for (const node of wf.nodes ?? []) {
+      const p = node?.parameters ?? {};
+      const collect = (v: unknown) => {
+        if (typeof v === 'string') allValues.push(v);
+      };
+      collect(p.url);
+      collect(p.body);
+      collect(p.responseBody);
+      const params = (p as { bodyParameters?: { parameters?: Array<{ value: string }> } })
+        .bodyParameters?.parameters;
+      for (const x of params ?? []) collect(x.value);
+      const headers = (p as { headerParameters?: { parameters?: Array<{ value: string }> } })
+        .headerParameters?.parameters;
+      for (const x of headers ?? []) collect(x.value);
+    }
+    const haystack = allValues.join(' ');
+    expect(
+      haystack,
+      'enrollment-created.json must reference $env.STRIPE_PRICE_SUBSCRIPTION (the monthly branch price)',
+    ).toContain('STRIPE_PRICE_SUBSCRIPTION');
+  });
+
+  it('references the inbound body `kind` field somewhere in the workflow', () => {
+    const allValues: string[] = [];
+    for (const node of wf.nodes ?? []) {
+      const p = node?.parameters ?? {};
+      const collect = (v: unknown) => {
+        if (typeof v === 'string') allValues.push(v);
+      };
+      collect(p.url);
+      collect(p.body);
+      collect(p.responseBody);
+      // Switch / If nodes use `rules.leftValue` (n8n If node v2.x
+      // stores it under `parameters.conditions.conditions[].leftValue`).
+      const rules = (p as { rules?: { values?: Array<{ leftValue?: string }> } }).rules;
+      for (const r of rules?.values ?? []) {
+        collect(r.leftValue);
+      }
+      const conditions = (p as {
+        conditions?: { conditions?: Array<{ leftValue?: string }> };
+      }).conditions;
+      for (const c of conditions?.conditions ?? []) {
+        collect(c.leftValue);
+      }
+      const params = (p as { bodyParameters?: { parameters?: Array<{ name: string; value: string }> } })
+        .bodyParameters?.parameters;
+      for (const x of params ?? []) {
+        if (typeof x.name === 'string') allValues.push(x.name);
+        collect(x.value);
+      }
+      const headers = (p as { headerParameters?: { parameters?: Array<{ name: string; value: string }> } })
+        .headerParameters?.parameters;
+      for (const x of headers ?? []) {
+        if (typeof x.name === 'string') allValues.push(x.name);
+        collect(x.value);
+      }
+    }
+    const haystack = allValues.join(' ');
+    // The Switch / If node reads `$json.body.kind` to branch.
+    expect(
+      haystack,
+      'enrollment-created.json must reference $json.body.kind (the branch selector)',
+    ).toMatch(/\$json\.body\.kind/);
+  });
+
+  it('still carries the PAYG (mode=payment) branch (no regression to v2 PAYG path)', () => {
+    const allValues: string[] = [];
+    for (const node of wf.nodes ?? []) {
+      const p = node?.parameters ?? {};
+      const params = (p as { bodyParameters?: { parameters?: Array<{ name: string; value: string }> } })
+        .bodyParameters?.parameters;
+      for (const x of params ?? []) {
+        if (typeof x.name === 'string' && typeof x.value === 'string') {
+          if (x.name === 'mode') allValues.push(x.value);
+        }
+      }
+    }
+    expect(
+      allValues,
+      'the PAYG mode=payment branch must remain in the workflow',
+    ).toContain('payment');
+  });
+});

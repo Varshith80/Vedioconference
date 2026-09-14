@@ -712,6 +712,24 @@
         "sessionsScheduled": "{count} planifiée(s)",
         "percent": "{percent}% terminé",
         "viewAll": "Voir tous les programmes"
+      },
+      "monthly": {
+        "activeTitle": "Soutien mensuel — actif",
+        "activeSubline": "Votre prochain renouvellement a lieu le {date}.",
+        "activeNote": "Vous disposez de 4 séances pour cette période. Les séances non utilisées expirent à la fin de la période.",
+        "cancelCta": "Annuler à la fin de la période",
+        "cancelling": "Annulation…",
+        "cancelError": "Impossible d'annuler votre abonnement. Veuillez réessayer.",
+        "activeCancellingTitle": "Soutien mensuel — annulation planifiée",
+        "activeCancellingSubline": "Votre Soutien mensuel prendra fin le {date}.",
+        "activeCancellingNote": "Vous conservez toutes les séances restantes jusqu'au {date}. Aucun remboursement ne sera effectué.",
+        "cancelPending": "Annulation en attente",
+        "pastDueTitle": "Paiement échoué — veuillez mettre à jour votre moyen de paiement",
+        "pastDueSubline": "Stripe n'a pas pu débiter votre carte. Nous réessaierons pendant les 5 prochains jours.",
+        "pastDueSublineWithGrace": "Stripe n'a pas pu débiter votre carte. Vous avez jusqu'au {date} pour mettre à jour votre moyen de paiement.",
+        "pastDueCurrentPeriodNote": "Vos séances de la période actuelle restent utilisables jusqu'au {date}.",
+        "cancelledTitle": "Soutien mensuel — annulé",
+        "cancelledSubline": "Votre abonnement a pris fin. Vous pouvez vous réabonner à tout moment depuis la page tarifaire."
       }
     },
     "cards": {
@@ -898,6 +916,16 @@
       "lockedTitle": "Ce module est verrouillé",
       "lockedDescription": "Vous devez terminer le module précédent avant de pouvoir réserver celui-ci.",
       "backToCourse": "Retour au cours"
+    },
+    "subscription": {
+      "title": "Mon Soutien mensuel",
+      "subline": "Votre abonnement récurrent. Annulez à tout moment — la période en cours reste utilisable jusqu'à la date de fin.",
+      "empty": "Vous n'avez pas encore d'abonnement Soutien mensuel. Visitez la page tarifaire pour en commencer un.",
+      "signIn": "Veuillez vous connecter pour consulter votre abonnement.",
+      "explainerTitle": "Comment fonctionne le Soutien mensuel",
+      "explainerCancel": "L'annulation est effective à la fin de la période. Vous conservez toutes les séances restantes jusqu'à la date de fin de période.",
+      "explainerNoRollover": "Les séances non utilisées expirent à la fin de chaque période. Elles ne sont pas reportées sur la période suivante.",
+      "explainerPastDue": "En cas d'échec de paiement, vos crédits de la période en cours restent utilisables pendant 5 jours pendant que Stripe réessaie."
     }
   },
   "Admin": {

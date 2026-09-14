@@ -712,6 +712,24 @@
         "sessionsScheduled": "{count} scheduled",
         "percent": "{percent}% complete",
         "viewAll": "View all programs"
+      },
+      "monthly": {
+        "activeTitle": "Monthly Support — active",
+        "activeSubline": "Your next renewal is on {date}.",
+        "activeNote": "You have 4 sessions available this period. Unused sessions expire at the end of the period.",
+        "cancelCta": "Cancel at period end",
+        "cancelling": "Cancelling…",
+        "cancelError": "Could not cancel your subscription. Please try again.",
+        "activeCancellingTitle": "Monthly Support — cancellation scheduled",
+        "activeCancellingSubline": "Your Monthly Support will end on {date}.",
+        "activeCancellingNote": "You keep all remaining sessions until {date}. No refund will be issued.",
+        "cancelPending": "Cancellation pending",
+        "pastDueTitle": "Payment failed — please update your payment method",
+        "pastDueSubline": "Stripe could not charge your card. We will retry over the next 5 days.",
+        "pastDueSublineWithGrace": "Stripe could not charge your card. You have until {date} to update your payment method.",
+        "pastDueCurrentPeriodNote": "Your current period's sessions remain usable until {date}.",
+        "cancelledTitle": "Monthly Support — cancelled",
+        "cancelledSubline": "Your subscription has ended. You can re-subscribe any time from the pricing page."
       }
     },
     "cards": {
@@ -898,6 +916,16 @@
       "lockedTitle": "This module is locked",
       "lockedDescription": "You need to complete the previous module before you can book this one.",
       "backToCourse": "Back to the course"
+    },
+    "subscription": {
+      "title": "My Monthly Support",
+      "subline": "Your recurring-billing subscription. Cancel at any time — the current period remains usable until the end date.",
+      "empty": "You do not have a Monthly Support subscription yet. Visit the pricing page to start one.",
+      "signIn": "Please sign in to view your subscription.",
+      "explainerTitle": "How Monthly Support works",
+      "explainerCancel": "Cancellation is end-of-period. You keep all remaining sessions until the period end date.",
+      "explainerNoRollover": "Unused sessions expire at the end of each period. They do not roll over to the next period.",
+      "explainerPastDue": "If a payment fails, your current-period credits remain usable for 5 days while Stripe retries."
     }
   },
   "Admin": {

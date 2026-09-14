@@ -68,6 +68,6 @@ export const PRICING_TIERS: ReadonlyArray<PricingTier> = [
       'monthlyFeature3',
       'monthlyFeature4',
     ],
-    cta: { label: 'monthlyCta', href: '/contact' },
+    cta: { label: 'monthlyCta', href: '/api/subscriptions' },
   },
 ];

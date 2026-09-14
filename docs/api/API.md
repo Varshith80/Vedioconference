@@ -64,6 +64,29 @@
 | `POST` | `/api/enrollments`                | user  | `{ courseId }` | Create an `enrollments` row in `pending_payment` and a Stripe Checkout Session; returns `{ url, sessionId, enrollmentId }` |
 | `GET`  | `/api/enrollments/[id]/modules`   | user  | — | List the modules of the course with this user's `module_progress` joined. `404` if the enrollment does not belong to the user. |
 
+### 2.5.1 Subscriptions  *(NEW in TASK 3 / Feature C — Monthly Support)*
+
+| Method | Path | Auth | Body | Description |
+|---|---|---|---|---|
+| `POST` | `/api/subscriptions`             | user  | `{ kind: 'monthly' }` | Provision the Monthly Support subscription row (status=`incomplete`) + first-period pool grant + first `subscription_period_grants` row (PRIMARY KEY race-safety), then call n8n to create a Stripe Checkout Session in `mode=subscription`. Returns `{ subscription_id, checkout_url, stripe_session_id, kind: 'monthly' }`. **Mock-gated**: when `N8N_ENROLLMENT_WEBHOOK_URL` is unset → 503 `checkout_unavailable`. On n8n non-OK → 502 `checkout_provider_error`. On duplicate subscription → 409 `monthly_subscription_exists`. |
+| `GET`  | `/api/student/subscription`      | user  | — | Returns the student's current Monthly Support subscription row + the current period's `subscription_period_grants` row + `cancel_at_period_end` + `period_end` + `next_refresh_at`. RLS-respecting. Returns `{ subscription: null, ... }` when no subscription. |
+| `DELETE` | `/api/student/subscription`    | user  | — | Student-initiated cancel-at-period-end (D-2). Sets `cancel_at_period_end=true`. Returns `{ cancel_at_period_end: true, period_end }`. No immediate state change; the period-refresh path at `current_period_end` finalises the cancellation. 409 `subscription_already_cancelling` if already cancelling. |
+
+### 2.5.2 Stripe subscription lifecycle (delegates from `/api/webhooks/stripe`)
+
+The webhook route (Sprint B2) now handles four additional event
+types that drive the Monthly Support state machine. The
+delegations live in `apps/web/lib/stripe/subscription-event-handlers.ts`.
+
+| Event | Handler | Effect |
+|---|---|---|
+| `customer.subscription.created` | `handleCustomerSubscriptionEvent` (no existing row branch) | `provisionMonthlySubscription` — creates `subscriptions` + `session_grants` pool + `subscription_period_grants` atomically. |
+| `customer.subscription.updated` (new `current_period_start`) | `handleCustomerSubscriptionEvent` (existing + period changed branch) | `refreshSubscriptionPeriod` — creates a new `subscription_period_grants` row + new pool. Race-safe via PK on `(subscription_id, period_start)`. |
+| `customer.subscription.updated` (status `past_due`) | `handleCustomerSubscriptionEvent` (past_due branch) | `markSubscriptionPastDue` — stamps `past_due_at`, `grace_period_ends_at = now + 5 days`, sends the `monthly_payment_failed` email. **D-1**: does NOT mutate the `session_grants` pool. |
+| `customer.subscription.updated` (status `active` recovered from `past_due`) | `handleCustomerSubscriptionEvent` (recovery branch) | `markSubscriptionPaymentRecovered` — clears `past_due_at` + `grace_period_ends_at`, sends the `monthly_payment_recovered` email. |
+| `customer.subscription.deleted` | `handleCustomerSubscriptionDeleted` | `markSubscriptionSuspended` (reason=`stripe_deleted`) — flips status=`cancelled`, stamps `suspended_at` + `cancelled_at`, sends the `monthly_suspended` email. |
+| `invoice.payment_failed` (when `inv.subscription` is set) | `handleInvoicePaymentFailed` | `markSubscriptionPastDue` — same as the `customer.subscription.updated` past_due branch. |
+
 ### 2.6 Module bookings  *(NEW in Sprint B2)*
 
 | Method | Path | Auth | Body | Description |

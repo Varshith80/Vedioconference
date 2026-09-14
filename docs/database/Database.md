@@ -397,4 +397,76 @@ The generated file is consumed by `services/`, `app/api/`, and
 
 ---
 
-*Last updated: 2026-07-09. Owner: project lead. Sprint B2 change.*
+## 12. Sprint TASK 3 — Feature C Monthly Support
+
+Adds the recurring-billing infrastructure for the Monthly Support
+product (€109 TTC / month, 4 × 60-min sessions per period, no
+rollover, end-of-period cancellation).
+
+**Migration**: `supabase/migrations/20260914000002_monthly_subscription_period_support.sql`
+
+### 12.1 New columns on `subscriptions`
+
+| Column | Type | Notes |
+|---|---|---|
+| `stripe_latest_invoice_id` | `text` | Latest Stripe invoice id (`invoice.id` from `customer.subscription.created` / `updated`). Set by the webhook handler. |
+| `past_due_at` | `timestamptz` | Stamped by the `invoice.payment_failed` / `customer.subscription.updated` (status=`past_due`) webhook handler. NULL when not past_due. |
+| `grace_period_ends_at` | `timestamptz` | `past_due_at + 5 days` (the business rule "2 retries over 5 days"). Cleared on payment recovery. |
+| `suspended_at` | `timestamptz` | Stamped by `markSubscriptionSuspended` when grace expires or `customer.subscription.deleted` arrives. NULL when not suspended. |
+
+All four columns are NULLABLE — the migration is forward-only and
+additive. No existing rows are modified.
+
+### 12.2 New table — `subscription_period_grants`
+
+The audit log of period-level grants. One row per period per
+subscription. The PRIMARY KEY `(subscription_id, period_start)`
+is the at-most-once-on-period primitive that prevents duplicate
+period refreshes.
+
+```
+subscription_period_grants
+  subscription_id    uuid   PK (FK → subscriptions.id, ON DELETE RESTRICT)
+  period_start       timestamptz  PK  -- Stripe's current_period_start
+  period_end         timestamptz NOT NULL  -- Stripe's current_period_end
+  session_grant_id   uuid   FK → session_grants.id, ON DELETE RESTRICT
+  created_at         timestamptz NOT NULL DEFAULT now()
+```
+
+**Indexes**:
+- PRIMARY KEY on `(subscription_id, period_start)` — the race-safety primitive.
+- `idx_sub_period_grants_period_end` on `(period_end)` — for the period-end scheduler (future sprint).
+- `idx_sub_period_grants_grant` on `(session_grant_id)` — for the reverse lookup (which period a given grant belongs to).
+
+**RLS**: enabled. One policy, `sub_period_grants_select_own_or_admin`,
+on `SELECT TO authenticated USING (student_id = auth.uid() OR public.is_admin())`.
+
+### 12.3 Locked business rules (user-approved D-1 → D-6)
+
+- **D-1** — `past_due` or `suspended` subscriptions keep their
+  current-period `session_grants` pool row consumable until
+  `current_period_end`. No rollover. No restoration.
+- **D-2** — Cancellation is end-of-period. The student sets
+  `cancel_at_period_end=true`; at `current_period_end` the
+  period-refresh path flips `status='cancelled'` and stamps
+  `cancelled_at`. No refund. No next-period grant.
+- **D-3** — When both a Monthly pool and a Pack pool exist for
+  the same student, the Monthly pool is consumed FIRST
+  (`pickSubscriptionPoolFirst` in
+  `apps/web/services/curriculum/session-bookings.ts`).
+- **D-4** — Outbox idempotency reuses the existing
+  `n8n_executions` UNIQUE `run_id` primitive (D-4 explicit
+  constraint: no second incompatible idempotency mechanism).
+- **D-5** — Emails go through the existing
+  `lib/email/send.ts` (Next.js → Resend, mock-gated on
+  `RESEND_API_KEY`). No production Resend config change.
+- **D-6** — Stripe's `current_period_start` /
+  `current_period_end` (stored on the `subscriptions` row at
+  webhook arrival) are the AUTHORITATIVE billing period. The
+  application NEVER computes a 30-day period locally.
+  `MONTHLY_PERIOD_DAYS` is intentionally NOT exported from
+  `services/curriculum/monthly-subscriptions.ts`.
+
+---
+
+*Last updated: 2026-07-09. Owner: project lead. Sprint B2 change. Sprint TASK 3 / Feature C: §12 added.*

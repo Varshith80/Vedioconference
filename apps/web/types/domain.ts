@@ -191,3 +191,51 @@ export interface SessionGrantWithDetails extends SessionGrant {
   program: Program;
   grade: Grade | null;
 }
+
+// -- Sprint Feature C Monthly Support (v1) ------------------------------
+
+/**
+ * `subscriptions` row, projected for the student dashboard's
+ * Monthly Support card. Shape matches the columns read by
+ * `getStudentSubscription()` in
+ * `services/curriculum/monthly-subscriptions.ts`.
+ *
+ * `status` is the string form of the `subscription_status`
+ * enum: one of `trialing | active | past_due | cancelled |
+ * incomplete | incomplete_expired`. Typed as `string` here to
+ * avoid coupling the dashboard type to the DB enum name.
+ *
+ * D-6: `current_period_start` and `current_period_end` come
+ * from Stripe (stored at webhook arrival). They are the
+ * authoritative billing period — no 30-day constant
+ * overrides them.
+ */
+export interface StudentSubscriptionView {
+  id: string;
+  student_id: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  cancelled_at: string | null;
+  past_due_at: string | null;
+  grace_period_ends_at: string | null;
+  suspended_at: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+}
+
+/**
+ * One row of `subscription_period_grants` projected for the
+ * student dashboard's "period history" list. The PRIMARY KEY
+ * `(subscription_id, period_start)` guarantees at most one
+ * grant per period — race-safe against repeated webhook
+ * arrivals for the same period.
+ */
+export interface PeriodGrantView {
+  subscription_id: string;
+  period_start: string;
+  period_end: string;
+  session_grant_id: string;
+  created_at: string;
+}
