@@ -713,6 +713,12 @@
         "percent": "{percent}% terminé",
         "viewAll": "Voir tous les programmes"
       },
+      "freeTrial": {
+        "eligibleTitle": "Essayez une séance gratuite de 60 minutes",
+        "eligibleSubline": "Vous pouvez réserver une séance gratuite de 60 minutes. La réduction de 100 % est appliquée automatiquement.",
+        "ineligibleTitle": "Vous avez déjà utilisé votre séance d'essai",
+        "ineligibleSubline": "Votre séance gratuite de 60 minutes a été réservée. Parcourez le catalogue pour plus de séances."
+      },
       "monthly": {
         "activeTitle": "Soutien mensuel — actif",
         "activeSubline": "Votre prochain renouvellement a lieu le {date}.",
@@ -1919,6 +1925,47 @@
       "resolveCancelCta": "Annuler la demande",
       "resolveCompleteCta": "Reattribuer et terminer",
       "resolving": "Enregistrement..."
+    }
+  },
+  "FreeTrial": {
+    "title": "Votre séance d'essai gratuite",
+    "eligible": {
+      "title": "Essayez une séance gratuite de 60 minutes",
+      "description": "En tant que nouvel étudiant, vous pouvez réserver une séance de 60 minutes sans frais. La réduction de 100 % est appliquée automatiquement au paiement — aucun code promo nécessaire.",
+      "cta": "Réserver ma séance gratuite",
+      "duration": "60 minutes",
+      "notice": "Vous ne pouvez utiliser votre séance d'essai qu'une seule fois. Au-delà, les tarifs habituels s'appliquent."
+    },
+    "ineligible": {
+      "title": "Vous avez déjà utilisé votre séance d'essai",
+      "description": "Votre séance gratuite de 60 minutes a été réservée. Parcourez le catalogue pour réserver d'autres séances au tarif standard.",
+      "cta": "Voir le catalogue",
+      "statusPending": "Votre séance d'essai est en cours de préparation.",
+      "statusActive": "Votre séance d'essai est active.",
+      "statusCompleted": "Votre séance d'essai a été terminée."
+    },
+    "loading": {
+      "checking": "Vérification de votre séance d'essai…",
+      "starting": "Préparation de votre séance gratuite…"
+    },
+    "success": {
+      "title": "Votre séance gratuite est prête",
+      "description": "Continuez vers le paiement sécurisé. Votre carte n'est pas débitée — la réduction de 100 % a été appliquée.",
+      "cta": "Continuer vers le paiement"
+    },
+    "failure": {
+      "title": "Nous n'avons pas pu démarrer votre séance gratuite",
+      "description": "Veuillez réessayer dans un instant. Si le problème persiste, contactez le support.",
+      "cta": "Réessayer"
+    },
+    "errors": {
+      "already_used": "Vous avez déjà utilisé votre séance d'essai gratuite de 60 minutes.",
+      "coupon_unavailable": "Le code de la séance d'essai n'est pas disponible pour le moment.",
+      "checkout_unavailable": "Le paiement n'est pas encore configuré. Veuillez réessayer plus tard.",
+      "session_price_missing": "Cette séance n'est pas encore disponible pour une séance d'essai.",
+      "session_not_found": "Nous n'avons pas trouvé cette séance.",
+      "network": "Erreur réseau. Veuillez vérifier votre connexion et réessayer.",
+      "generic": "Nous n'avons pas pu démarrer votre séance gratuite. Veuillez réessayer."
     }
   }
 }

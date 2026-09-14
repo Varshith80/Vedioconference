@@ -713,6 +713,12 @@
         "percent": "{percent}% complete",
         "viewAll": "View all programs"
       },
+      "freeTrial": {
+        "eligibleTitle": "Try a free 60-minute session",
+        "eligibleSubline": "You can book one free 60-minute session. The 100% discount is applied automatically.",
+        "ineligibleTitle": "You have already used your free trial",
+        "ineligibleSubline": "Your free 60-minute session has been booked. Browse the catalog for more sessions."
+      },
       "monthly": {
         "activeTitle": "Monthly Support — active",
         "activeSubline": "Your next renewal is on {date}.",
@@ -1950,6 +1956,47 @@
       "resolveCancelCta": "Cancel request",
       "resolveCompleteCta": "Re-point and complete",
       "resolving": "Saving..."
+    }
+  },
+  "FreeTrial": {
+    "title": "Your free trial",
+    "eligible": {
+      "title": "Try a free 60-minute session",
+      "description": "As a new student, you can book one 60-minute session at no cost. The 100% discount is applied automatically at checkout — you don't need a coupon code.",
+      "cta": "Claim your free session",
+      "duration": "60 minutes",
+      "notice": "You can only use your free trial once. After this, normal pricing applies."
+    },
+    "ineligible": {
+      "title": "You have already used your free trial",
+      "description": "Your free 60-minute session has been booked. Browse the catalog to book more sessions at the standard rate.",
+      "cta": "Browse the catalog",
+      "statusPending": "Your free trial is being prepared.",
+      "statusActive": "Your free trial is active.",
+      "statusCompleted": "Your free trial has been completed."
+    },
+    "loading": {
+      "checking": "Checking your free-trial status…",
+      "starting": "Preparing your free session…"
+    },
+    "success": {
+      "title": "Your free session is ready",
+      "description": "Continue to secure checkout. Your card is not charged — the 100% discount has been applied.",
+      "cta": "Continue to checkout"
+    },
+    "failure": {
+      "title": "We could not start your free session",
+      "description": "Please try again in a moment. If the problem persists, contact support.",
+      "cta": "Try again"
+    },
+    "errors": {
+      "already_used": "You have already used your free 60-minute trial.",
+      "coupon_unavailable": "The free-trial coupon is not available right now.",
+      "checkout_unavailable": "Checkout is not yet configured. Please try again later.",
+      "session_price_missing": "This session is not yet available for a free trial.",
+      "session_not_found": "We could not find that session.",
+      "network": "Network error. Please check your connection and try again.",
+      "generic": "We could not start your free session. Please try again."
     }
   }
 }

@@ -467,6 +467,100 @@ on `SELECT TO authenticated USING (student_id = auth.uid() OR public.is_admin())
   `MONTHLY_PERIOD_DAYS` is intentionally NOT exported from
   `services/curriculum/monthly-subscriptions.ts`.
 
+### 12.4 Phase 1 — Feature A: First free 60-minute session
+
+Adds the schema support for the Pricing Q6 "first free 60-minute
+session" rule. The trial is a `session_grants` row with
+`is_trial = true` and `amount_cents = 0`, discounted at Stripe
+Checkout by a system-owned 100%-off coupon.
+
+**Migrations**:
+- `supabase/migrations/20260913000003_free_trial_coupon_seed.sql`
+  — seeds the `COURSENLIGNE_FREE_TRIAL` coupon row.
+- `supabase/migrations/20260913000003_free_trial_session_grant.sql`
+  — adds `session_grants.is_trial` + the partial unique index.
+
+#### 12.4.1 New column on `session_grants`
+
+| Column | Type | Notes |
+|---|---|---|
+| `is_trial` | `boolean NOT NULL DEFAULT false` | Pricing Q6 flag. `true` only on the one-time 60-minute free trial grant per student. Enforced globally by `uq_session_grants_one_trial_per_student`. `amount_cents` is always `0` for trial rows; the Stripe 100% discount coupon is applied at checkout time by the n8n `enrollment-created` workflow. |
+
+The column is `NOT NULL DEFAULT false` so all pre-existing
+rows are tagged as non-trial with no migration backfill needed.
+
+#### 12.4.2 New indexes
+
+- `uq_session_grants_one_trial_per_student` (partial unique)
+  on `(student_id) WHERE is_trial = true AND status IN
+  ('pending_payment', 'active', 'completed')` — the
+  race-safety gate. Two parallel inserts of a trial for the
+  same student hit Postgres SQLSTATE 23505; the service maps
+  it to 409 `free_trial_already_used`. Statuses outside the
+  predicate (`cancelled`, `refunded`) do not count, so an
+  operator can cancel an accidental trial without locking the
+  student out.
+- `idx_session_grants_student_is_trial` on
+  `(student_id, is_trial) WHERE is_trial = true` — the
+  dashboard eligibility read (RLS-respecting).
+
+#### 12.4.3 Global one-trial-per-student invariant
+
+Pricing Q6: one 60-minute trial per student, **not** per
+program/course/subject. A student cannot stack trials by
+switching subjects. The per-student global uniqueness is
+enforced by `uq_session_grants_one_trial_per_student`, which
+keys on `student_id` only (not on `session_id`). A second
+trial attempt on a different published session for the same
+student is rejected at the DB.
+
+#### 12.4.4 Status semantics on trial rows
+
+| `session_grants.status` | Trial row counts toward "used"? |
+|---|---|
+| `pending_payment` | yes |
+| `active`              | yes |
+| `completed`           | yes |
+| `cancelled`           | no (operator-cancelled — student may re-attempt) |
+| `refunded`            | no (refunded — student may re-attempt) |
+
+The same status list is the index predicate; the service
+helper `hasUsedFreeTrial()` mirrors it for in-process checks.
+
+#### 12.4.5 System-owned coupon row
+
+`public.coupons` carries one canonical row for the trial:
+
+| Field | Value |
+|---|---|
+| `code` | `COURSENLIGNE_FREE_TRIAL` |
+| `kind` | `percent` |
+| `percent_off` | `100` |
+| `currency` | `EUR` |
+| `is_active` | `true` |
+| `max_redemptions` | `null` (per-student gating is on `session_grants`, not on the coupon) |
+| `redeemed_count` | `0` |
+| `metadata` | `{ kind: 'free_trial', notes: 'Pricing Q6: one per student. Seeded by migration 20260913000003_free_trial_coupon_seed.sql.' }` |
+
+The row is read via the public `coupons_select_active` RLS
+policy. The row is NOT inserted by the application at
+runtime — the service layer has only a `SELECT` lookup; the
+seed migration is the canonical writer. No student-side
+privileged write path is created.
+
+#### 12.4.6 Race-safety purpose
+
+The partial unique index
+`uq_session_grants_one_trial_per_student` is the structural
+backstop. The pre-flight SELECT in
+`startFreeTrialSessionGrant` is best-effort (it can miss a
+parallel INSERT in a race); the index is the
+authoritative gate. The losing caller receives Postgres
+SQLSTATE 23505, the service catches it, runs a follow-up
+SELECT to resolve the winner's grant id, and returns
+`free_trial_already_used`. The route maps that to
+`409 { code: 'free_trial_already_used', details: { grant_id } }`.
+
 ---
 
-*Last updated: 2026-07-09. Owner: project lead. Sprint B2 change. Sprint TASK 3 / Feature C: §12 added.*
+*Last updated: 2026-07-09. Owner: project lead. Sprint B2 change. Sprint TASK 3 / Feature C: §12 added. Phase 1 / Feature A: §12.4 added.*

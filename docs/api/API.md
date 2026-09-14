@@ -87,6 +87,21 @@ delegations live in `apps/web/lib/stripe/subscription-event-handlers.ts`.
 | `customer.subscription.deleted` | `handleCustomerSubscriptionDeleted` | `markSubscriptionSuspended` (reason=`stripe_deleted`) — flips status=`cancelled`, stamps `suspended_at` + `cancelled_at`, sends the `monthly_suspended` email. |
 | `invoice.payment_failed` (when `inv.subscription` is set) | `handleInvoicePaymentFailed` | `markSubscriptionPastDue` — same as the `customer.subscription.updated` past_due branch. |
 
+### 2.5.3 Free Trial  *(NEW in Phase 1 — Feature A — First free 60-minute session)*
+
+| Method | Path | Auth | Body | Description |
+|---|---|---|---|---|
+| `POST` | `/api/free-trial`              | user  | `{ session_id: uuid }` | Claim the student's one-time free 60-minute trial on a published session. Student identity is taken from the authenticated session — NEVER from the body. Calls `startFreeTrialSessionGrant` (which is gated by `uq_session_grants_one_trial_per_student` for race-safety), looks up the seeded `COURSENLIGNE_FREE_TRIAL` coupon (100% off, EUR), and POSTs a trial-shaped payload (`kind: 'trial'`, `coupon_id`, `amount_cents: 0`, `success_url`, `cancel_url`, `locale`) to n8n to mint a Stripe Checkout Session. Returns `201 { ok: true, data: { session_grant_id, checkout_url, kind: 'trial' } }`. **Mock-gated**: when `N8N_ENROLLMENT_WEBHOOK_URL` is unset → 503 `checkout_unavailable`. Status mapping: `404 session_not_found` / `422 session_price_missing` / `409 free_trial_already_used` (with `details.grant_id`) / `503 coupon_unavailable` / `502 checkout_provider_error`. |
+| `GET`  | `/api/free-trial`              | user  | — | Returns the student's free-trial eligibility read for the dashboard banner: `{ ok: true, data: { used: boolean, grant_id: string \| null, status: 'pending_payment' \| 'active' \| 'completed' \| null } }`. RLS-respecting. `used=true` when the student has a counting trial grant (`pending_payment`, `active`, or `completed`). `401` when no user is signed in. |
+
+The endpoint is gated by the partial unique index
+`uq_session_grants_one_trial_per_student` on
+`public.session_grants(student_id) WHERE is_trial = true AND
+status IN ('pending_payment', 'active', 'completed')`. Two
+parallel trial claims for the same student resolve to exactly
+one `session_grants` row (Postgres SQLSTATE 23505 → service
+maps to 409 `free_trial_already_used`). See `Database.md §12.4`.
+
 ### 2.6 Module bookings  *(NEW in Sprint B2)*
 
 | Method | Path | Auth | Body | Description |
