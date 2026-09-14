@@ -7,6 +7,12 @@ import { Unauthorized } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
 import { serverEnv } from '@/lib/env';
 import { markSessionGrantPaid } from '@/services/curriculum/session-grants';
+import {
+  handleCustomerSubscriptionEvent,
+  handleCustomerSubscriptionDeleted,
+  handleInvoicePaymentFailed,
+  handleInvoicePaymentSucceeded,
+} from '@/lib/stripe/subscription-event-handlers';
 
 /**
  * Stripe inbound webhook.
@@ -141,6 +147,52 @@ export async function POST(req: NextRequest) {
               refunded_amount_cents: charge.amount_refunded,
             } as never)
             .eq('stripe_payment_intent_id', charge.payment_intent as string);
+        }
+        break;
+      }
+      // ---------------------------------------------------------
+      // Feature C — Monthly Support recurring-billing lifecycle.
+      // Wired in TASK 3 / Feature C. Delegates to
+      // `lib/stripe/subscription-event-handlers.ts`. The four
+      // events drive the state machine documented in
+      // `docs/plans/TASK3_FEATURE_C_MONTHLY_SUPPORT.md` §1.1.
+      // D-1: no session_grants mutation here — current-period
+      // pool rows remain consumable until current_period_end.
+      // D-4: idempotency via the existing n8n_executions UNIQUE
+      // run_id primitive (reused from Pack refund).
+      // D-6: Stripe's current_period_start / current_period_end
+      // are authoritative — no 30-day computation here.
+      // ---------------------------------------------------------
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription;
+        await handleCustomerSubscriptionEvent(sub);
+        break;
+      }
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object as Stripe.Subscription;
+        await handleCustomerSubscriptionDeleted(sub);
+        break;
+      }
+      case 'invoice.payment_failed': {
+        const inv = event.data.object as Stripe.Invoice;
+        if (inv.subscription) {
+          await handleInvoicePaymentFailed(inv);
+        }
+        break;
+      }
+      // TASK 3 correction v2 — close the recovery-gap left by the
+      // customer.subscription.updated-only path. Some Stripe
+      // accounts emit invoice.payment_succeeded WITHOUT a paired
+      // subscription.updated that flips status back to active.
+      // Without this handler, a subscription can stay stuck in
+      // past_due even after Stripe charged the card successfully.
+      // `invoice.paid` is the newer (forward-compat) event name.
+      case 'invoice.payment_succeeded':
+      case 'invoice.paid': {
+        const inv = event.data.object as Stripe.Invoice;
+        if (inv.subscription) {
+          await handleInvoicePaymentSucceeded(inv);
         }
         break;
       }
