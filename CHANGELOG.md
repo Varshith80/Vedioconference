@@ -169,8 +169,145 @@ Feature A tests remain green. No Feature A file touched.
   free trial session`, commit 53e07f1, tag
   `v1.13.0-phase2-sprint-13`) shipped independently on
   2026-09-15. Feature B is the second slice of Sprint 13.
-- Sprint 13 Feature C (Monthly Support dashboard relocation)
-  is pending its own release.
+- Sprint 12 Feature C (`feat(sprint-12): complete Sprint 12
+  close-out — Feature C Monthly Support`, commit `c44a9c8`,
+  plus the integration correction
+  `fix(sprint-12): complete Feature C Monthly Support
+  integration`, commit `21d6f9d`, repair tag
+  `v1.12.1-phase2-sprint-12-repair` →
+  `6bab052`) shipped on 2026-09-14, before Sprint 13. Feature C
+  is the Sprint 12 close-out; the earlier Feature C CHANGELOG
+  entry was missed during Sprint 12 close-out and is recorded
+  here as a historical correction. Feature C is **not pending**
+  and has **no remaining implementation work**.
+
+## [1.12.1-phase2-sprint-12-repair] — 2026-09-14
+
+### Added — Sprint 12 Feature C Monthly Support (historical correction)
+
+Sprint 12 ships Feature C — the Monthly Support recurring-billing
+lifecycle (€109 TTC / month, 4 × 60-minute sessions per billing
+period, no rollover, end-of-period cancellation). The
+implementation landed in two commits: `c44a9c8` (initial
+Sprint 12 close-out) and `21d6f9d` (the integration correction
+that closed the i18n, email-dispatcher, n8n notify template,
+pricing CTA, and Monthly-first booking-pool gaps). This
+CHANGELOG entry is the historical correction — it was missed
+during Sprint 12 close-out and is recorded here to keep the
+project history accurate. The existing repair tag
+`v1.12.1-phase2-sprint-12-repair` (`6bab0524e83085188e600ee49e4c7d2a1865cd75`)
+remains the canonical reference and was NOT recreated.
+
+#### Business rules (locked, D-1 to D-6, user-approved)
+
+- D-1: past_due / suspended rows keep their current-period pool
+  consumable until `current_period_end`. NO rollover.
+- D-2: cancellation is end-of-period. Finalised at
+  `current_period_end` via `refreshSubscriptionPeriod`.
+- D-3: Monthly pool consumed BEFORE Pack pool in
+  `session-bookings.ts` (`pickSubscriptionPoolFirst`).
+- D-4: idempotency uses the existing `n8n_executions UNIQUE run_id`
+  plus `subscription_period_grants` PK. No new primitive.
+- D-5: email via the existing Next.js → Resend layer
+  (mock-gated in dev).
+- D-6: Stripe's `current_period_start` / `current_period_end`
+  are authoritative — no 30-day computation anywhere.
+
+#### Database (forward-only, idempotent, LOCAL Supabase only)
+
+- `supabase/migrations/20260914000002_monthly_subscription_period_support.sql`
+  - New table `subscription_period_grants` (one row per
+    billing period, PK on `(subscription_id, period_start)`).
+  - New columns on `subscriptions`:
+    `current_period_start`, `current_period_end`,
+    `cancel_at_period_end`, `cancelled_at`, `past_due_at`,
+    `suspended_at`, `recovered_at`.
+  - RLS policies for student-self and admin paths.
+
+#### Service layer
+
+- `apps/web/services/curriculum/monthly-subscriptions.ts`
+  (998 lines) — provisioning, period refresh, lifecycle
+  transitions (past_due, recovered, suspended),
+  terminal-state-guarded.
+- `apps/web/lib/stripe/subscription-event-handlers.ts`
+  (539 lines) — Stripe lifecycle dispatch with A/B/C
+  classification on `active`/`trialing`.
+- `apps/web/app/api/webhooks/stripe/route.ts` — gains the
+  `invoice.payment_succeeded` (and forward-compat `invoice.paid`)
+  handler that closes the recovery-gap left by the
+  `customer.subscription.updated`-only path.
+- `apps/web/services/curriculum/session-bookings.ts`
+  (MODIFIED by 21d6f9d) — Monthly-first pool handling
+  (`pickSubscriptionPoolFirst`); PAYG-only `session_id`
+  enforcement (pool grants have `session_id IS NULL` by design).
+
+#### UI + API
+
+- `apps/web/app/[locale]/dashboard/subscription/page.tsx`
+  (NEW, 173 lines) — student dashboard subscription surface.
+- `apps/web/components/dashboard/monthly-subscription-card.tsx`
+  (NEW, 230 lines) — Monthly pool card with explainer block.
+- `apps/web/app/api/subscriptions/route.ts` (NEW, 207 lines)
+  — `POST` provision endpoint.
+- `apps/web/app/api/student/subscription/route.ts`
+  (NEW, 120 lines) — student self-service endpoint.
+
+#### Email + n8n
+
+- Three monthly email templates:
+  - `monthly-payment-failed.tsx`
+  - `monthly-payment-recovered.tsx`
+  - `monthly-suspended.tsx`
+  Wired into `lib/email/templates/index.ts` (`EmailTemplateName`,
+  `EmailTemplateProps`, `renderEmailTemplate`) and the n8n
+  notify route's `TEMPLATE_NAMES` + `renderTemplate`.
+- `n8n/workflows/enrollment-created.json` (MODIFIED) —
+  `STRIPE_PRICE_SUBSCRIPTION` branch added; PAYG
+  (`mode=payment`) branch preserved.
+
+#### Documentation
+
+- `docs/review/PHASE2_SPRINT_FEATURE_C_MONTHLY_SUPPORT.md`
+  (NEW, 365 lines) — Sprint 12 close-out note.
+- `docs/database/Database.md §12` — Sprint TASK 3 / Feature C
+  Monthly Support section (4 new columns + `subscription_period_grants`
+  table + D-1 to D-6 rules).
+- `docs/api/API.md` — §2.5.1 (Subscriptions) + §2.5.2
+  (Stripe subscription lifecycle handlers).
+- `apps/web/types/domain.ts` — `StudentSubscriptionView` +
+  `PeriodGrantView` domain types.
+- `apps/web/lib/constants/pricing.ts` — `monthly.cta.href`
+  changed from `/contact` to `/api/subscriptions`.
+
+#### Tests
+
+- `monthly-subscription-provision.test.ts`
+- `monthly-subscription-refresh.test.ts`
+- `monthly-subscription-recovered.test.ts`
+- `monthly-subscription-priority.test.ts`
+- `monthly-subscriptions.test.ts`
+- `subscription-route.test.ts`
+- `webhooks-stripe-subscription.test.ts`
+- `n8n-workflows-shape.test.ts` (3 new cases for
+  `STRIPE_PRICE_SUBSCRIPTION` branch + PAYG preservation).
+
+#### Quality gates (at Sprint 12 release)
+
+- `pnpm type-check` ✓, `pnpm lint` ✓, `pnpm test` ✓
+  (979 / 979 across 86 files at the integration-fix commit),
+  `pnpm build` ✓.
+
+### Notes
+
+- Sprint 12 Feature C is **complete and released**. The repair
+  tag `v1.12.1-phase2-sprint-12-repair` was applied at the
+  integration-fix commit and was NOT recreated by this
+  CHANGELOG correction.
+- No new SaaS, no new top-level folder, no new env var, no
+  `.env.example` key change, no service-role-key workaround,
+  no RLS weakening beyond the explicit Feature C RLS additions
+  in the migration, no second Stripe integration.
 
 ## [Unreleased] — Sprint 11 (R-3 — Zoom recording.completed → meeting_links.recording_url)
 
