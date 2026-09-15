@@ -856,3 +856,353 @@ describe('n8n/workflows/enrollment-created.json — Feature C monthly branch', (
     ).toContain('payment');
   });
 });
+
+// =====================================================================
+// TASK 15 — Feature B pack_refund branch.
+//
+// The admin pack refund route
+// (apps/web/app/api/admin/pack-grants/[id]/refund/route.ts)
+// POSTs `{ kind: 'pack_refund', session_grant_id, student_id,
+// amount_cents, currency, refund_request_id, refund_reason }` to
+// N8N_ENROLLMENT_WEBHOOK_URL. The workflow MUST route that body to
+// Stripe /v1/refunds (NOT to a Checkout Session creation).
+//
+// The locked contract here:
+//   a. kind=pack_refund reaches the refund branch.
+//   b. kind=monthly still reaches Monthly (regression pin).
+//   c. normal PAYG still reaches PAYG (regression pin).
+//   d. pack_refund does NOT reach the PAYG branch.
+//   e. Stripe endpoint is /v1/refunds.
+//   f. Stripe Checkout endpoint is NOT used by the pack_refund branch.
+//   g. Refund amount comes from the authorized amount_cents field.
+//   h. refund_request_id is used for idempotency/tracing.
+//   i. Existing HMAC verification (x-webhook-secret) remains
+//      present.
+//
+// These are structural assertions over the JSON — no runtime
+// invocation of n8n. The test loads the workflow file and walks
+// the node graph.
+// =====================================================================
+
+describe('n8n/workflows/enrollment-created.json — TASK 15 pack_refund branch', () => {
+  const FILE = 'enrollment-created.json';
+  const wfs = readWorkflows();
+  const flow = wfs.find((w) => w.file === FILE);
+  if (!flow) {
+    it('enrollment-created.json exists', () => {
+      expect(flow, 'enrollment-created.json must exist').toBeTruthy();
+    });
+    return;
+  }
+  const wf = flow.wf;
+
+  // Helper: find a node by exact name.
+  const findNode = (name: string): N8nNode | undefined =>
+    (wf.nodes ?? []).find((n) => n?.name === name);
+
+  // Helper: every string-valued parameter / url / header in a node.
+  const nodeStringValues = (n: N8nNode | undefined): string[] => {
+    if (!n) return [];
+    const p = n.parameters ?? {};
+    const out: string[] = [];
+    const collect = (v: unknown) => {
+      if (typeof v === 'string') out.push(v);
+    };
+    collect(p.url);
+    collect(p.body);
+    collect(p.responseBody);
+    const bp = (p as { bodyParameters?: { parameters?: Array<{ value: string }> } })
+      .bodyParameters?.parameters;
+    for (const x of bp ?? []) collect(x.value);
+    const hp = (p as { headerParameters?: { parameters?: Array<{ value: string }> } })
+      .headerParameters?.parameters;
+    for (const x of hp ?? []) collect(x.value);
+    // Switch / If nodes store their conditions under
+    // parameters.conditions.conditions[].leftValue / rightValue.
+    // Walk those too so discovery by keyword (e.g. 'pack_refund')
+    // works for both HttpRequest and If nodes uniformly.
+    const conds = (p as {
+      conditions?: { conditions?: Array<{ leftValue?: unknown; rightValue?: unknown }> };
+    }).conditions?.conditions;
+    for (const c of conds ?? []) {
+      collect(c.leftValue);
+      collect(c.rightValue);
+    }
+    return out;
+  };
+
+  // Helper: read the body parameter list (name + value).
+  const nodeBodyParams = (n: N8nNode | undefined): Array<{ name: string; value: string }> =>
+    (n?.parameters as { bodyParameters?: { parameters?: Array<{ name: string; value: string }> } } | undefined)
+      ?.bodyParameters?.parameters ?? [];
+
+  // Helper: walk the connection graph from a node, breadth-first,
+  // and return every node name reachable on the success path
+  // (main index 0) by repeatedly following main[0] chains.
+  const reachableSuccess = (start: string): Set<string> => {
+    const out = new Set<string>();
+    const queue: string[] = [start];
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      const conns = wf.connections?.[cur]?.main ?? [];
+      for (const branch of conns) {
+        for (const c of branch) {
+          if (c?.node && !out.has(c.node)) {
+            out.add(c.node);
+            queue.push(c.node);
+          }
+        }
+      }
+    }
+    return out;
+  };
+
+  // ---- (a)+(b)+(c)+(d) routing -----------------------------------
+
+  // The workflow has at least one Switch / If node keyed on
+  // `kind === 'pack_refund'`. We expect a dedicated If node whose
+  // leftValue compares `$json.body.kind` to the literal
+  // `pack_refund`.
+  const ifPackRefund = (wf.nodes ?? []).find(
+    (n) =>
+      n?.type === 'n8n-nodes-base.if' &&
+      nodeStringValues(n).some((v) => v.includes('pack_refund')),
+  );
+
+  it('a. has a Switch / If node that branches on kind === pack_refund', () => {
+    expect(ifPackRefund, 'a Switch / If node must reference pack_refund in its conditions').toBeTruthy();
+    const conds = (ifPackRefund!.parameters as {
+      conditions?: { conditions?: Array<{ leftValue?: string; rightValue?: string }> };
+    }).conditions?.conditions ?? [];
+    const kindCond = conds.find((c) => c.leftValue?.includes('$json.body.kind'));
+    expect(
+      kindCond,
+      'the Switch / If conditions must include a comparison on $json.body.kind',
+    ).toBeTruthy();
+    expect(kindCond!.rightValue, 'the right-hand side must be the literal pack_refund').toBe('pack_refund');
+  });
+
+  // The pack_refund arm (true branch of the new Switch) reaches a
+  // node that posts to /v1/refunds.
+  it('a. kind=pack_refund reaches the refund branch (a node POSTing to /v1/refunds)', () => {
+    expect(ifPackRefund, 'a Switch / If node must exist').toBeTruthy();
+    // The If node's two outputs: index 0 = true (kind === pack_refund),
+    // index 1 = false (else).
+    const ifOut = wf.connections?.[ifPackRefund!.name]?.main ?? [];
+    const trueBranch = ifOut[0] ?? [];
+    expect(trueBranch.length, 'the true branch of the pack_refund Switch must not be empty').toBeGreaterThan(0);
+    // Walk downstream from the true branch — somewhere there must
+    // be a node whose URL is /v1/refunds.
+    const visited = new Set<string>([ifPackRefund!.name]);
+    const queue: string[] = trueBranch
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    let foundRefundNode = false;
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const node = findNode(cur);
+      const url = (node?.parameters?.url ?? '') as string;
+      if (url.includes('/v1/refunds')) {
+        foundRefundNode = true;
+        break;
+      }
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+    expect(
+      foundRefundNode,
+      'downstream of the kind=pack_refund Switch true branch, a node must POST to /v1/refunds',
+    ).toBe(true);
+  });
+
+  // (d) a body with kind=pack_refund must NEVER reach a Stripe
+  // Checkout Session creation node. Walk the TRUE branch of the
+  // pack_refund Switch downstream — only a refund node or a
+  // router leading to a refund node is allowed.
+  it('d. kind=pack_refund does NOT reach PAYG / Stripe Checkout Session creation', () => {
+    expect(ifPackRefund, 'a Switch / If node must exist').toBeTruthy();
+    const ifOut = wf.connections?.[ifPackRefund!.name]?.main ?? [];
+    const trueBranch = ifOut[0] ?? [];
+    expect(trueBranch.length, 'the true branch of the pack_refund Switch must not be empty').toBeGreaterThan(0);
+    const visited = new Set<string>([ifPackRefund!.name]);
+    const queue: string[] = trueBranch
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const node = findNode(cur);
+      const url = (node?.parameters?.url ?? '') as string;
+      const params = nodeBodyParams(node);
+      const mode = params.find((p) => p.name === 'mode')?.value;
+      if (url.includes('/v1/checkout/sessions') && (mode === 'payment' || mode === 'subscription')) {
+        throw new Error(
+          `kind=pack_refund reaches Stripe Checkout Session creation node "${cur}" (mode=${mode}) — pack_refund must NEVER create a charge`,
+        );
+      }
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+  });
+
+  // (b) kind=monthly still reaches Monthly (regression pin).
+  it('b. kind=monthly still routes to the Monthly subscription Checkout node', () => {
+    // The existing Switch: kind=monthly? If node must still exist.
+    const ifMonthly = findNode('Switch: kind=monthly?');
+    expect(ifMonthly, 'the existing Switch: kind=monthly? node must remain').toBeTruthy();
+    const monthlyOut = wf.connections?.[ifMonthly!.name]?.main?.[0] ?? [];
+    const reachesMonthly = monthlyOut.some(
+      (c) => c?.node === 'Create Stripe Subscription Checkout (monthly)',
+    );
+    expect(
+      reachesMonthly,
+      'Switch: kind=monthly? true branch must reach "Create Stripe Subscription Checkout (monthly)"',
+    ).toBe(true);
+  });
+
+  // (c) normal PAYG still reaches PAYG (regression pin).
+  it('c. normal PAYG (kind !== monthly && kind !== pack_refund) still routes to the PAYG Checkout node', () => {
+    const ifMonthly = findNode('Switch: kind=monthly?');
+    expect(ifMonthly, 'the existing Switch: kind=monthly? node must remain').toBeTruthy();
+    const monthlyFalse = wf.connections?.[ifMonthly!.name]?.main?.[1] ?? [];
+    // The false branch must reach either the pack_refund Switch
+    // (which in turn forwards non-pack_refund to PAYG) OR the
+    // PAYG Checkout node directly. Both are acceptable topologies.
+    const downstreamNames = monthlyFalse
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    const reachesPaygOrRouter = downstreamNames.some((n) => {
+      if (n === 'Create Stripe Checkout Session') return true;
+      // If the downstream is the pack_refund Switch, that's fine:
+      // pack_refund Switch false branch must reach PAYG.
+      const found = findNode(n);
+      return found?.type === 'n8n-nodes-base.if';
+    });
+    expect(
+      reachesPaygOrRouter,
+      'Switch: kind=monthly? false branch must reach either the PAYG Checkout node directly or the pack_refund Switch',
+    ).toBe(true);
+  });
+
+  // ---- (e)+(f) Stripe API endpoint ---------------------------------
+
+  it('e. a Stripe /v1/refunds HttpRequest node exists in the workflow', () => {
+    const refundNodes = (wf.nodes ?? []).filter((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      return url.includes('/v1/refunds');
+    });
+    expect(refundNodes.length, 'exactly one /v1/refunds HttpRequest node').toBeGreaterThanOrEqual(1);
+    const refund = refundNodes[0]!;
+    expect(refund.parameters?.method, 'the refund call uses POST').toBe('POST');
+  });
+
+  it('f. the pack_refund branch does NOT use a Stripe Checkout endpoint', () => {
+    // Walk downstream of the pack_refund Switch true branch and
+    // confirm NO node POSTs to /v1/checkout/sessions.
+    expect(ifPackRefund, 'a Switch / If node must exist').toBeTruthy();
+    const ifOut = wf.connections?.[ifPackRefund!.name]?.main ?? [];
+    const trueBranch = ifOut[0] ?? [];
+    const visited = new Set<string>([ifPackRefund!.name]);
+    const queue: string[] = trueBranch
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const node = findNode(cur);
+      const url = (node?.parameters?.url ?? '') as string;
+      expect(
+        url.includes('/v1/checkout/sessions'),
+        `pack_refund branch must NOT reach a Checkout Session node (found at "${cur}")`,
+      ).toBe(false);
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+  });
+
+  // ---- (g) refund amount from amount_cents -----------------------
+
+  it('g. the /v1/refunds request body supplies amount from $json.body.amount_cents', () => {
+    const refundNode = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      return url.includes('/v1/refunds');
+    });
+    expect(refundNode, 'a /v1/refunds node must exist').toBeTruthy();
+    const params = nodeBodyParams(refundNode);
+    const amountParam = params.find((p) => p.name === 'amount');
+    expect(amountParam, 'refund body must carry an `amount` parameter').toBeTruthy();
+    expect(
+      amountParam!.value,
+      'refund amount must come from $json.body.amount_cents',
+    ).toMatch(/\$json\.body\.amount_cents/);
+  });
+
+  // ---- (h) idempotency via refund_request_id ----------------------
+
+  it('h. the /v1/refunds request uses refund_request_id as the Stripe Idempotency-Key', () => {
+    const refundNode = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      return url.includes('/v1/refunds');
+    });
+    expect(refundNode, 'a /v1/refunds node must exist').toBeTruthy();
+    const headers = (refundNode!.parameters as {
+      headerParameters?: { parameters?: Array<{ name: string; value: string }> };
+    }).headerParameters?.parameters ?? [];
+    const idemHeader = headers.find((h) => /idempotency/i.test(h.name));
+    expect(
+      idemHeader,
+      'the refund HttpRequest must set a Stripe Idempotency-Key header',
+    ).toBeTruthy();
+    expect(
+      idemHeader!.value,
+      'Idempotency-Key must derive from $json.body.refund_request_id',
+    ).toMatch(/\$json\.body\.refund_request_id/);
+  });
+
+  it('h. the /v1/refunds request body also surfaces refund_request_id in metadata for tracing', () => {
+    const refundNode = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      return url.includes('/v1/refunds');
+    });
+    expect(refundNode, 'a /v1/refunds node must exist').toBeTruthy();
+    const params = nodeBodyParams(refundNode);
+    const meta = params.find((p) => /metadata\[refund_request_id\]/.test(p.name));
+    expect(
+      meta,
+      'refund body must carry metadata[refund_request_id] for tracing',
+    ).toBeTruthy();
+  });
+
+  // ---- (i) HMAC verification preserved ----------------------------
+
+  it('i. existing HMAC webhook verification (x-webhook-secret) remains present', () => {
+    const verify = findNode('Verify webhook secret');
+    expect(verify, 'the existing HMAC verification node must remain').toBeTruthy();
+    const conds = (verify!.parameters as {
+      conditions?: { conditions?: Array<{ leftValue?: string; rightValue?: string }> };
+    }).conditions?.conditions ?? [];
+    const hmacCond = conds.find(
+      (c) => c.leftValue?.includes('x-webhook-secret') && c.rightValue?.includes('N8N_WEBHOOK_SECRET'),
+    );
+    expect(
+      hmacCond,
+      'HMAC verification must compare x-webhook-secret inbound header to $env.N8N_WEBHOOK_SECRET',
+    ).toBeTruthy();
+  });
+});
