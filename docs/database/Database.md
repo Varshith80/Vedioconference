@@ -563,4 +563,262 @@ SELECT to resolve the winner's grant id, and returns
 
 ---
 
-*Last updated: 2026-07-09. Owner: project lead. Sprint B2 change. Sprint TASK 3 / Feature C: §12 added. Phase 1 / Feature A: §12.4 added.*
+### 12.5 Phase 2 — Feature B: Pack 10 admin grants + €35/unused-session refund
+
+Pack 10 = €299 / 10 × 60-min sessions / 6-month validity
+(`session_grants.expires_at`). The admin back-office surface
+(`/admin/packs`, `/admin/packs/[id]`) is read-only against the
+existing `session_grants` schema; the only DB-level writes are
+the Stripe-authoritative `fn_enrollments_refund` cascade
+(unchanged from Sprint 3.5 / `20260715000000`) and the new
+admin UPDATE policy + the `n8n_executions` outbox RLS.
+
+#### 12.5.1 Admin UPDATE policy on `session_grants`
+
+**Policy name:** `session_grants_update_admin`
+**Migration:** `20260913000004_pack_refund_admin_oversight.sql`
+
+```sql
+drop policy if exists session_grants_update_admin on public.session_grants;
+create policy session_grants_update_admin
+    on public.session_grants for update
+    to authenticated
+    using (public.is_admin())
+    with check (
+        public.is_admin()
+        and status in (
+            'pending_payment', 'active', 'completed',
+            'cancelled', 'refunded'
+        )
+    );
+```
+
+- `for update` ONLY. INSERT and DELETE remain deny-by-default.
+- `using (public.is_admin())` — non-admin authenticated users
+  fail the USING clause and cannot read-then-write the row.
+- `with check` constrains `status` to the documented
+  `enrollment_status` lifecycle values. The `enrollment_status`
+  enum has 5 values: `pending_payment, active, completed,
+  cancelled, refunded` (Sprint 3.5, `20260714000002`).
+  `no_show` and `rescheduled` belong to `booking_status` and
+  cannot appear on `session_grants.status`.
+- The `student_id` column is not constrained by the policy
+  (the admin does not change ownership).
+- The Stripe inbound webhook continues to UPDATE `session_grants`
+  via the service-role admin client (existing layer rule).
+
+#### 12.5.2 CHECK constraint on refund bounds
+
+**Constraint name:** `session_grants_refund_in_bounds`
+**Migration:** `20260913000004_pack_refund_admin_oversight.sql`
+
+```sql
+alter table public.session_grants
+    add constraint session_grants_refund_in_bounds
+    check (
+        refunded_amount_cents >= 0
+        and refunded_amount_cents <= amount_cents
+        and (
+            (refunded_amount_cents = 0 and refunded_at is null)
+         or (refunded_amount_cents > 0 and refunded_at is not null)
+        )
+    );
+```
+
+Four invariants in one CHECK:
+
+1. `refunded_amount_cents >= 0` — no negative refunds.
+2. `refunded_amount_cents <= amount_cents` — no refund larger
+   than the original charge (the R5 / R13 rule that 10 unused
+   × €35 = €350 caps at €299 paid).
+3. `refunded_amount_cents = 0 ⟺ refunded_at IS NULL` — a
+   non-zero amount must always carry a timestamp; a phantom
+   `refunded_at` with `refunded_amount_cents = 0` would block
+   the partial unique indexes on subsequent attempts.
+4. The CHECK is the structural backstop; the service layer is
+   the primary guard.
+
+#### 12.5.3 Cascade trigger `fn_enrollments_refund`
+
+**Function:** `public.fn_enrollments_refund()` — `SECURITY DEFINER`,
+PL/pgSQL, fires `before update of status on public.payments`.
+
+When `payments.status` flips to `refunded` (Stripe
+`charge.refunded` webhook), the trigger cascades the flip to
+the linked `session_grant`:
+
+```sql
+update public.session_grants sg
+set status                  = 'refunded',
+    refunded_at             = coalesce(sg.refunded_at, now()),
+    refunded_amount_cents   = NEW.refunded_amount_cents,
+    updated_at              = now()
+where sg.id = NEW.session_grant_id
+  and sg.status in ('active', 'completed');
+```
+
+- **Idempotent.** The `WHERE sg.status IN ('active',
+  'completed')` filter makes the cascade a no-op on an
+  already-refunded grant; the Stripe webhook can re-enter
+  without a second write.
+- **The SOLE authoritative path that flips
+  `session_grants.status='refunded'` and writes
+  `refunded_amount_cents`.** The admin refund route NEVER
+  writes these columns. The admin route is an outbox
+  enqueuer only (see §12.5.5).
+- **`no_show` and `rescheduled` cannot appear on
+  `session_grants.status`** — they belong to `booking_status`.
+  The trigger's IN list is the correct subset of
+  `enrollment_status` that a refund can cascade to.
+- **Race-safety.** The `WHERE` filter is the same shape as
+  the admin service's pre-flight read; concurrent admin and
+  Stripe paths converge on the same end state. If both paths
+  attempt to stamp the row, the CHECK (12.5.2) prevents the
+  second write.
+
+#### 12.5.4 `n8n_executions` outbox RLS
+
+**Migration:** `20260914000001_n8n_executions_admin_refund.sql`
+
+The admin refund route uses `n8n_executions` (NOT
+`webhook_events`) as its durable outbox. The
+`n8n_executions.run_id UNIQUE` index is the at-most-once-on-
+enqueue primitive.
+
+Two new policies:
+
+```sql
+-- Admin INSERT (outbox row creation).
+drop policy if exists n8n_executions_admin_insert on public.n8n_executions;
+create policy n8n_executions_admin_insert
+    on public.n8n_executions for insert
+    to authenticated
+    with check (public.is_admin());
+
+-- Admin UPDATE (stamp status='completed' | 'failed').
+drop policy if exists n8n_executions_admin_update on public.n8n_executions;
+create policy n8n_executions_admin_update
+    on public.n8n_executions for update
+    to authenticated
+    using (public.is_admin())
+    with check (public.is_admin());
+```
+
+- INSERT and UPDATE both gated by `public.is_admin()`. Student
+  / tutor / anon authenticated users fail the WITH CHECK
+  clause.
+- No DELETE policy — the outbox is append/audit-only.
+- The pre-existing `n8n_executions_admin_read` SELECT policy
+  is preserved unchanged.
+- No service-role bypass is added. The admin route uses the
+  RLS-respecting server client; the `is_admin()` helper
+  determines whether the caller's authenticated session is
+  admin.
+
+#### 12.5.5 Why `n8n_executions` (not `webhook_events`) is the outbox
+
+`webhook_events.processed=true` carries the documented
+semantic "this inbound provider event has been applied to DB
+state" (used by both the Stripe and n8n inbound routes).
+Reusing `processed=true` for an outbound enqueue would
+corrupt that semantic. The correct outbox primitive is
+`n8n_executions.run_id UNIQUE` — it is dedicated to the
+n8n-side execution log and is the same primitive n8n has
+always used to dedupe its own executions.
+
+The `webhook_events` table is therefore untouched by Feature B:
+only the pre-existing `webhook_events_admin_read` SELECT
+policy exists; no INSERT/UPDATE policy was added.
+
+#### 12.5.6 Outbox acceptance vs. Stripe-authoritative refund state
+
+The four states of a pack refund request, in order:
+
+| State | n8n_executions row | session_grants row | HTTP |
+|---|---|---|---|
+| **REQUESTED** (admin clicks Refund) | INSERT `status='started'`, `run_id=refund_request_id` | unchanged (still `active` or `completed`) | — |
+| **n8n accepted** (n8n POST 2xx) | UPDATE `status='completed', finished_at=now` | unchanged | 200 with `refund_status='n8n_accepted'` |
+| **n8n failed** (5xx / throw) | UPDATE `status='failed', error=<reason>` | unchanged | 502 `pack_refund_webhook_failed` |
+| **n8n unreachable** (webhook URL unset) | stays `started` | unchanged | 503 `pack_refund_webhook_unavailable` |
+| **Stripe confirmed** (asynchronous, hours or days later) | (no change — already `completed` or `failed`) | UPDATE `status='refunded', refunded_at, refunded_amount_cents` via `fn_enrollments_refund` cascade | (the admin UI polls / reads `payments.status='refunded'`) |
+
+**Invariant:** the application never claims a refund has
+succeeded until Stripe has confirmed. `refund_status=
+'n8n_accepted'` is the maximum truth the admin route can
+return; the `session_grants.status='refunded'` flip is owned
+by the `fn_enrollments_refund` cascade and is the sole signal
+the application uses to indicate Stripe confirmation.
+
+#### 12.5.7 Locked business rules (user-approved R1 → R13)
+
+- R1 — Pack 10 = €299 / 10 × 60-min: `PACK_TOTAL_CENTS =
+  29900`, `PACK_TOTAL_CREDITS = 10` in
+  `services/admin/pack-grants.ts`.
+- R2 — 6-month validity: `session_grants.expires_at` (already
+  populated by the Stripe webhook + `fn_consume_pack_credit`
+  blocks new bookings on an expired pool).
+- R3 — Non-transferable: `session_grants.student_id` UNIQUE
+  + partial unique indexes on `session_bookings`.
+- R4 — €35 per unused session: `PACK_PER_UNUSED_REFUND_CENTS
+  = 3500`.
+- R5 / R13 — `actual ≤ amount_paid`: `Math.min(calculated,
+  amount_paid)` in `calculatePackRefundPreview()` AND the
+  `session_grants_refund_in_bounds` CHECK.
+- R6 — No refund for consumed: preview clamps `unused =
+  total − consumed` to `[0, total]`; 0 unused →
+  `kind: 'refund_zero'` (HTTP 422).
+- R7 — No duplicate refund: three layers — (a) service-level
+  pre-flight read, (b) `session_grants_refund_in_bounds` CHECK
+  (23514), (c) `fn_enrollments_refund` cascade WHERE filter.
+  The outbox adds (d) `n8n_executions.run_id UNIQUE` (23505).
+- R8 — No refund after invalid state: `invalid_state` →
+  HTTP 409 (`currentStatus` ∈ `cancelled`).
+- R9 — 10 unused → €350 calculated, capped at €299 paid:
+  tested in `pack-refund-preview.test.ts`.
+- R10 — 5 unused → €175: tested.
+- R11 — 0 unused → €0: tested.
+- R12 — Orchestration via the existing approved n8n
+  architecture: POST to `N8N_ENROLLMENT_WEBHOOK_URL`; n8n
+  performs the Stripe call (CLAUDE.md §2.3).
+
+#### 12.5.8 Race-safety story
+
+The user-stated invariant "no duplicate refund" is enforced
+by three independent layers + one outbox layer:
+
+1. **Service-level pre-flight read.** The service computes
+   the preview against the current `consumed_credits` and
+   `status`. If the row is already `refunded`, the service
+   short-circuits to `kind: 'already_refunded'`.
+2. **DB CHECK constraint.** `session_grants_refund_in_bounds`
+   makes a second write fail with SQLSTATE `23514`. The
+   service catches `code: '23514'` and maps it to
+   `kind: 'already_refunded'`.
+3. **Cascade-trigger WHERE filter.** `fn_enrollments_refund`
+   only fires on `sg.status IN ('active', 'completed')`. When
+   n8n's Stripe refund webhook re-enters via
+   `payments.status='refunded'`, the cascade sees
+   `sg.status='refunded'`, skips, and is a no-op.
+4. **Outbox UNIQUE.** `n8n_executions.run_id UNIQUE`. Two
+   admins racing produce exactly one outbox row (23505 →
+   `kind: 'already_refunded'`).
+
+#### 12.5.9 "Webhook never arrives" is NOT auto-mapped to failed
+
+`n8n_executions.status='started'` (n8n unreachable / URL
+unset) is intentionally NOT promoted to `failed` by any
+background job. There is no such reconciliation mechanism in
+the current schema. The state machine is:
+
+- n8n 2xx → `status='completed'` → HTTP 200.
+- n8n 5xx / throw → `status='failed'` → HTTP 502.
+- webhookUrl null → `status='started'` (left as-is) → HTTP 503.
+
+A future operational sprint must add a reconciliation / drain
+mechanism that promotes a stale `started` row to `failed`
+after a documented threshold. **Documented as remaining
+operational work, not invented here.**
+
+---
+
+*Last updated: 2026-07-09. Owner: project lead. Sprint B2 change. Sprint TASK 3 / Feature C: §12 added. Phase 1 / Feature A: §12.4 added. Phase 2 / Feature B: §12.5 added.*

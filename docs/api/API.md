@@ -102,6 +102,141 @@ parallel trial claims for the same student resolve to exactly
 one `session_grants` row (Postgres SQLSTATE 23505 → service
 maps to 409 `free_trial_already_used`). See `Database.md §12.4`.
 
+### 2.5.4 Admin Pack 10 grants + €35/unused-session refund  *(NEW in Phase 2 — Feature B)*
+
+The admin back-office surface for Pack 10 (€299, 10 × 60-min
+sessions, 6-month validity). All four routes are gated by
+`requireAdminRoute()` (401 anonymous, 403 non-admin). The
+service layer is `apps/web/services/admin/pack-grants.ts`.
+The DB-layer invariants are documented in `Database.md §12.5`.
+
+| Method | Path | Auth | Body | Description |
+|---|---|---|---|---|
+| `GET` | `/api/admin/pack-grants` | admin | — | List Pack 10 grants (filter `grant_type='pack'`, order `created_at desc`, limit 200). Joins `student:profiles!session_grants_student_id_fkey` for student name/email. RLS-respecting — non-admins receive `403`. Returns `{ ok: true, data: AdminPackGrant[] }`. |
+| `GET` | `/api/admin/pack-grants/[id]` | admin | — | Single Pack grant by id. RLS-respecting. Returns `{ ok: true, data: AdminPackGrant }`. `404` when the row does not exist (or RLS denies). |
+| `GET` | `/api/admin/pack-grants/[id]/refund-preview` | admin | — | Compute the refund preview WITHOUT mutating the row. Returns `{ ok: true, data: { preview: PackRefundPreview } }` where `preview.kind` is one of `ok` (with `unusedSessions`, `calculatedCents`, `actualCents`, `capped`), `already_refunded`, or `invalid_state` (with `currentStatus`). `404` when the row does not exist. |
+| `POST` | `/api/admin/pack-grants/[id]/refund` | admin | — (empty) | Initiate the Pack refund. See §2.5.4.1 for the full state machine and HTTP shape. |
+
+The list row shape (`AdminPackGrant`) is the flattened join
+of `session_grants` + `profiles`:
+
+```ts
+type AdminPackGrant = {
+  id: string;                       // session_grants.id
+  studentId: string;                // profiles.id
+  studentName: string | null;       // profiles.full_name
+  studentEmail: string | null;      // profiles.email
+  status: 'pending_payment' | 'active' | 'completed' | 'cancelled' | 'refunded';
+  amountCents: number;              // integer cents (€29900)
+  currency: 'EUR';
+  totalCredits: number;             // 10 (PACK_TOTAL_CREDITS)
+  consumedCredits: number;          // 0..10
+  refundedAt: string | null;        // ISO 8601 or null
+  refundedAmountCents: number;      // 0..amountCents
+  createdAt: string;                // ISO 8601
+  expiresAt: string;                // ISO 8601 (purchase + 6 months)
+};
+```
+
+#### 2.5.4.1 `POST /api/admin/pack-grants/[id]/refund` — state machine
+
+The admin refund route NEVER writes `session_grants.status` or
+`session_grants.refunded_amount_cents`. Those columns are
+flipped SOLELY by the `fn_enrollments_refund` cascade
+trigger on Stripe's `charge.refunded` webhook
+(`Database.md §12.5.3`). The admin route is an **outbox
+enqueuer only** — it records the outbound attempt in
+`n8n_executions` (with `run_id = refund_request_id`,
+UNIQUE = at-most-once primitive) and POSTs to
+`N8N_ENROLLMENT_WEBHOOK_URL`.
+
+The service (`executePackRefund`) returns a discriminated
+union:
+
+```ts
+type ExecutePackRefundResult =
+  | { kind: 'ok'; refundRequestId: string;
+      requestedAmountCents: number; currency: 'EUR' }
+  | { kind: 'not_found' }
+  | { kind: 'invalid_state'; currentStatus: string }
+  | { kind: 'already_refunded' }
+  | { kind: 'refund_zero'; unusedSessions: number }
+  | { kind: 'webhook_failed'; reason: string;
+      refundRequestId: string }
+  | { kind: 'webhook_unavailable'; reason: 'not_configured';
+      refundRequestId: string };
+```
+
+HTTP status mapping (verbatim from the route):
+
+| Service `kind` | HTTP | Body `error.code` | Notes |
+|---|---|---|---|
+| `ok` | 200 | — | `refund_status: 'n8n_accepted'` (n8n returned 2xx). Body does NOT claim Stripe confirmation. |
+| `not_found` | 404 | — | Pack grant id does not exist. |
+| `invalid_state` | 409 | `pack_refund_invalid_state` | `currentStatus` ∈ `cancelled`. |
+| `already_refunded` | 409 | `pack_refund_already_refunded` | Also fires on the SQLSTATE 23505 / 23514 race (outbox UNIQUE / DB CHECK). |
+| `refund_zero` | 422 | `pack_refund_zero` | `unused_sessions: 0` — all 10 sessions consumed. |
+| `webhook_failed` | 502 | `pack_refund_webhook_failed` | n8n returned 5xx or the fetch threw. The outbox row is `status='failed'`; operator may retry. |
+| `webhook_unavailable` | 503 | `pack_refund_webhook_unavailable` | `N8N_ENROLLMENT_WEBHOOK_URL` unset. The outbox row is `status='started'`; operator must configure or drain. |
+
+**200 response body** (the only success shape):
+
+```jsonc
+{
+  "ok": true,
+  "data": {
+    "refund_request_id": "<grantId>:<ISO timestamp>",
+    "requested_amount_cents": 17500,            // 5 unused × €35
+    "currency": "EUR",
+    "refund_status": "n8n_accepted",             // NOT "stripe_confirmed"
+    "grant": { /* AdminPackGrant, re-read */ }
+  }
+}
+```
+
+**Why `refund_status='n8n_accepted'` (not `'stripe_confirmed'`).**
+The admin route cannot know whether Stripe has confirmed the
+refund at HTTP-response time. Stripe confirmation is observed
+asynchronously via the `charge.refunded` webhook →
+`payments.status='refunded'` → `fn_enrollments_refund`
+cascade, which flips `session_grants.status='refunded'` and
+writes `refunded_amount_cents`. Until that webhook fires, the
+DB row remains `active` (or `completed`). The admin UI can
+poll / re-read `payments.status='refunded'` for the linked
+payment row to surface the Stripe-confirmed state.
+
+**Why the route does NOT write `session_grants.status='refunded'`.**
+The user-stated invariant is that the DB row's
+`status='refunded'` and `refunded_amount_cents` MUST NOT be
+written by the admin route — those writes are owned by the
+Stripe cascade. Before the application claims "the refund is
+done", it must wait for the Stripe webhook. Until then, the
+admin UI shows `refund_status='n8n_accepted'` (not "refunded")
+and the DB row continues to display `status='active'` /
+`'completed'` depending on where in the cascade the
+operation currently sits.
+
+#### 2.5.4.2 Race-safety
+
+Two admins clicking Refund simultaneously produce exactly one
+outbox row. The second's INSERT into `n8n_executions` hits
+`UNIQUE (run_id)` and Postgres returns SQLSTATE `23505`.
+The service maps `23505` → `kind: 'already_refunded'` → 409
+`pack_refund_already_refunded`. The Stripe-side race
+(Stripe receives the refund request twice for the same
+`payment_intent`) is handled by Stripe's own
+`idempotency_key` mechanism + the cascade's `WHERE` filter,
+both pre-existing.
+
+#### 2.5.4.3 Why `n8n_executions` is the outbox (not `webhook_events`)
+
+`webhook_events.processed=true` carries the documented
+semantic "this inbound provider event has been applied to DB
+state" (used by both the Stripe and n8n inbound routes).
+Reusing `processed=true` for an outbound enqueue would
+corrupt that semantic. The correct outbox primitive is
+`n8n_executions.run_id UNIQUE`. See `Database.md §12.5.4`.
+
 ### 2.6 Module bookings  *(NEW in Sprint B2)*
 
 | Method | Path | Auth | Body | Description |

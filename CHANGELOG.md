@@ -4,6 +4,174 @@
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 > and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0-phase2-sprint-13-feature-b] — 2026-09-15
+
+### Added — Sprint 13 Feature B (Pack 10 admin grants + €35/unused-session refund + 6-month expiry)
+
+Pack 10 = €299 / 10 × 60-min sessions / 6-month validity. The
+admin back-office surface (`/admin/packs`, `/admin/packs/[id]`)
++ four new admin-only API routes + the financial-consistency
+repair that moves the Stripe-refund write authority to the
+`fn_enrollments_refund` cascade only. The admin refund route
+is now an **outbox enqueuer**; it never writes
+`session_grants.status` or `session_grants.refunded_amount_cents`
+directly. See `docs/review/PHASE2_SPRINT_FEATURE_B_PACK_REFUND.md`
+and `Database.md §12.5` for the full contract.
+
+#### Database (forward-only, idempotent, LOCAL Supabase only)
+
+- `supabase/migrations/20260913000004_pack_refund_admin_oversight.sql`
+  - `session_grants_update_admin` policy — admin UPDATE on
+    `session_grants`, gated by `public.is_admin()`, with
+    `with check` constraining `status` to the
+    `enrollment_status` enum values
+    (`pending_payment, active, completed, cancelled, refunded`).
+    INSERT and DELETE remain deny-by-default.
+  - `session_grants_refund_in_bounds` CHECK — four invariants:
+    `refunded_amount_cents ∈ [0, amount_cents]` and
+    `refunded_amount_cents = 0 ⟺ refunded_at IS NULL`. The
+    structural backstop for the no-duplicate-refund rule.
+  - `fn_enrollments_refund()` (REPLACED) — tightened the
+    `WHERE` filter to `sg.status IN ('active', 'completed')`
+    so the cascade is idempotent on already-refunded grants.
+  - `trg_enrollments_refund` (RECREATED) — `before update of
+    status on public.payments`.
+- `supabase/migrations/20260914000001_n8n_executions_admin_refund.sql`
+  - `n8n_executions_admin_insert` policy — admin INSERT,
+    gated by `public.is_admin()`.
+  - `n8n_executions_admin_update` policy — admin UPDATE
+    (both USING and WITH CHECK), gated by
+    `public.is_admin()`. No DELETE policy (audit-only).
+
+#### API (4 new admin-only routes)
+
+- `GET  /api/admin/pack-grants` — list Pack 10 grants
+  (filter `grant_type='pack'`, order `created_at desc`, limit
+  200). Joins `student:profiles!session_grants_student_id_fkey`.
+- `GET  /api/admin/pack-grants/[id]` — single Pack grant by
+  id. `404` on miss.
+- `GET  /api/admin/pack-grants/[id]/refund-preview` —
+  pre-computes `calculatePackRefundPreview`; no mutation.
+- `POST /api/admin/pack-grants/[id]/refund` — initiates the
+  Pack refund. Maps `ExecutePackRefundResult.kind` to HTTP
+  status: 200 `n8n_accepted` / 404 / 409
+  `pack_refund_invalid_state` / 409 `pack_refund_already_refunded` /
+  422 `pack_refund_zero` / 502 `pack_refund_webhook_failed` /
+  503 `pack_refund_webhook_unavailable`. **Never writes
+  `session_grants.status` or `refunded_amount_cents`** —
+  those columns remain owned by the Stripe
+  `charge.refunded` → `fn_enrollments_refund` cascade.
+
+#### Service
+
+- `apps/web/services/admin/pack-grants.ts` (NEW, 589 lines) —
+  pure helpers (`unusedCredits`, `calculatePackRefundPreview`),
+  readers (`listPackGrants`, `getPackGrantById`), and the
+  outbox enqueuer `executePackRefund`. Discriminated-union
+  result types throughout. Locked constants:
+  `PACK_TOTAL_CENTS = 29900`, `PACK_TOTAL_CREDITS = 10`,
+  `PACK_PER_UNUSED_REFUND_CENTS = 3500`.
+
+#### UI (admin back-office)
+
+- `/admin/packs` — list page (uses `AdminListPage` shell).
+- `/admin/packs/[id]` — detail page (4 stat cards + the
+  `PackRefundCard`).
+- `apps/web/components/admin/pack-refund-card.tsx` (NEW) —
+  client form. `SubmitState` discriminated union. POSTs to
+  `/api/admin/pack-grants/${grantId}/refund`. Surfaces the
+  new `successPendingStripe` / `webhookFailed` /
+  `webhookUnavailable` copy explicitly (does NOT claim the
+  row is refunded).
+
+#### i18n (EN + FR)
+
+- `Admin.packs.*` namespace — `title`, `subline`, `empty`,
+  `action.view`, 7 list columns, 6 detail fields, 13 refund
+  sub-namespace keys (incl. `successPendingStripe`,
+  `webhookFailed`, `webhookUnavailable`).
+- `Admin.sidebar.items` and `Admin.topNav.items` — new
+  `{ id: 'packs', label: 'Packs', href: '/admin/packs' }`
+  entry in both locales.
+
+#### Tests (131 new cases across 5 files)
+
+- `apps/web/tests/unit/pack-grants-list.test.ts` (7) — list
+  query shape, ordering, limit, row flattening, null profile
+  join, throw-on-error.
+- `apps/web/tests/unit/pack-refund-preview.test.ts` (18) —
+  `unusedCredits` clamp + fallbacks; the three user-locked
+  examples (10 / 5 / 0 unused); partial on `completed`;
+  `pending_payment` cancel path; `refunded` / `cancelled`
+  terminal states; the `actual ≤ amount_paid` /
+  `actual ≤ calculated` / `unused ∈ [0, total]` invariants.
+- `apps/web/tests/unit/pack-grants-execute.test.ts` (16) —
+  happy 5-unused path; 10-unused cap; service NEVER writes
+  `session_grants`; `refund_zero`; `already_refunded`;
+  `invalid_state` (×3); `not_found`; **23505 race → already_refunded**;
+  n8n 500 → `webhook_failed`; fetch throw → `webhook_failed`;
+  webhookUrl null → `webhook_unavailable`; n8n 2xx →
+  `ok` stamps `completed`; amount invariants.
+- `apps/web/tests/unit/pack-grants-route.test.ts` (14) —
+  401 / 403 / 200 list; 404 / 200 detail; 404 / 200 preview;
+  200 / 404 / 409 / 409 / 422 / 502 / 503 refund.
+- `apps/web/tests/unit/pack-grants-i18n.test.ts` (76) — 32
+  keys × 2 locales + sidebar / topNav nav-presence cases.
+
+#### Documentation
+
+- `docs/review/PHASE2_SPRINT_FEATURE_B_PACK_REFUND.md` (NEW,
+  756 lines) — 20-section close-out (business rules,
+  files, race-safety, refund flow, architecture alignment,
+  operator runbook, edge cases) + 10-section TASK 2.1
+  financial-consistency repair appendix.
+- `docs/database/Database.md` — §12.5 added (Feature B DB
+  contract). §12.4 (Feature A) preserved unchanged.
+- `docs/api/API.md` — §2.5.4 added (Feature B API routes +
+  state machine + race-safety + outbox rationale). §2.5.3
+  (Feature A) preserved unchanged.
+
+### Quality gates
+
+| Gate | Result |
+|---|---|
+| `pnpm type-check` | exit 0 |
+| `pnpm lint` | exit 0 (1 pre-existing `lib/utils/logger.ts:31` warning — unchanged) |
+| `pnpm test` | exit 0 — 922 / 922 across 79 files (Sprint 13 baseline) |
+| `pnpm build` | exit 0 — the 4 new `/api/admin/pack-grants/*` routes + the 2 new `/[locale]/admin/packs` pages registered |
+
+Feature A tests remain green. No Feature A file touched.
+
+### Changed
+
+- `docs/database/Database.md` — §12.5 appended.
+- `docs/api/API.md` — §2.5.4 appended.
+- `PROJECT_STATE.md` — Feature B release-preparation recorded.
+- `CHANGELOG.md` — this entry.
+
+### Removed
+
+- None.
+
+### Notes
+
+- The application never claims a refund has succeeded until
+  Stripe confirms. `refund_status='n8n_accepted'` is the
+  maximum truth the admin route can return; the DB row's
+  `status='refunded'` flip is owned by the
+  `fn_enrollments_refund` cascade and arrives asynchronously
+  via Stripe's `charge.refunded` webhook.
+- A future operational sprint must add the reconciliation /
+  drain mechanism that promotes a stale `started` outbox row
+  to `failed` after a documented threshold. **Documented as
+  remaining operational work, not invented here.**
+- Sprint 13 Feature A (`feat(sprint-13): complete Feature A
+  free trial session`, commit 53e07f1, tag
+  `v1.13.0-phase2-sprint-13`) shipped independently on
+  2026-09-15. Feature B is the second slice of Sprint 13.
+- Sprint 13 Feature C (Monthly Support dashboard relocation)
+  is pending its own release.
+
 ## [Unreleased] — Sprint 11 (R-3 — Zoom recording.completed → meeting_links.recording_url)
 
 ### Added — Sprint 11 (R-3 — Zoom recording write-back & read path)

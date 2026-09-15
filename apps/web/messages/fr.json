@@ -978,6 +978,11 @@
           "href": "/admin/payments"
         },
         {
+          "id": "packs",
+          "label": "Packs",
+          "href": "/admin/packs"
+        },
+        {
           "id": "students",
           "label": "Étudiants",
           "href": "/admin/students"
@@ -1041,6 +1046,11 @@
           "id": "payments",
           "label": "Paiements",
           "href": "/admin/payments"
+        },
+        {
+          "id": "packs",
+          "label": "Packs",
+          "href": "/admin/packs"
         },
         {
           "id": "students",
@@ -1696,6 +1706,55 @@
       "success": "Réservation marquée terminée.",
       "alreadyTerminal": "Réservation déjà dans un état terminal.",
       "notFound": "Réservation introuvable."
+    },
+    "packs": {
+      "title": "Grants Pack 10",
+      "subline": "Tous les pools de crédits Pack 10. Rembourser les séances non utilisées à 35 € chacune (plafonné au montant payé).",
+      "empty": "Aucun grant Pack 10 pour le moment.",
+      "action": {
+        "view": "Voir"
+      },
+      "columns": {
+        "student": "Étudiant",
+        "status": "Statut",
+        "amount": "Payé",
+        "credits": "Crédits",
+        "refunded": "Remboursé",
+        "createdAt": "Créé le",
+        "expiresAt": "Expire le"
+      },
+      "detail": {
+        "title": "Grant Pack 10",
+        "subline": "Pool de crédits étudiant — rembourser les séances non utilisées à 35 € chacune, plafonné au montant payé.",
+        "fields": {
+          "student": "Étudiant",
+          "status": "Statut",
+          "amount": "Montant payé",
+          "credits": "Crédits",
+          "created": "Créé",
+          "expires": "Expire",
+          "refunded": "Remboursé"
+        },
+        "refund": {
+          "title": "Rembourser les séances non utilisées",
+          "description": "35 € par séance non utilisée, plafonné au montant réellement payé. La demande de remboursement est envoyée à n8n pour l'appel Stripe ; la base de données ne marque le pack comme remboursé qu'une fois le webhook Stripe confirmé.",
+          "calculate": "Calculer",
+          "execute": "Effectuer le remboursement",
+          "executing": "En cours…",
+          "success": "Demande de remboursement envoyée à n8n",
+          "successPendingStripe": "Confirmation Stripe en attente. Cette page affichera l'état confirmé par Stripe lorsque le webhook charge.refunded arrivera.",
+          "failure": "Impossible d'effectuer le remboursement.",
+          "webhookFailed": "La demande de remboursement n'a pas pu être envoyée à n8n. La ligne du pack n'est PAS marquée remboursée ; réessayez la demande.",
+          "webhookUnavailable": "Le webhook de remboursement n'est pas configuré. La ligne du pack n'est PAS marquée remboursée ; configurez N8N_ENROLLMENT_WEBHOOK_URL ou drainez manuellement.",
+          "alreadyRefunded": "Ce pack a déjà été remboursé (ou une demande de remboursement est déjà en cours).",
+          "invalidState": "Ce pack est dans un état non remboursable (annulé).",
+          "zeroUnused": "Toutes les séances ont été consommées. Rien à rembourser.",
+          "unusedSessions": "Séances non utilisées",
+          "calculated": "Calculé",
+          "actual": "Remboursement réel",
+          "capped": "plafonné au montant payé"
+        }
+      }
     }
   },
   "SiteHeader": {

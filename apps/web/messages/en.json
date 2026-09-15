@@ -978,6 +978,11 @@
           "href": "/admin/payments"
         },
         {
+          "id": "packs",
+          "label": "Packs",
+          "href": "/admin/packs"
+        },
+        {
           "id": "students",
           "label": "Students",
           "href": "/admin/students"
@@ -1041,6 +1046,11 @@
           "id": "payments",
           "label": "Payments",
           "href": "/admin/payments"
+        },
+        {
+          "id": "packs",
+          "label": "Packs",
+          "href": "/admin/packs"
         },
         {
           "id": "students",
@@ -1683,6 +1693,55 @@
       "success": "Booking marked complete.",
       "alreadyTerminal": "Booking is already in a terminal state.",
       "notFound": "Booking not found."
+    },
+    "packs": {
+      "title": "Pack 10 grants",
+      "subline": "Every Pack 10 credit pool. Refund the unused sessions at €35 each (capped at the amount paid).",
+      "empty": "No Pack 10 grants yet.",
+      "action": {
+        "view": "View"
+      },
+      "columns": {
+        "student": "Student",
+        "status": "Status",
+        "amount": "Paid",
+        "credits": "Credits",
+        "refunded": "Refunded",
+        "createdAt": "Created",
+        "expiresAt": "Expires"
+      },
+      "detail": {
+        "title": "Pack 10 grant",
+        "subline": "Student credit pool — refund the unused sessions at €35 each, capped at the amount paid.",
+        "fields": {
+          "student": "Student",
+          "status": "Status",
+          "amount": "Amount paid",
+          "credits": "Credits",
+          "created": "Created",
+          "expires": "Expires",
+          "refunded": "Refunded"
+        },
+        "refund": {
+          "title": "Refund unused sessions",
+          "description": "€35 per unused session, capped at the amount actually paid. The refund is enqueued to n8n for the Stripe call; the database does not mark the pack as refunded until the Stripe webhook confirms the refund.",
+          "calculate": "Calculate",
+          "execute": "Execute refund",
+          "executing": "Executing…",
+          "success": "Refund request enqueued to n8n",
+          "successPendingStripe": "Stripe confirmation is pending. This page will reflect the Stripe-confirmed state when the charge.refunded webhook fires.",
+          "failure": "Could not execute the refund.",
+          "webhookFailed": "Refund request could not be enqueued to n8n. The pack row is NOT marked refunded; retry the refund request.",
+          "webhookUnavailable": "Refund webhook is not configured. The pack row is NOT marked refunded; configure N8N_ENROLLMENT_WEBHOOK_URL or drain manually.",
+          "alreadyRefunded": "This pack has already been refunded (or a refund request is already in flight).",
+          "invalidState": "This pack is in a state that cannot be refunded (cancelled).",
+          "zeroUnused": "All sessions have been consumed. Nothing to refund.",
+          "unusedSessions": "Unused sessions",
+          "calculated": "Calculated",
+          "actual": "Actual refund",
+          "capped": "capped at amount paid"
+        }
+      }
     }
   },
   "SiteHeader": {
