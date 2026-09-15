@@ -62,7 +62,21 @@ export async function POST(req: NextRequest) {
     // workflow creates the Zoom meeting, persists the
     // meeting_link row, and flips the session_booking
     // status to `confirmed`.
-    if (body.event === 'invitee.created') {
+    //
+    // TASK 21 — GAP 2: forward `invitee.updated` and
+    // `invitee.canceled` in addition to `invitee.created`,
+    // so the reschedule / cancellation n8n workflows
+    // (`module-reschedule.json`, `module-cancellation.json`)
+    // can fire from real Calendly events. All three events
+    // are routed through the same `${N8N_ENROLLMENT_WEBHOOK_URL}/calendly`
+    // path with the same `x-webhook-secret` header — the
+    // downstream `type` discriminator tells n8n which
+    // workflow to dispatch to.
+    if (
+      body.event === 'invitee.created' ||
+      body.event === 'invitee.updated' ||
+      body.event === 'invitee.canceled'
+    ) {
       const env = serverEnv();
       const webhookUrl = env.N8N_ENROLLMENT_WEBHOOK_URL;
       if (webhookUrl) {
@@ -75,9 +89,9 @@ export async function POST(req: NextRequest) {
             'content-type':     'application/json',
             'x-webhook-secret': env.N8N_WEBHOOK_SECRET ?? '',
           },
-          body: JSON.stringify({ type: 'invitee.created', event_id: eventId, payload: body.payload }),
+          body: JSON.stringify({ type: body.event, event_id: eventId, payload: body.payload }),
         }).catch((err) => {
-          logger.warn('calendly → n8n forwarding failed', { event_id: eventId, err: (err as Error).message });
+          logger.warn('calendly → n8n forwarding failed', { event: body.event, event_id: eventId, err: (err as Error).message });
         });
       } else {
         logger.info('calendly webhook received but N8N_ENROLLMENT_WEBHOOK_URL is not configured (mock mode)', { event: body.event });

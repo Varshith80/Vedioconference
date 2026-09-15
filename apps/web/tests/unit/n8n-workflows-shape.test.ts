@@ -1206,3 +1206,652 @@ describe('n8n/workflows/enrollment-created.json — TASK 15 pack_refund branch',
     ).toBeTruthy();
   });
 });
+
+// =====================================================================
+// TASK 21 — GAP 1 — `kind === "trial"` branch in
+// `enrollment-created.json`.
+//
+// Sprint 13 Feature A (free-trial session) ships with
+// `kind === "trial"` (one per student, 100%-off coupon,
+// EUR). TASK 20 found that kind=trial was silently falling into
+// PAYG and producing a zero-amount Stripe Checkout Session
+// because the existing PAYG node reads `amount=$json.body.amount_cents`
+// but the free-trial payload sets amount_cents=0.
+//
+// GAP 1 closes that hole by inserting an explicit `Switch: kind=trial?`
+// If node between `Switch: kind=monthly?` (false branch) and
+// `Switch: kind=pack_refund?`. The new branch:
+//
+//   a. has a Switch / If node keyed on $json.body.kind === 'trial'
+//      and that switch exists with the correct topology;
+//   b. trial TRUE branch reaches an HttpRequest node posting to
+//      https://api.stripe.com/v1/checkout/sessions;
+//   c. trial's HttpRequest body has a non-zero nominal `amount`
+//      derived from $json.body.amount_cents (NOT a literal "0");
+//   d. trial's HttpRequest body carries
+//      `discounts[0][coupon]=$json.body.coupon_id`;
+//   e. trial's HttpRequest body does NOT call /v1/refunds
+//      (refunds are still stripe-to-bank, application-side via
+//      the `kind === pack_refund` branch);
+//   f. trial branch does NOT reach the PAYG node
+//      (`Create Stripe Checkout Session`) downstream;
+//   g. monthly / pack_refund / PAYG routes remain unchanged
+//      (regression pins);
+//   h. the HMAC verifier node is still present (regression pin).
+//
+// These are structural assertions over the JSON; no runtime
+// invocation of n8n.
+// =====================================================================
+
+describe('n8n/workflows/enrollment-created.json — TASK 21 GAP 1 trial branch', () => {
+  const FILE = 'enrollment-created.json';
+  const wfs = readWorkflows();
+  const flow = wfs.find((w) => w.file === FILE);
+  if (!flow) {
+    it('enrollment-created.json exists', () => {
+      expect(flow, 'enrollment-created.json must exist').toBeTruthy();
+    });
+    return;
+  }
+  const wf = flow.wf;
+
+  // Helper: find a node by exact name.
+  const findNode = (name: string): N8nNode | undefined =>
+    (wf.nodes ?? []).find((n) => n?.name === name);
+
+  // Helper: every string-valued parameter / url / header in a node.
+  const nodeStringValues = (n: N8nNode | undefined): string[] => {
+    if (!n) return [];
+    const p = n.parameters ?? {};
+    const out: string[] = [];
+    const collect = (v: unknown) => {
+      if (typeof v === 'string') out.push(v);
+    };
+    collect(p.url);
+    collect(p.body);
+    collect(p.responseBody);
+    const bp = (p as { bodyParameters?: { parameters?: Array<{ value: string }> } })
+      .bodyParameters?.parameters;
+    for (const x of bp ?? []) collect(x.value);
+    const hp = (p as { headerParameters?: { parameters?: Array<{ value: string }> } })
+      .headerParameters?.parameters;
+    for (const x of hp ?? []) collect(x.value);
+    const conds = (p as {
+      conditions?: { conditions?: Array<{ leftValue?: unknown; rightValue?: unknown }> };
+    }).conditions?.conditions;
+    for (const c of conds ?? []) {
+      collect(c.leftValue);
+      collect(c.rightValue);
+    }
+    return out;
+  };
+
+  // Helper: read the body parameter list (name + value).
+  const nodeBodyParams = (n: N8nNode | undefined): Array<{ name: string; value: string }> =>
+    (n?.parameters as { bodyParameters?: { parameters?: Array<{ name: string; value: string }> } } | undefined)
+      ?.bodyParameters?.parameters ?? [];
+
+  // (a) A Switch / If node whose leftValue is `$json.body.kind` and
+  //     rightValue is the literal string `trial` must exist.
+  const ifTrial = (wf.nodes ?? []).find(
+    (n) =>
+      n?.type === 'n8n-nodes-base.if' &&
+      (n?.parameters as {
+        conditions?: { conditions?: Array<{ leftValue?: string; rightValue?: string }> };
+      }).conditions?.conditions?.some(
+        (c) => c.leftValue?.includes('$json.body.kind') && c.rightValue === 'trial',
+      ),
+  );
+
+  it('a. has a Switch / If node that branches on kind === "trial"', () => {
+    expect(ifTrial, 'a Switch / If node keyed on kind === "trial" must exist').toBeTruthy();
+    const conds = (ifTrial!.parameters as {
+      conditions?: { conditions?: Array<{ leftValue?: string; rightValue?: string; operator?: { operation?: string } }> };
+    }).conditions?.conditions ?? [];
+    const trialCond = conds.find((c) => c.leftValue?.includes('$json.body.kind'));
+    expect(trialCond, 'a condition on $json.body.kind must exist').toBeTruthy();
+    expect(
+      trialCond!.rightValue,
+      'the right-hand side must be the literal "trial"',
+    ).toBe('trial');
+    // The operator must be a string-equals (the canonical Switch
+    // / If condition shape used elsewhere in this workflow).
+    expect(
+      trialCond!.operator?.operation,
+      'the condition operator must be "equals"',
+    ).toBe('equals');
+  });
+
+  // (b) Trial TRUE branch reaches an HttpRequest node POSTing to
+  //     https://api.stripe.com/v1/checkout/sessions.
+  it('b. kind=trial true branch reaches a /v1/checkout/sessions HttpRequest node', () => {
+    expect(ifTrial, 'a Switch / If node keyed on kind === "trial" must exist').toBeTruthy();
+    const ifOut = wf.connections?.[ifTrial!.name]?.main ?? [];
+    const trueBranch = ifOut[0] ?? [];
+    expect(trueBranch.length, 'the true branch of the trial Switch must not be empty').toBeGreaterThan(0);
+
+    // Walk downstream of the true branch and confirm there is a
+    // node whose URL is the canonical Stripe Checkout Session
+    // creation endpoint.
+    const visited = new Set<string>([ifTrial!.name]);
+    const queue: string[] = trueBranch
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    let foundCheckoutNode = false;
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const node = findNode(cur);
+      const url = (node?.parameters?.url ?? '') as string;
+      if (url.includes('/v1/checkout/sessions')) {
+        foundCheckoutNode = true;
+        break;
+      }
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+    expect(
+      foundCheckoutNode,
+      'downstream of kind=trial Switch true branch, a node must POST to https://api.stripe.com/v1/checkout/sessions',
+    ).toBe(true);
+  });
+
+  // (c) The trial HttpRequest body has a non-zero nominal `amount`
+  //     coming from $json.body.amount_cents.
+  it('c. trial HttpRequest body carries a nominal amount derived from $json.body.amount_cents', () => {
+    const trialCheckout = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      // The Trial Checkout node mirrors the PAYG node but adds
+      // metadata[kind]=trial and discounts[0][coupon]=coupon_id.
+      // We identify it via the metadata[kind]=trial body param
+      // (a stable discriminator the route cannot accidentally
+      // collide with).
+      if (!url.includes('/v1/checkout/sessions')) return false;
+      const params = (n?.parameters as {
+        bodyParameters?: { parameters?: Array<{ name: string; value: string }> };
+      }).bodyParameters?.parameters ?? [];
+      return params.some((p) => p.name === 'metadata[kind]' && p.value === 'trial');
+    });
+    expect(
+      trialCheckout,
+      'a /v1/checkout/sessions node with metadata[kind]=trial must exist',
+    ).toBeTruthy();
+    const params = (trialCheckout!.parameters as {
+      bodyParameters?: { parameters?: Array<{ name: string; value: string }> };
+    }).bodyParameters!.parameters!;
+    const amountParam = params.find((p) => p.name === 'amount');
+    expect(amountParam, 'trial body must carry an `amount` parameter').toBeTruthy();
+    expect(
+      amountParam!.value,
+      'trial amount must come from $json.body.amount_cents (NOT a hard-coded "0")',
+    ).toMatch(/\$json\.body\.amount_cents/);
+    // Express rejection — the amount must NEVER be a literal 0.
+    expect(
+      amountParam!.value,
+      'trial amount must NOT be a hard-coded "0"',
+    ).not.toBe('0');
+    // Reject the degenerate "$json.body.amount_cents || 0" /
+    // fallback-to-zero patterns that would re-create the bug.
+    expect(
+      amountParam!.value,
+      'trial amount must not be wrapped in a `... || 0` fallback',
+    ).not.toMatch(/\|\|\s*0/);
+    // The node must use the canonical PAYG contract — mode=payment,
+    // nominal `unit_amount`, currency lowercased.
+    const mode = params.find((p) => p.name === 'mode')?.value;
+    expect(mode, 'trial body must carry mode=payment').toBe('payment');
+    const unit = params.find((p) => p.name === 'line_items[0][price_data][unit_amount]')?.value;
+    expect(
+      unit,
+      'trial body must carry line_items[0][price_data][unit_amount] from $json.body.amount_cents',
+    ).toMatch(/\$json\.body\.amount_cents/);
+    const currency = params.find((p) => p.name === 'currency')?.value;
+    expect(
+      currency,
+      'trial currency must be derived from $json.body.currency.toLowerCase()',
+    ).toMatch(/\$json\.body\.currency\.toLowerCase\(\)/);
+  });
+
+  // (d) The trial HttpRequest body applies a coupon via
+  //     `discounts[0][coupon]=$json.body.coupon_id`.
+  it('d. trial HttpRequest body applies discounts[0][coupon] from $json.body.coupon_id', () => {
+    const trialCheckout = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      if (!url.includes('/v1/checkout/sessions')) return false;
+      const params = (n?.parameters as {
+        bodyParameters?: { parameters?: Array<{ name: string; value: string }> };
+      }).bodyParameters?.parameters ?? [];
+      return params.some((p) => p.name === 'metadata[kind]' && p.value === 'trial');
+    });
+    expect(trialCheckout, 'a trial Checkout node must exist').toBeTruthy();
+    const params = (trialCheckout!.parameters as {
+      bodyParameters?: { parameters?: Array<{ name: string; value: string }> };
+    }).bodyParameters!.parameters!;
+    const couponParam = params.find((p) => p.name === 'discounts[0][coupon]');
+    expect(
+      couponParam,
+      'trial body must carry discounts[0][coupon]',
+    ).toBeTruthy();
+    expect(
+      couponParam!.value,
+      'discounts[0][coupon] must be $json.body.coupon_id',
+    ).toBe('={{ $json.body.coupon_id }}');
+    // Hard negative: must NOT be a hardcoded coupon id (security:
+    // application must never let n8n pick the coupon).
+    expect(couponParam!.value).not.toMatch(/^coupon_/);
+    expect(couponParam!.value).not.toMatch(/^[A-Z]{4,}/);
+  });
+
+  // (e) Trial branch does NOT call /v1/refunds downstream (refunds
+  //     belong to the pack_refund branch, not trial).
+  it('e. kind=trial branch does NOT reach /v1/refunds', () => {
+    expect(ifTrial, 'a Switch / If node keyed on kind === "trial" must exist').toBeTruthy();
+    const ifOut = wf.connections?.[ifTrial!.name]?.main ?? [];
+    const trueBranch = ifOut[0] ?? [];
+    const visited = new Set<string>([ifTrial!.name]);
+    const queue: string[] = trueBranch
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const node = findNode(cur);
+      const url = (node?.parameters?.url ?? '') as string;
+      expect(
+        url.includes('/v1/refunds'),
+        `trial branch must NOT reach /v1/refunds (found at "${cur}")`,
+      ).toBe(false);
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+  });
+
+  // (f) Trial TRUE branch must NOT reach the PAYG Checkout node
+  //     (`Create Stripe Checkout Session`) — they are distinct
+  //     nodes. The PAYG node is reached only via the FALSE branch
+  //     of the trial Switch (which routes to pack_refund Switch
+  //     false → PAYG).
+  it('f. kind=trial true branch does NOT reach the canonical PAYG Checkout node', () => {
+    expect(ifTrial, 'a Switch / If node keyed on kind === "trial" must exist').toBeTruthy();
+    const ifOut = wf.connections?.[ifTrial!.name]?.main ?? [];
+    const trueBranch = ifOut[0] ?? [];
+    const visited = new Set<string>([ifTrial!.name]);
+    const queue: string[] = trueBranch
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const params = (findNode(cur)?.parameters as {
+        bodyParameters?: { parameters?: Array<{ name: string; value: string }> };
+      }).bodyParameters?.parameters ?? [];
+      // The PAYG node has metadata[kind] ABSENT; trial has
+      // metadata[kind]=trial. If the trial true branch ever lands
+      // on a /v1/checkout/sessions node WITHOUT metadata[kind]
+      // it is the PAYG node and the topology regressed.
+      const url = (findNode(cur)?.parameters?.url ?? '') as string;
+      if (url.includes('/v1/checkout/sessions')) {
+        const kindMeta = params.find((p) => p.name === 'metadata[kind]');
+        expect(
+          kindMeta,
+          `trial true branch must NOT reach the PAYG Checkout node (found /v1/checkout/sessions without metadata[kind]=trial at "${cur}")`,
+        ).toBeTruthy();
+        expect(kindMeta!.value, 'the reached Checkout node must be the trial node').toBe('trial');
+      }
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+  });
+
+  // (g1) MONTHLY branch unchanged.
+  it('g.1 kind=monthly still routes to the Monthly subscription Checkout node', () => {
+    const ifMonthly = findNode('Switch: kind=monthly?');
+    expect(ifMonthly, 'the existing Switch: kind=monthly? must remain').toBeTruthy();
+    const monthlyOut = wf.connections?.[ifMonthly!.name]?.main?.[0] ?? [];
+    const reachesMonthly = monthlyOut.some(
+      (c) => c?.node === 'Create Stripe Subscription Checkout (monthly)',
+    );
+    expect(
+      reachesMonthly,
+      'Switch: kind=monthly? true branch must reach "Create Stripe Subscription Checkout (monthly)"',
+    ).toBe(true);
+  });
+
+  // (g2) The trial Switch is wired BETWEEN the monthly Switch
+  //      and the pack_refund Switch.
+  //      monthly-false → trial → (trial-true → Trial Checkout /
+  //      trial-false → pack_refund Switch).
+  it('g.2 Switch: kind=trial? is inserted between Switch: kind=monthly? (false) and Switch: kind=pack_refund?', () => {
+    const ifMonthly = findNode('Switch: kind=monthly?');
+    expect(ifMonthly).toBeTruthy();
+    expect(ifTrial).toBeTruthy();
+    const monthlyFalse = wf.connections?.[ifMonthly!.name]?.main?.[1] ?? [];
+    const trialIsNext = monthlyFalse.some((c) => c?.node === ifTrial!.name);
+    expect(
+      trialIsNext,
+      'Switch: kind=monthly? false branch must reach Switch: kind=trial?',
+    ).toBe(true);
+    // trial-false branch must reach the pack_refund Switch.
+    const trialFalse = wf.connections?.[ifTrial!.name]?.main?.[1] ?? [];
+    const reachesPackRefundSwitch = trialFalse.some(
+      (c) => c?.node === 'Switch: kind=pack_refund?',
+    );
+    expect(
+      reachesPackRefundSwitch,
+      'Switch: kind=trial? false branch must reach Switch: kind=pack_refund?',
+    ).toBe(true);
+    // pack_refund Switch false branch must still reach PAYG
+    // (regression pin — we did not delete anything downstream).
+    const packRefundFalse = wf.connections?.['Switch: kind=pack_refund?']?.main?.[1] ?? [];
+    const reachesPayg = packRefundFalse.some(
+      (c) => c?.node === 'Create Stripe Checkout Session',
+    );
+    expect(
+      reachesPayg,
+      'Switch: kind=pack_refund? false branch must reach the PAYG Checkout node',
+    ).toBe(true);
+  });
+
+  // (g3) The trial Checkout node is also routed through the
+  //      shared checkout-created notify + email pipeline. Its
+  //      success branch must reach
+  //      "Notify Next.js: checkout created (session_grant_checkout_created)"
+  //      so the trial reuses the existing post-create
+  //      notification + checkout-started email behaviour.
+  it('g.3 trial Checkout success branch reaches the existing checkout-created notification pipeline', () => {
+    const trialCheckout = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      if (!url.includes('/v1/checkout/sessions')) return false;
+      const params = (n?.parameters as {
+        bodyParameters?: { parameters?: Array<{ name: string; value: string }> };
+      }).bodyParameters?.parameters ?? [];
+      return params.some((p) => p.name === 'metadata[kind]' && p.value === 'trial');
+    });
+    expect(trialCheckout, 'a trial Checkout node must exist').toBeTruthy();
+    const trialSuccess = wf.connections?.[trialCheckout!.name]?.main?.[0] ?? [];
+    const reachesCheckoutCreated = trialSuccess.some(
+      (c) => c?.node === 'Notify Next.js: checkout created (session_grant_checkout_created)',
+    );
+    expect(
+      reachesCheckoutCreated,
+      'trial Checkout true branch must reach the existing checkout-created notify node',
+    ).toBe(true);
+    // Hard negative: trial must NOT send email itself (CLAUDE.md
+    // §2.3 — n8n never sends email directly; it forwards to
+    // /api/n8n/notify which the Next.js renderer handles).
+    // We already enforce this by routing through the shared
+    // checkout-created notify, but pin it explicitly anyway.
+    const trialFalse = wf.connections?.[trialCheckout!.name]?.main?.[1] ?? [];
+    const reachesDeadLetter = trialFalse.some(
+      (c) => c?.node === 'Dead-letter on Stripe error',
+    );
+    expect(
+      reachesDeadLetter,
+      'trial Checkout false (error) branch must reach the dead-letter safety net',
+    ).toBe(true);
+  });
+
+  // (h) HMAC verifier still present (top-level regression pin).
+  it('h. HMAC webhook verification (x-webhook-secret) remains present', () => {
+    const verify = findNode('Verify webhook secret');
+    expect(verify, 'the existing HMAC verification node must remain').toBeTruthy();
+    const conds = (verify!.parameters as {
+      conditions?: { conditions?: Array<{ leftValue?: string; rightValue?: string }> };
+    }).conditions?.conditions ?? [];
+    const hmacCond = conds.find(
+      (c) => c.leftValue?.includes('x-webhook-secret') && c.rightValue?.includes('N8N_WEBHOOK_SECRET'),
+    );
+    expect(
+      hmacCond,
+      'HMAC verification must compare x-webhook-secret inbound header to $env.N8N_WEBHOOK_SECRET',
+    ).toBeTruthy();
+  });
+});
+
+// =====================================================================
+// TASK 21 — GAP 3 — Pack refund success email.
+//
+// The pack_refund branch's Stripe refund is the authoritative
+// money movement (Stripe `charge.refunded` is the inbound event
+// that flips `session_grants.status='refunded'` in the
+// application DB). After the refund CALL returns 2xx, n8n
+// should fire-and-forget a notification to the Next.js renderer
+// at `/api/n8n/notify` with `type=email`,
+// `template=session_grant_refund_succeeded`, preserving the
+// refund context (session_grant_id, student_id, refund_request_id,
+// refund_id, amount_cents, currency, refund_reason, student_email,
+// locale).
+//
+// n8n MUST NOT send email directly (CLAUDE.md §2.3) and MUST NOT
+// mutate session_grants (the inbound `charge.refunded` webhook
+// is the single source of truth for the DB flip — GAP 3 is
+// notification-only).
+//
+// Contract:
+//   i.  A HttpRequest node exists whose URL is
+//       `${NEXT_PUBLIC_SITE_URL}/api/n8n/notify`.
+//   j.  Its body has `type=email` and
+//       `template=session_grant_refund_succeeded`.
+//   k.  Its body surfaces the refund context (session_grant_id,
+//       student_id, refund_request_id, refund_id, amount_cents,
+//       currency, refund_reason, student_email).
+//   l.  The pack_refund branch (downstream of the refund node)
+//       reaches the refund-success notify node.
+//   m.  The pack_refund branch has NO node that mutates
+//       session_grants (defence-in-depth — n8n never
+//       touches the application DB; Stripe inbound is the
+//       single source of truth).
+// =====================================================================
+
+describe('n8n/workflows/enrollment-created.json — TASK 21 GAP 3 refund succeeded notify', () => {
+  const FILE = 'enrollment-created.json';
+  const wfs = readWorkflows();
+  const flow = wfs.find((w) => w.file === FILE);
+  if (!flow) {
+    it('enrollment-created.json exists', () => {
+      expect(flow, 'enrollment-created.json must exist').toBeTruthy();
+    });
+    return;
+  }
+  const wf = flow.wf;
+
+  // Helper: find a node by exact name.
+  const findNode = (name: string): N8nNode | undefined =>
+    (wf.nodes ?? []).find((n) => n?.name === name);
+
+  // Helper: read the body parameter list (name + value).
+  const nodeBodyParams = (n: N8nNode | undefined): Array<{ name: string; value: string }> =>
+    (n?.parameters as { bodyParameters?: { parameters?: Array<{ name: string; value: string }> } } | undefined)
+      ?.bodyParameters?.parameters ?? [];
+
+  // (i) A HttpRequest node that POSTs to /api/n8n/notify and is
+  //     specifically the refund-succeeded notify must exist.
+  const refundNotify = (wf.nodes ?? []).find((n) => {
+    const url = (n?.parameters?.url ?? '') as string;
+    if (!url.includes('/api/n8n/notify')) return false;
+    const params = nodeBodyParams(n);
+    return params.some(
+      (p) => p.name === 'template' && p.value === 'session_grant_refund_succeeded',
+    );
+  });
+
+  it('i. has an HttpRequest node posting to /api/n8n/notify with template=session_grant_refund_succeeded', () => {
+    expect(
+      refundNotify,
+      'a /api/n8n/notify HttpRequest node with template=session_grant_refund_succeeded must exist',
+    ).toBeTruthy();
+    expect(refundNotify!.parameters?.method).toBe('POST');
+  });
+
+  // (j) Body type=email, template=session_grant_refund_succeeded.
+  it('j. the refund-succeeded notify body is type=email, template=session_grant_refund_succeeded', () => {
+    expect(refundNotify, 'refund-succeeded notify node must exist').toBeTruthy();
+    const params = nodeBodyParams(refundNotify);
+    expect(
+      params.find((p) => p.name === 'type')?.value,
+      'type must be the /api/n8n/notify email discriminator',
+    ).toBe('email');
+    expect(
+      params.find((p) => p.name === 'template')?.value,
+      'template must be the locked v2 event type',
+    ).toBe('session_grant_refund_succeeded');
+  });
+
+  // (k) Refund context is preserved: session_grant_id, student_id,
+  //     refund_request_id, refund_id, amount_cents, currency,
+  //     refund_reason, student_email.
+  it('k. the refund-succeeded notify body surfaces the full refund context', () => {
+    expect(refundNotify, 'refund-succeeded notify node must exist').toBeTruthy();
+    const params = nodeBodyParams(refundNotify);
+    const required: Array<{ key: string; expr?: string }> = [
+      { key: 'props[session_grant_id]', expr: '\\$json\\.body\\.session_grant_id' },
+      { key: 'props[student_id]',       expr: '\\$json\\.body\\.student_id' },
+      { key: 'props[refund_request_id]', expr: '\\$json\\.body\\.refund_request_id' },
+      // refund_id must come from the Stripe refund response, not the body.
+      { key: 'props[refund_id]',        expr: "\\$node\\['Create Stripe Refund'\\]\\.json\\.id" },
+      // amount_cents / currency similarly.
+      { key: 'props[amount_cents]',     expr: "\\$node\\['Create Stripe Refund'\\]\\.json\\.amount" },
+      { key: 'props[currency]',         expr: "\\$node\\['Create Stripe Refund'\\]\\.json\\.currency" },
+      { key: 'props[refund_reason]',    expr: '\\$json\\.body\\.refund_reason' },
+    ];
+    for (const r of required) {
+      const param = params.find((p) => p.name === r.key);
+      expect(param, `refund-notify body must carry ${r.key}`).toBeTruthy();
+      if (r.expr) {
+        const re = new RegExp(r.expr);
+        expect(
+          re.test(param!.value),
+          `${r.key} must reference upstream via ${r.expr}; got "${param!.value}"`,
+        ).toBe(true);
+      }
+    }
+    // The notify body must carry a `to` (the student email) and a
+    // locale so the Next.js renderer can pick the right template.
+    expect(
+      params.find((p) => p.name === 'to')?.value,
+      'refund-notify must carry a `to` field bound to $json.body.student_email',
+    ).toBe('={{ $json.body.student_email }}');
+    expect(
+      params.find((p) => p.name === 'locale')?.value,
+      'refund-notify must carry a `locale` (default to fr)',
+    ).toMatch(/\$json\.body\.locale/);
+    // Hard negative: must NOT directly reference the Resend API
+    // (CLAUDE.md §2.3 — n8n is forbidden from sending email
+    // itself; the Next.js renderer is the single source of truth).
+    const haystack = JSON.stringify(refundNotify!.parameters);
+    expect(
+      haystack,
+      'refund-notify must NOT reference api.resend.com — CLAUDE.md §2.3 forbids n8n from sending email directly',
+    ).not.toMatch(/api\.resend\.com/);
+    expect(haystack).not.toMatch(/RESEND_API_KEY/);
+  });
+
+  // (l) Topological reach: the pack_refund branch (downstream of
+  //     the `Create Stripe Refund` node) reaches the refund-succeeded
+  //     notify node. Stripe `charge.refunded` remains the
+  //     authoritative DB-flip event; this is notification-only.
+  it('l. the pack_refund branch reaches the refund-succeeded notify node', () => {
+    const refundNode = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      return url.includes('/v1/refunds');
+    });
+    expect(refundNode, 'Create Stripe Refund node must exist').toBeTruthy();
+    expect(
+      refundNotify,
+      'refund-succeeded notify node must exist',
+    ).toBeTruthy();
+    const refundOut = wf.connections?.[refundNode!.name]?.main?.[0] ?? [];
+    const visited = new Set<string>([refundNode!.name]);
+    const queue: string[] = refundOut
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    let reachedNotify = false;
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      if (cur === refundNotify!.name) {
+        reachedNotify = true;
+        break;
+      }
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+    expect(
+      reachedNotify,
+      'downstream of Create Stripe Refund, the workflow must reach the refund-succeeded notify node',
+    ).toBe(true);
+  });
+
+  // (m) Defence-in-depth: the pack_refund branch has no node that
+  //     issues an UPDATE/INSERT against `session_grants`. n8n
+  //     never mutates the application DB — Stripe `charge.refunded`
+  //     is the single source of truth for the status flip.
+  it('m. the pack_refund branch has no node that mutates session_grants (defence-in-depth)', () => {
+    const refundNode = (wf.nodes ?? []).find((n) => {
+      const url = (n?.parameters?.url ?? '') as string;
+      return url.includes('/v1/refunds');
+    });
+    expect(refundNode).toBeTruthy();
+    const refundOut = wf.connections?.[refundNode!.name]?.main ?? [];
+    const visited = new Set<string>([refundNode!.name]);
+    const queue: string[] = refundOut
+      .flat()
+      .map((c) => c?.node)
+      .filter((n): n is string => !!n);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      const node = (wf.nodes ?? []).find((n) => n?.name === cur);
+      // The DB mutation goes through Next.js via the dedicated
+      // inbound webhooks (/api/webhooks/n8n, /api/webhooks/stripe).
+      // A node whose URL targets the application DB directly would
+      // be a regression.
+      const url = (node?.parameters?.url ?? '') as string;
+      const headers = (node?.parameters as {
+        headerParameters?: { parameters?: Array<{ name: string; value: string }> };
+      }).headerParameters?.parameters ?? [];
+      const hitsDb = url.includes('supabase')
+        || url.includes('/rest/v1/session_grants')
+        || url.includes('/rest/v1/payments')
+        || url.includes('/rest/v1/webhook_events');
+      const hasSupabaseKey = headers.some(
+        (h) => /SUPABASE_SERVICE_ROLE_KEY/i.test(h.name) || /service_role_key/i.test(h.name),
+      );
+      expect(
+        hitsDb,
+        `pack_refund branch node "${cur}" must NOT hit Supabase REST directly`,
+      ).toBe(false);
+      expect(
+        hasSupabaseKey,
+        `pack_refund branch node "${cur}" must NOT carry a Supabase service-role key`,
+      ).toBe(false);
+      const next = wf.connections?.[cur]?.main ?? [];
+      for (const branch of next) {
+        for (const c of branch) {
+          if (c?.node && !visited.has(c.node)) queue.push(c.node);
+        }
+      }
+    }
+  });
+});

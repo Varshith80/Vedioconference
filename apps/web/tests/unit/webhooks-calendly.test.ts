@@ -122,3 +122,121 @@ describe('POST /api/webhooks/calendly — happy path', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+// =====================================================================
+// TASK 21 — GAP 2 — Calendly invites relay coverage.
+//
+// The booking-path pipeline expects three Calendly events on the
+// n8n enrolment webhook:
+//   - invitee.created  → module-booking-to-zoom
+//   - invitee.updated  → module-reschedule
+//   - invitee.canceled → module-cancellation
+//
+// The route forwards all three to the same `${WEBHOOK}/calendly`
+// path with the same `x-webhook-secret` header; the downstream
+// `type` discriminator tells n8n which child workflow to dispatch.
+// Each event carries its own webhook_events id, so the
+// `webhook_events.UNIQUE (provider, event_id)` idempotency rule
+// applies independently to each event.
+//
+// Three contract assertions:
+//   1. invitee.updated is forwarded with type=invitee.updated
+//      (no longer dropped silently).
+//   2. invitee.canceled is forwarded with type=invitee.canceled
+//      (no longer dropped silently).
+//   3. The original invitee.created path is unchanged
+//      (regression pin).
+//
+// Both new cases assert:
+//   - HTTP 200,
+//   - mockFetch called exactly once,
+//   - URL = `${WEBHOOK}/calendly`,
+//   - header `x-webhook-secret` echoes the env secret,
+//   - forwarded body `type` mirrors `body.event` exactly,
+//   - forwarded body `payload.uri` mirrors the original payload.
+// =====================================================================
+
+describe('POST /api/webhooks/calendly — TASK 21 GAP 2 (invitee.updated + invitee.canceled)', () => {
+  it('returns 200 and forwards invitee.updated to n8n with type=invitee.updated', async () => {
+    mockFetch.mockResolvedValue({ ok: true, text: async () => '' });
+
+    const payload = JSON.stringify({
+      event: 'invitee.updated',
+      payload: {
+        uri: 'https://api.calendly.com/scheduled_events/abc/invitees/xyz',
+        event: 'https://api.calendly.com/scheduled_events/abc',
+      },
+    });
+    const res = await POST(makeReq(payload, signCalendly(payload, 'cal_shh')));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { received: boolean };
+    expect(body.received).toBe(true);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://n8n.example/webhook/calendly');
+    const headers = init.headers as Record<string, string>;
+    expect(headers['x-webhook-secret']).toBe('n8n_shh');
+    const bodyOut = JSON.parse(init.body as string) as { type: string; event_id: string; payload: { uri: string } };
+    // The type discriminator must mirror body.event — the test
+    // name says updated, the wire says updated, not a stringified
+    // literal and not the old hardcoded 'invitee.created'.
+    expect(bodyOut.type).toBe('invitee.updated');
+    expect(bodyOut.type).not.toBe('invitee.created');
+    expect(bodyOut.event_id).toBeTruthy();
+    expect(bodyOut.event_id).toContain('invitee.updated-');
+    expect(bodyOut.payload.uri).toBe('https://api.calendly.com/scheduled_events/abc/invitees/xyz');
+  });
+
+  it('returns 200 and forwards invitee.canceled to n8n with type=invitee.canceled', async () => {
+    mockFetch.mockResolvedValue({ ok: true, text: async () => '' });
+
+    const payload = JSON.stringify({
+      event: 'invitee.canceled',
+      payload: {
+        uri: 'https://api.calendly.com/scheduled_events/abc/invitees/xyz',
+        event: 'https://api.calendly.com/scheduled_events/abc',
+      },
+    });
+    const res = await POST(makeReq(payload, signCalendly(payload, 'cal_shh')));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { received: boolean };
+    expect(body.received).toBe(true);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://n8n.example/webhook/calendly');
+    const headers = init.headers as Record<string, string>;
+    expect(headers['x-webhook-secret']).toBe('n8n_shh');
+    const bodyOut = JSON.parse(init.body as string) as { type: string; event_id: string; payload: { uri: string } };
+    expect(bodyOut.type).toBe('invitee.canceled');
+    expect(bodyOut.type).not.toBe('invitee.created');
+    expect(bodyOut.event_id).toBeTruthy();
+    expect(bodyOut.event_id).toContain('invitee.canceled-');
+    expect(bodyOut.payload.uri).toBe('https://api.calendly.com/scheduled_events/abc/invitees/xyz');
+  });
+
+  it('invitee.created regression: the original invited.created forward path is unchanged', async () => {
+    // Pin: TASK 21 GAP 2 only widens the forward branch — it does
+    // NOT change the wire shape of invitee.created. This regression
+    // test exists so a future refactor that narrows the condition
+    // back to a single equality would still see the canonical case
+    // pinning `type: 'invitee.created'` against the env echo.
+    mockFetch.mockResolvedValue({ ok: true, text: async () => '' });
+
+    const payload = JSON.stringify({
+      event: 'invitee.created',
+      payload: {
+        uri: 'https://api.calendly.com/scheduled_events/abc/invitees/xyz',
+        event: 'https://api.calendly.com/scheduled_events/abc',
+      },
+    });
+    const res = await POST(makeReq(payload, signCalendly(payload, 'cal_shh')));
+    expect(res.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://n8n.example/webhook/calendly');
+    const bodyOut = JSON.parse(init.body as string) as { type: string };
+    expect(bodyOut.type).toBe('invitee.created');
+  });
+});
