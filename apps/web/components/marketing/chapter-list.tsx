@@ -7,6 +7,7 @@ import { ChevronDown, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatCents } from '@/lib/utils/format';
 import { localizedTitle } from '@/lib/i18n/localized-title';
+import { SessionBookingCard } from '@/components/marketing/session-booking-card';
 import type { ChapterWithSessions, Session } from '@/types/domain';
 
 interface ChapterListProps {
@@ -24,6 +25,12 @@ interface ChapterListProps {
  * detail page (`/{locale}/sessions/{id}`) for the "Buy this
  * session" CTA. The "View chapter" link points at the
  * chapter detail page (`{basePath}/{chapterSlug}`).
+ *
+ * Phase 3 — M3.3: each session row also mounts
+ * `<SessionBookingCard>` so the student can book a slot via
+ * the embedded Calendly widget (or sees the
+ * `embedUnavailable` fallback when no tutor or no event URI
+ * is configured).
  *
  * Pure presentational. The page owns the open/close state via
  * a small `<details>`/`<summary>` per chapter (no JS needed;
@@ -151,51 +158,58 @@ function SessionRow({ session, fallbackDuration, basePath, chapterSlug, tSession
   // importer is the only writer of the metadata field.
   const sessionTitle = localizedTitle(session, locale as 'en' | 'fr');
   return (
-    <li className="flex items-center justify-between gap-3 rounded-md border bg-background p-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">
-          {tSessions('positionTitle', { n: session.position, title: sessionTitle })}
-        </p>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          {dur > 0 ? (
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-3 w-3" aria-hidden="true" />
-              {tSessions('duration', { minutes: dur })}
-            </span>
-          ) : null}
+    <li className="flex flex-col gap-3 rounded-md border bg-background p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            {tSessions('positionTitle', { n: session.position, title: sessionTitle })}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {dur > 0 ? (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3 w-3" aria-hidden="true" />
+                {tSessions('duration', { minutes: dur })}
+              </span>
+            ) : null}
+            {priceKnown ? (
+              <span className="font-semibold text-foreground">
+                {formatCents(session.price_cents as number, session.currency, locale as 'en' | 'fr')}
+              </span>
+            ) : (
+              <Badge variant="outline" className="text-[10px]">{tSessions('priceTbd')}</Badge>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href={chapterHref}
+            className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {tSessions('viewChapter')}
+          </Link>
           {priceKnown ? (
-            <span className="font-semibold text-foreground">
-              {formatCents(session.price_cents as number, session.currency, locale as 'en' | 'fr')}
-            </span>
+            <Link
+              href={buyHref}
+              className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {tSessions('buy')}
+            </Link>
           ) : (
-            <Badge variant="outline" className="text-[10px]">{tSessions('priceTbd')}</Badge>
+            <span
+              aria-disabled="true"
+              title={tSessions('priceTbdHint')}
+              className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-muted px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              {tSessions('priceTbd')}
+            </span>
           )}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <Link
-          href={chapterHref}
-          className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {tSessions('viewChapter')}
-        </Link>
-        {priceKnown ? (
-          <Link
-            href={buyHref}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {tSessions('buy')}
-          </Link>
-        ) : (
-          <span
-            aria-disabled="true"
-            title={tSessions('priceTbdHint')}
-            className="inline-flex cursor-not-allowed items-center justify-center rounded-md bg-muted px-3 py-1.5 text-xs font-semibold text-primary-foreground"
-          >
-            {tSessions('priceTbd')}
-          </span>
-        )}
-      </div>
+      {/* Phase 3 — M3.3: per-session Calendly embed on the
+          course detail page. Falls back to the
+          `embedUnavailable` i18n string when the session has
+          no tutor or no event-type URI. */}
+      <SessionBookingCard session={session} locale={locale as 'en' | 'fr'} />
     </li>
   );
 }

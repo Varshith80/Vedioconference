@@ -677,7 +677,9 @@
     "pendingPayment": "Paiement en attente",
     "notFoundTitle": "Session introuvable",
     "liveOnlineSession": "Session en visio",
-    "freePreview": "Aperçu gratuit"
+    "freePreview": "Aperçu gratuit",
+    "embedTitle": "Réserver cette session",
+    "embedUnavailable": "Les réservations ouvrent bientôt — revenez d'ici peu."
   },
   "Dashboard": {
     "loading": "Chargement de votre espace…",
@@ -1886,6 +1888,17 @@
       "title": "Workflow en dead-letter",
       "body": "Le workflow n8n {workflow} a échoué et l'événement a été mis en file d'attente. Le payload d'origine se trouve ci-dessous.",
       "errorLabel": "Erreur"
+    },
+    "sessionBookingRescheduled": {
+      "subject": "Votre session a été replanifiée — {sessionTitle}",
+      "title": "Session replanifiée",
+      "greeting": "Bonjour {name},",
+      "body": "Votre session « {sessionTitle} » ({courseTitle}) a été replanifiée. Veuillez noter le nouvel horaire ci-dessous.",
+      "previousLabel": "Horaire précédent",
+      "newLabel": "Nouvel horaire",
+      "duration": "{minutes} minutes",
+      "joinCta": "Rejoindre la session",
+      "dashboardLink": "Ouvrir mon espace"
     }
   },
   "Notifications": {

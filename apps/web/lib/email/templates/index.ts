@@ -2,6 +2,7 @@ import 'server-only';
 import type { RenderedEmail, EmailLocale } from './_base';
 import { renderEnrollmentConfirmedEmail, type EnrollmentConfirmedProps } from './enrollment-confirmed';
 import { renderSessionBookingConfirmedEmail, type SessionBookingConfirmedProps } from './session-booking-confirmed';
+import { renderSessionBookingRescheduledEmail, type SessionBookingRescheduledProps } from './session-booking-rescheduled';
 import { renderReminder24hEmail, type Reminder24hProps } from './reminder-24h';
 import { renderReminder1hEmail, type Reminder1hProps } from './reminder-1h';
 import { renderSessionCancelledEmail, type SessionCancelledProps } from './session-cancelled';
@@ -37,6 +38,7 @@ import {
 export type EmailTemplateName =
   | 'enrollment_confirmed'
   | 'session_booking_confirmed'
+  | 'session_booking_rescheduled'
   | 'reminder_24h'
   | 'reminder_1h'
   | 'session_cancelled'
@@ -48,6 +50,7 @@ export type EmailTemplateName =
 export type EmailTemplateProps =
   | { name: 'enrollment_confirmed';        props: EnrollmentConfirmedProps }
   | { name: 'session_booking_confirmed';   props: SessionBookingConfirmedProps }
+  | { name: 'session_booking_rescheduled'; props: SessionBookingRescheduledProps }
   | { name: 'reminder_24h';                props: Reminder24hProps }
   | { name: 'reminder_1h';                 props: Reminder1hProps }
   | { name: 'session_cancelled';           props: SessionCancelledProps }
@@ -65,6 +68,8 @@ export async function renderEmailTemplate(
       return renderEnrollmentConfirmedEmail(locale, template.props);
     case 'session_booking_confirmed':
       return renderSessionBookingConfirmedEmail(locale, template.props);
+    case 'session_booking_rescheduled':
+      return renderSessionBookingRescheduledEmail(locale, template.props);
     case 'reminder_24h':
       return renderReminder24hEmail(locale, template.props);
     case 'reminder_1h':

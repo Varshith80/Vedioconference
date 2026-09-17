@@ -677,7 +677,9 @@
     "pendingPayment": "Pending payment",
     "notFoundTitle": "Session not found",
     "liveOnlineSession": "Live online session",
-    "freePreview": "Free preview"
+    "freePreview": "Free preview",
+    "embedTitle": "Book this session",
+    "embedUnavailable": "Booking opens soon — check back shortly."
   },
   "Dashboard": {
     "loading": "Loading your space…",
@@ -1917,6 +1919,17 @@
       "title": "Workflow dead-letter",
       "body": "The n8n workflow {workflow} failed and the event was dead-lettered. The original payload is below.",
       "errorLabel": "Error"
+    },
+    "sessionBookingRescheduled": {
+      "subject": "Your session was rescheduled — {sessionTitle}",
+      "title": "Session rescheduled",
+      "greeting": "Hi {name},",
+      "body": "Your session \"{sessionTitle}\" ({courseTitle}) was rescheduled. Please note the new time below.",
+      "previousLabel": "Previous time",
+      "newLabel": "New time",
+      "duration": "{minutes} minutes",
+      "joinCta": "Join the session",
+      "dashboardLink": "Open my dashboard"
     }
   },
   "Notifications": {

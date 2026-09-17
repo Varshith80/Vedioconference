@@ -8,6 +8,7 @@ vi.mock('next-intl/server', () => ({
     const fixture: Record<string, string> = {
       'Emails.enrollmentConfirmed.subject':       'Welcome to {courseTitle}',
       'Emails.sessionBookingConfirmed.subject':   'Session confirmed — {sessionTitle}',
+      'Emails.sessionBookingRescheduled.subject': 'Session rescheduled — {sessionTitle}',
       'Emails.reminder24h.subject':               'Reminder — {sessionTitle} tomorrow',
       'Emails.reminder1h.subject':                'Starting soon — {sessionTitle}',
       'Emails.sessionCancelled.subject':          'Session cancelled — {sessionTitle}',
@@ -31,6 +32,7 @@ vi.mock('next-intl/server', () => ({
 
 import { renderEnrollmentConfirmedEmail } from '@/lib/email/templates/enrollment-confirmed';
 import { renderSessionBookingConfirmedEmail } from '@/lib/email/templates/session-booking-confirmed';
+import { renderSessionBookingRescheduledEmail } from '@/lib/email/templates/session-booking-rescheduled';
 import { renderReminder24hEmail } from '@/lib/email/templates/reminder-24h';
 import { renderReminder1hEmail } from '@/lib/email/templates/reminder-1h';
 import { renderSessionCancelledEmail } from '@/lib/email/templates/session-cancelled';
@@ -71,6 +73,16 @@ describe('email templates', () => {
       courseTitle:      'Mathématiques — Terminale',
       cancelledReason:  'Tutor unavailable',
       dashboardUrl:     'https://example.com/en/dashboard',
+    },
+    sessionBookingRescheduled: {
+      studentName:               'Alice',
+      sessionTitle:              'Algèbre linéaire',
+      courseTitle:               'Mathématiques — Terminale',
+      previousScheduledStartIso: '2026-09-20T14:00:00.000Z',
+      newScheduledStartIso:      '2026-09-22T16:00:00.000Z',
+      durationMin:               60,
+      joinUrl:                   'https://zoom.example/j/789',
+      dashboardUrl:              'https://example.com/en/dashboard',
     },
     adminDeadLetter: {
       workflow:      'session-booking-to-zoom',
@@ -117,14 +129,38 @@ describe('email templates', () => {
     expect(r.html).toMatch(/foo/);
   });
 
+  it('session_booking_rescheduled renders the previous and new dates in EN', async () => {
+    const r = await renderSessionBookingRescheduledEmail('en', baseProps.sessionBookingRescheduled);
+    expect(r.subject).toContain('Algèbre linéaire');
+    expect(r.html).toContain('zoom.example/j/789');
+    expect(r.html).toContain('example.com/en/dashboard');
+    expect(r.html).toContain('CoursEnLigne');
+    // The "Previous time" line carries the human-readable
+    // UTC date of the prior slot.
+    expect(r.html).toMatch(/Sun, 20 Sep 2026/);
+    // The "New time" line carries the human-readable UTC
+    // date of the rescheduled slot.
+    expect(r.html).toMatch(/Tue, 22 Sep 2026/);
+    expect(r.text.length).toBeGreaterThan(0);
+  });
+
+  it('session_booking_rescheduled renders in FR with translated subject', async () => {
+    const r = await renderSessionBookingRescheduledEmail('fr', baseProps.sessionBookingRescheduled);
+    // The FR subject uses the literal fixture; the dispatcher
+    // mock returns the path when no fixture entry matches.
+    expect(r.subject.length).toBeGreaterThan(0);
+    expect(r.html).toContain('zoom.example/j/789');
+  });
+
   it('every template produces a non-empty plain-text fallback', async () => {
     const results = await Promise.all([
-      renderEnrollmentConfirmedEmail('en',    baseProps.enrollmentConfirmed),
-      renderSessionBookingConfirmedEmail('en', baseProps.sessionBookingConfirmed),
-      renderReminder24hEmail('en',            baseProps.reminder24h),
-      renderReminder1hEmail('en',             baseProps.reminder1h),
-      renderSessionCancelledEmail('en',       baseProps.sessionCancelled),
-      renderAdminDeadLetterEmail('en',        baseProps.adminDeadLetter),
+      renderEnrollmentConfirmedEmail('en',         baseProps.enrollmentConfirmed),
+      renderSessionBookingConfirmedEmail('en',     baseProps.sessionBookingConfirmed),
+      renderSessionBookingRescheduledEmail('en',   baseProps.sessionBookingRescheduled),
+      renderReminder24hEmail('en',                 baseProps.reminder24h),
+      renderReminder1hEmail('en',                  baseProps.reminder1h),
+      renderSessionCancelledEmail('en',            baseProps.sessionCancelled),
+      renderAdminDeadLetterEmail('en',             baseProps.adminDeadLetter),
     ]);
     for (const r of results) {
       expect(r.text.length).toBeGreaterThan(0);
