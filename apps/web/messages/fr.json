@@ -1948,7 +1948,13 @@
       "reasonLabel": "Pourquoi souhaitez-vous changer ? (facultatif)",
       "reasonPlaceholder": "Dites-nous ce qui n'a pas fonctionne - rythme, style d'enseignement, horaire, n'importe quoi.",
       "submit": "Envoyer la demande",
-      "submitting": "Envoi..."
+      "submitting": "Envoi...",
+      "cooldown": {
+        "banner": "Vous pourrez redemander un changement de tuteur dans {remaining}.",
+        "in": "dans {remaining}",
+        "error": "Vous pourrez redemander un changement de tuteur dans {remaining}.",
+        "cta": "Voir quand redemander"
+      }
     },
     "admin": {
       "listTitle": "Demandes de changement de tuteur",

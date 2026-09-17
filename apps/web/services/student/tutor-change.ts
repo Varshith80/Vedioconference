@@ -11,6 +11,10 @@ import {
   notNullViolationToBadRequest,
 } from '@/lib/utils/errors';
 import { logger } from '@/lib/utils/logger';
+import {
+  assertNoCooldown,
+  recordSuccessfulTutorChange,
+} from '@/services/student/tutor-change-cooldown';
 import type {
   CreateTutorChangeRequestInput,
   StudentSelectAlternativeInput,
@@ -240,6 +244,21 @@ export async function createRequest(
 ): Promise<TutorChangeRequest> {
   const supabase = await createSupabaseServerClientUntyped();
 
+  // ---- Sprint 6.5 — global per-student 24h cooldown gate ------
+  // Throws `TutorChangeCooldownActiveError` (code:
+  // 'tutor_change_cooldown_active') when the student has had a
+  // successful tutor reassignment within the previous 24 hours.
+  // The route layer catches the error and returns HTTP 409 with
+  // the timing details. The BEFORE INSERT trigger in
+  // `20260915000001_student_tutor_change_events_cooldown.sql`
+  // is the un-bypassable server-side backstop for any future
+  // code path that forgets to call this gate.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw Forbidden('Sign in required.');
+  await assertNoCooldown(user.id, supabase);
+
   // ---- Look up the booking --------------------------------------
   const { data: booking, error: bookingError } = await supabase
     .from('session_bookings')
@@ -265,10 +284,7 @@ export async function createRequest(
   // The SSR client runs as auth.uid(); RLS already gates the
   // read, but we re-check defensively so a future RLS regression
   // does not leak ownership logic to the route layer.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user || user.id !== bookingRow.student_id) {
+  if (user.id !== bookingRow.student_id) {
     throw Forbidden('You do not own this booking.');
   }
 
@@ -439,6 +455,29 @@ export async function selectAlternative(
       'server_error',
       'Unable to update the booking. The request status was changed; contact support.',
     );
+  }
+
+  // ---- Sprint 6.5 — record the successful reassignment --------
+  // This is the canonical cooldown-start event. The student just
+  // completed a tutor change successfully, so the global 24h
+  // cooldown must start now. Submitted / rejected / cancelled /
+  // failed paths do NOT reach this code. The event is keyed by
+  // `request_id` (UNIQUE) so a retried call is a no-op.
+  const recordResult = await recordSuccessfulTutorChange({
+    studentId: row.student_id,
+    bookingId: row.session_booking_id,
+    fromTutorId: row.current_tutor_id,
+    toTutorId: input.selected_tutor_id,
+    requestId: row.id,
+  });
+  if (!recordResult.ok && recordResult.code === 'unknown') {
+    // The booking re-point already succeeded. The cooldown
+    // event is the audit trail; a write failure here is logged
+    // but does not roll back the booking. The next request
+    // will hit the trigger / RPC and surface the missing event.
+    logger.error('selectAlternative cooldown record failed', {
+      requestId: id,
+    });
   }
 
   const { data: closed, error: closeErr } = await admin

@@ -7,6 +7,8 @@ import { Breadcrumbs } from '@/components/dashboard/breadcrumbs';
 import { BRAND } from '@/lib/constants/brand';
 import { getCurrentUser } from '@/services/auth';
 import { getStudentSessionBookings } from '@/services/curriculum/session-bookings';
+import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
+import { getStudentTutorChangeCooldown } from '@/services/student/tutor-change-cooldown';
 import { TutorChangeNewForm } from '@/components/dashboard/tutor-change-new-form';
 
 // =====================================================================
@@ -91,6 +93,32 @@ export default async function DashboardTutorChangeNewPage({
       return { id: b.id, label };
     });
 
+  // Sprint 6.5 — read the per-student cooldown status (RLS-
+  // respecting). The form uses it to render the banner and
+  // disable submission. The trigger + service layer remain
+  // authoritative; this is purely a UX hint.
+  let cooldown: {
+    inCooldown: boolean;
+    remainingMs: number;
+    nextEligibleAt: string | null;
+    lastChangedAt: string | null;
+  } | null = null;
+  if (user) {
+    try {
+      const supabase = await createSupabaseServerClientUntyped();
+      const status = await getStudentTutorChangeCooldown(user.id, supabase);
+      cooldown = {
+        inCooldown: status.inCooldown,
+        remainingMs: status.remainingMs,
+        nextEligibleAt: status.nextEligibleAt?.toISOString() ?? null,
+        lastChangedAt: status.lastChangedAt?.toISOString() ?? null,
+      };
+    } catch {
+      // Fail open: never block the page on a cooldown read.
+      cooldown = null;
+    }
+  }
+
   return (
     <Section spacing="default" aria-labelledby="tutor-change-new-title">
       <Container>
@@ -125,7 +153,11 @@ export default async function DashboardTutorChangeNewPage({
             {t('student.empty')}
           </p>
         ) : (
-          <TutorChangeNewForm bookings={eligible} locale={locale} />
+          <TutorChangeNewForm
+            bookings={eligible}
+            locale={locale}
+            cooldown={cooldown}
+          />
         )}
       </Container>
     </Section>

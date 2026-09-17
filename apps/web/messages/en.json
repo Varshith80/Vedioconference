@@ -1979,7 +1979,13 @@
       "reasonLabel": "Why do you want a change? (optional)",
       "reasonPlaceholder": "Tell us what didn't work - pacing, teaching style, scheduling, anything.",
       "submit": "Submit request",
-      "submitting": "Submitting..."
+      "submitting": "Submitting...",
+      "cooldown": {
+        "banner": "You can request another tutor change in {remaining}.",
+        "in": "in {remaining}",
+        "error": "You can request another tutor change in {remaining}.",
+        "cta": "See when you can change again"
+      }
     },
     "admin": {
       "listTitle": "Tutor change requests",

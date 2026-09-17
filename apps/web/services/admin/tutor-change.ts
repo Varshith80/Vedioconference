@@ -19,6 +19,7 @@ import {
   type TutorChangeRequestRow,
   type TutorChangeRequestStatus,
 } from '@/services/student/tutor-change';
+import { recordSuccessfulTutorChange } from '@/services/student/tutor-change-cooldown';
 
 // =====================================================================
 // Sprint 6 — Admin-side tutor-change-request service.
@@ -339,6 +340,22 @@ export async function resolveRequest(
         error: describeError(bookingErr),
       });
       throw ServerError('Unable to update the booking.');
+    }
+
+    // ---- Sprint 6.5 — record the successful reassignment --------
+    // The student just had their tutor changed by the admin —
+    // this is the canonical cooldown-start event. The `cancelled`
+    // branch below does NOT reach this code, so cancellation
+    // does NOT start the cooldown.
+    const recordResult = await recordSuccessfulTutorChange({
+      studentId: row.student_id,
+      bookingId: row.session_booking_id,
+      fromTutorId: row.current_tutor_id,
+      toTutorId: input.selected_tutor_id,
+      requestId: row.id,
+    });
+    if (!recordResult.ok && recordResult.code === 'unknown') {
+      logger.error('resolveRequest cooldown record failed', { id });
     }
 
     selectedTutorId = input.selected_tutor_id;

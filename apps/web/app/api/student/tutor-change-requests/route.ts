@@ -1,12 +1,19 @@
 import { type NextRequest } from 'next/server';
 import { jsonResponse, errorResponse } from '@/lib/utils/api';
 import { createSupabaseServerClientUntyped } from '@/lib/supabase/server';
-import { Unauthorized } from '@/lib/utils/errors';
+import {
+  ApiError,
+  Unauthorized,
+  describeError,
+  normaliseError,
+} from '@/lib/utils/errors';
+import { logger } from '@/lib/utils/logger';
 import { createTutorChangeRequestSchema } from '@/lib/validations/tutor-change';
 import {
   createRequest,
   getMyRequests,
 } from '@/services/student/tutor-change';
+import type { TutorChangeCooldownActiveError } from '@/services/student/tutor-change-cooldown';
 
 // =====================================================================
 // Sprint 6 — Student tutor-change-request API surface.
@@ -54,6 +61,78 @@ export async function POST(req: NextRequest) {
     const created = await createRequest(input);
     return jsonResponse({ ok: true as const, data: created }, { status: 201 });
   } catch (e) {
+    // Sprint 6.5 — translate the cooldown gate's discriminated
+    // error into the 409 envelope. `assertNoCooldown` throws an
+    // error with `code === 'tutor_change_cooldown_active'` and a
+    // `details` payload carrying `next_eligible_at`, `remaining_ms`,
+    // and `last_changed_at`. The BEFORE INSERT trigger raises
+    // SQLSTATE P0001 with message `tutor_change_cooldown_active:
+    // <remaining_ms>`; we catch that here too as a belt-and-braces
+    // backstop in case the service-layer gate is ever bypassed.
+    if (isCooldownError(e)) {
+      return errorResponse(
+        new ApiError(
+          409,
+          'tutor_change_cooldown_active',
+          'You can request another tutor change after the cooldown period.',
+          e.details,
+        ),
+      );
+    }
+    if (isCooldownTriggerError(e)) {
+      return errorResponse(
+        new ApiError(
+          409,
+          'tutor_change_cooldown_active',
+          'You can request another tutor change after the cooldown period.',
+          parseTriggerCooldownDetails(e),
+        ),
+      );
+    }
     return errorResponse(e);
   }
+}
+
+function isCooldownError(e: unknown): e is TutorChangeCooldownActiveError {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    (e as { code?: string }).code === 'tutor_change_cooldown_active' &&
+    typeof (e as { details?: unknown }).details === 'object' &&
+    (e as { details?: unknown }).details !== null
+  );
+}
+
+function isCooldownTriggerError(e: unknown): boolean {
+  // Supabase / PostgREST surfaces the SQLSTATE `P0001` either
+  // as `e.code === 'P0001'` (typed insert error) or inside the
+  // canonical message text. We normalise first, then match.
+  const norm = normaliseError(e);
+  if (norm.code === 'P0001') {
+    return /tutor_change_cooldown_active/.test(norm.message);
+  }
+  return (
+    /tutor_change_cooldown_active/.test(norm.message) &&
+    /P0001/.test(norm.message)
+  );
+}
+
+function parseTriggerCooldownDetails(e: unknown): {
+  next_eligible_at: string;
+  remaining_ms: number;
+  last_changed_at: string | null;
+} {
+  const norm = normaliseError(e);
+  const match = norm.message.match(/tutor_change_cooldown_active:(\d+)/);
+  const remainingMs = match && match[1] ? Number.parseInt(match[1], 10) : 0;
+  const nextEligibleAt = new Date(Date.now() + remainingMs).toISOString();
+  logger.warn('cooldown triggered by SQL trigger (service gate bypassed)', {
+    remainingMs,
+    raw: describeError(e),
+  });
+  return {
+    next_eligible_at: nextEligibleAt,
+    remaining_ms: remainingMs,
+    last_changed_at: null,
+  };
 }
